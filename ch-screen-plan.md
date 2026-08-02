@@ -1,6 +1,6 @@
 # Project plan: `open-company-uk` — batch Companies House extraction and company-status, compliance and ownership indicators
 
-*Plan v0.3, August 2026. Naming: repository `open-company-uk` (fits the open-road-risk / openbotrisk family), Python package/CLI `ukcompany` (PyPI deferred; note a `ukcompanies` package likely already exists — check before publishing). "Batch" not "bulk": v1 processes a supplied list, not the register. Goal: given a list of UK company numbers, produce (a) a full structured attribute table and (b) a transparent, rule-documented indicator table — from free Companies House data, no LLM in the bulk path, no paid subscriptions.*
+*Plan v0.3, August 2026. Naming: repository `open-company-uk` (fits the open-road-risk family), Python package/CLI `ukcompany` (PyPI deferred; note a `ukcompanies` package likely already exists — check before publishing). "Batch" not "bulk": v1 processes a supplied list, not the register. Goal: given a list of UK company numbers, produce (a) a full structured attribute table and (b) a transparent, rule-documented indicator table — from free Companies House data, no LLM in the bulk path, no paid subscriptions.*
 
 *Positioning: "an open, reproducible pipeline for analysing UK company-register data and deriving transparent company-status, compliance and ownership indicators." Not a "trustworthiness" measure — CH records support due-diligence signals; they cannot establish that a company is trustworthy, solvent or non-fraudulent.*
 
