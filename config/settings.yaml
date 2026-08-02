@@ -1,0 +1,7 @@
+# Runtime config only. Methodological constants (rate limits, rule thresholds,
+# severity assignments) live in code with comments - see plan.
+paths:
+  cache_dir: data/raw
+  output_dir: data/processed
+fetch:
+  max_age_days: 7   # re-fetch cached responses older than this

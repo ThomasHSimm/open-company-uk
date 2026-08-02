@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-company-uk"
+version = "0.1.0"
+description = "Open, reproducible pipeline for UK Companies House data: bulk extraction and transparent company-status, compliance and ownership indicators."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Thomas Simm" }]
+dependencies = [
+    "requests>=2.31",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+
+[project.scripts]
+ukcompany = "ukcompany.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Match existing project convention: no strict docstring/naming linting.
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]  # long lines handled by formatter judgement at 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: tests that hit the real Companies House API (skipped in CI)"]
+addopts = "-m 'not live'"

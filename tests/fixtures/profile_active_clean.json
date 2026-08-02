@@ -1,0 +1,36 @@
+{
+  "company_number": "01234567",
+  "company_name": "SYNTHETIC TRADING LIMITED",
+  "company_status": "active",
+  "type": "ltd",
+  "jurisdiction": "england-wales",
+  "date_of_creation": "2011-05-10",
+  "sic_codes": [
+    "47110"
+  ],
+  "accounts": {
+    "last_accounts": {
+      "type": "small",
+      "period_end_on": "2025-03-31"
+    },
+    "next_accounts": {
+      "due_on": "2026-12-31",
+      "overdue": false
+    }
+  },
+  "confirmation_statement": {
+    "overdue": false,
+    "next_due": "2026-09-01"
+  },
+  "has_charges": false,
+  "has_insolvency_history": false,
+  "registered_office_is_in_dispute": false,
+  "undeliverable_registered_office_address": false,
+  "registered_office_address": {
+    "postal_code": "SA1 1AA",
+    "locality": "Swansea"
+  },
+  "links": {
+    "self": "/company/01234567"
+  }
+}

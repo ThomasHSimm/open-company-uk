@@ -1,0 +1,27 @@
+{
+  "company_number": "04444444",
+  "company_name": "SYNTHETIC RETIRING HOLDINGS LIMITED",
+  "company_status": "liquidation",
+  "type": "ltd",
+  "jurisdiction": "england-wales",
+  "date_of_creation": "1998-06-01",
+  "sic_codes": [
+    "70100"
+  ],
+  "accounts": {
+    "next_accounts": {
+      "overdue": false
+    }
+  },
+  "confirmation_statement": {
+    "overdue": false
+  },
+  "registered_office_address": {
+    "postal_code": "CF10 1DD",
+    "locality": "Cardiff"
+  },
+  "links": {
+    "self": "/company/04444444",
+    "insolvency": "/company/04444444/insolvency"
+  }
+}

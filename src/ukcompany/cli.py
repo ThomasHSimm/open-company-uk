@@ -1,0 +1,164 @@
+"""CLI: validate -> fetch -> derive -> score.
+
+    ukcompany run --input companies.csv          # full pipeline
+    ukcompany run --input companies.csv --no-fetch   # re-derive/score from cache only
+    ukcompany rules-doc                          # regenerate docs/rules.md
+
+Input CSV needs a `company_number` column (or pass a single-column file).
+Config (paths etc.) in config/settings.yaml; API key ONLY via CH_API_KEY env.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import logging
+import sys
+from pathlib import Path
+
+import yaml
+
+from . import cache as cache_mod
+from . import fetch as fetch_mod
+from .client import CHClient
+from .derive import derive_all, generate_data_dictionary_md
+from .rules import generate_rules_md
+from .score import score_all, summarise, write_csv
+from .validate import validate_input
+
+log = logging.getLogger("ukcompany")
+
+DEFAULT_SETTINGS = {
+    "paths": {
+        "cache_dir": "data/raw",
+        "output_dir": "data/processed",
+    },
+    "fetch": {
+        "max_age_days": 7,
+    },
+}
+
+
+def load_settings(path: str | None) -> dict:
+    settings = {k: dict(v) for k, v in DEFAULT_SETTINGS.items()}
+    if path and Path(path).exists():
+        user = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+        for section, values in user.items():
+            settings.setdefault(section, {}).update(values or {})
+    return settings
+
+
+def read_input_numbers(path: str) -> list[str]:
+    rows = []
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        reader = csv.reader(f)
+        header = next(reader, None)
+        if header is None:
+            return []
+        header_norm = [h.strip().lower() for h in header]
+        if "company_number" in header_norm:
+            idx = header_norm.index("company_number")
+        elif len(header) == 1:
+            idx = 0
+            # single column, header might itself be a number
+            if header[0].strip() and not header[0].strip().lower().startswith("company"):
+                rows.append(header[0])
+        else:
+            raise SystemExit(f"Input {path} has no 'company_number' column (found: {header}).")
+        rows += [row[idx] for row in reader if row and len(row) > idx]
+    return rows
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    settings = load_settings(args.settings)
+    cache = cache_mod.RawCache(settings["paths"]["cache_dir"])
+    out_dir = Path(settings["paths"]["output_dir"])
+
+    report = validate_input(read_input_numbers(args.input))
+    print("-- input validation --")
+    print(report.summary())
+    if report.invalid and not args.allow_invalid:
+        print(
+            "\nInvalid company numbers present. Fix the input (or pass --allow-invalid "
+            "to proceed with the valid subset). Refusing to silently drop rows.",
+            file=sys.stderr,
+        )
+        return 2
+    numbers = report.numbers
+    if not numbers:
+        print("No valid company numbers in input.", file=sys.stderr)
+        return 2
+
+    if not args.no_fetch:
+        client = CHClient()
+        stats = fetch_mod.fetch_companies(
+            client, cache, numbers, max_age_days=float(settings["fetch"]["max_age_days"])
+        )
+        print("-- fetch --")
+        print(stats.summary())
+
+    profiles = [c for c in (cache.read(n, fetch_mod.PROFILE) for n in numbers) if c is not None]
+    missing = set(numbers) - {p.company_number for p in profiles}
+    if missing:
+        print(f"WARNING: {len(missing)} numbers have no cached profile (run without --no-fetch?)")
+    insolvency = {n: c for n in numbers if (c := cache.read(n, fetch_mod.INSOLVENCY)) is not None}
+    records = derive_all(profiles, insolvency)
+    result = score_all(records)
+
+    write_csv(records, out_dir / "companies.csv")
+    write_csv(
+        result["flags"],
+        out_dir / "flags.csv",
+        ["company_number", "rule_id", "severity", "evidence", "observed_at"],
+    )
+    write_csv(result["excluded"], out_dir / "excluded.csv")
+    write_csv(result["not_found"], out_dir / "not_found.csv")
+
+    print("-- score --")
+    print(summarise(result, n_input=len(numbers)))
+    print(f"\noutputs in {out_dir}/  (companies.csv, flags.csv, excluded.csv, not_found.csv)")
+    return 0
+
+
+def cmd_data_dict(args: argparse.Namespace) -> int:
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(generate_data_dictionary_md(), encoding="utf-8")
+    print(f"wrote {out}")
+    return 0
+
+
+def cmd_rules_doc(args: argparse.Namespace) -> int:
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(generate_rules_md(), encoding="utf-8")
+    print(f"wrote {out}")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    parser = argparse.ArgumentParser(prog="ukcompany", description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_run = sub.add_parser("run", help="validate + fetch + derive + score")
+    p_run.add_argument("--input", required=True, help="CSV with a company_number column")
+    p_run.add_argument("--settings", default="config/settings.yaml")
+    p_run.add_argument("--no-fetch", action="store_true", help="re-derive/score from cache only")
+    p_run.add_argument("--allow-invalid", action="store_true")
+    p_run.set_defaults(func=cmd_run)
+
+    p_doc = sub.add_parser("rules-doc", help="regenerate docs/rules.md from the registry")
+    p_doc.add_argument("--out", default="docs/rules.md")
+    p_doc.set_defaults(func=cmd_rules_doc)
+
+    p_dd = sub.add_parser("data-dict", help="regenerate docs/data-dictionary.md from field docs")
+    p_dd.add_argument("--out", default="docs/data-dictionary.md")
+    p_dd.set_defaults(func=cmd_data_dict)
+
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
