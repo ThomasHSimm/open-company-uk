@@ -1,0 +1,4 @@
+company_number,notes_column_ignored
+00000006,long-standing real number often used in CH API examples
+1234567,deliberately Excel-damaged - will be repaired to 01234567 and reported FIXED
+SC000000,synthetic Scottish-prefix placeholder - replace with real numbers

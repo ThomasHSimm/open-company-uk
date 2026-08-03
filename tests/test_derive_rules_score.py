@@ -97,7 +97,7 @@ def test_registry_metadata_complete():
     ids = [r.rule_id for r in REGISTRY]
     assert len(ids) == len(set(ids))
     for r in REGISTRY:
-        assert r.severity in {"high", "medium", "info"}
+        assert r.severity in {"high", "medium", "low", "info"}
         assert r.tier == 1  # v1 promise: Tier-1 fields only
         assert r.definition and r.caveats
 

@@ -6,9 +6,17 @@ v1 endpoints:
                                                 insolvency link - per plan, the
                                                 flag must carry case-level
                                                 evidence, not just a boolean)
+  officers    GET /company/{number}/officers   (always, for found companies;
+                                                PAGINATES - see _fetch_paginated)
+  psc         GET /company/{number}/persons-with-significant-control
+  psc_stmts   GET /company/{number}/persons-with-significant-control-statements
+                                                (both always, for found
+                                                companies; PAGINATE; 404 is a
+                                                legitimate "none filed" result
+                                                for many companies, not an error)
 
-Officers / filing-history / PSC are phase 1.1: they paginate (35-100 items per
-page) and are deliberately not half-implemented here.
+Filing history remains phase 1.1: it paginates too and is deliberately not
+half-implemented here.
 """
 
 from __future__ import annotations
@@ -23,11 +31,20 @@ log = logging.getLogger(__name__)
 
 PROFILE = "profile"
 INSOLVENCY = "insolvency"
+OFFICERS = "officers"
+PSC = "psc"
+PSC_STATEMENTS = "psc_statements"
 
 _PATHS = {
     PROFILE: "/company/{number}",
     INSOLVENCY: "/company/{number}/insolvency",
+    OFFICERS: "/company/{number}/officers",
+    PSC: "/company/{number}/persons-with-significant-control",
+    PSC_STATEMENTS: "/company/{number}/persons-with-significant-control-statements",
 }
+
+# CH caps items_per_page at 100 on the list endpoints (officers, PSC, ...).
+PAGE_SIZE = 100
 
 
 @dataclass
@@ -60,6 +77,62 @@ def _fetch_one(
     return True, resp.json
 
 
+def _fetch_paginated(
+    client: CHClient, cache: RawCache, number: str, endpoint: str, max_age_days: float
+) -> tuple[bool, dict | None]:
+    """Fetch a paginated list resource, merged into ONE cache entry.
+
+    The list endpoints paginate (items_per_page capped at 100). An old PLC can
+    carry well over 100 officer appointments, and the truncation failure mode
+    the plan warns about is stopping after page one. We page on start_index
+    until every item is collected, then store all pages merged under a single
+    envelope for `endpoint`: the full list under data["items"], with
+    data["total_results"] preserved so downstream code can detect an incomplete
+    merge.
+
+    start_index advances by the number of items actually collected so far (not
+    a fixed page stride), so a short page cannot leave a gap; a page that comes
+    back empty stops the loop even if total_results is overstated.
+
+    A 404 is a legitimate result for several of these resources (many companies
+    file no PSC information at all) and is cached, never treated as an error.
+    """
+    if cache.is_fresh(number, endpoint, max_age_days):
+        cached = cache.read(number, endpoint)
+        assert cached is not None
+        return False, cached.data
+
+    path = _PATHS[endpoint].format(number=number)
+    first = client.get(path, params={"items_per_page": PAGE_SIZE, "start_index": 0})
+    if first.not_found:
+        cache.write(number, endpoint, 404, first.url, None)
+        return True, None
+
+    data = dict(first.json or {})
+    items = list(data.get("items") or [])
+    total = data.get("total_results")
+    if total is None:
+        total = len(items)
+
+    while len(items) < total:
+        resp = client.get(path, params={"items_per_page": PAGE_SIZE, "start_index": len(items)})
+        page_items = (resp.json or {}).get("items") or []
+        if not page_items:
+            break  # total_results overstated or API inconsistency - stop, don't spin
+        items.extend(page_items)
+
+    data["items"] = items
+    data["total_results"] = total
+    cache.write(number, endpoint, first.status_code, first.url, data, etag=first.etag)
+    return True, data
+
+
+def _fetch_officers(
+    client: CHClient, cache: RawCache, number: str, max_age_days: float
+) -> tuple[bool, dict | None]:
+    return _fetch_paginated(client, cache, number, OFFICERS, max_age_days)
+
+
 def fetch_companies(
     client: CHClient,
     cache: RawCache,
@@ -80,6 +153,10 @@ def fetch_companies(
             if profile is None:
                 stats.not_found.append(number)
                 continue
+            for endpoint in (OFFICERS, PSC, PSC_STATEMENTS):
+                was_fetch_p, _ = _fetch_paginated(client, cache, number, endpoint, max_age_days)
+                stats.fetched += int(was_fetch_p)
+                stats.from_cache += int(not was_fetch_p)
             links = profile.get("links") or {}
             if links.get("insolvency"):
                 was_fetch_i, _ = _fetch_one(client, cache, number, INSOLVENCY, max_age_days)

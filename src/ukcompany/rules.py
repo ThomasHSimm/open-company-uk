@@ -40,7 +40,7 @@ YOUNG_COMPANY_MONTHS = 24  # judgement call: "young" = under 2 years; context on
 class Rule:
     rule_id: str
     name: str
-    severity: str  # "high" | "medium" | "info"
+    severity: str  # "high" | "medium" | "low" | "info"
     tier: int  # verification tier of the underlying field(s); v1 rules are all 1
     definition: str  # human-readable, goes verbatim into docs/rules.md
     caveats: str
@@ -126,6 +126,38 @@ def _young(a: Attributes) -> str | None:
     age = a.get("age_months")
     if age is not None and age < YOUNG_COMPANY_MONTHS:
         return f"age_months={age}"
+    return None
+
+
+# Verbatim official PSC statement constants (companieshouse/api-enumerations
+# psc_descriptions.yml) that mean the beneficial owner is not resolved. Matched
+# literally against active_psc_statement_codes - do NOT normalise or "fix"
+# spelling here; some official constants are misspelled and normalising breaks
+# the match. (These are correctly spelled upstream; the caution stands for the
+# wider set.)
+#
+# The `-partnership` variants are the Scottish Limited Partnership form of the
+# same unresolved-owner condition and are kept as DISTINCT constants (the
+# register keeps them distinct; live scan 2026-08 found active SLP statements use
+# only the -partnership forms). SLPs are historically the highest-risk vehicle
+# for concealed ownership, so they must trigger the rule too.
+PSC_UNRESOLVED_STATEMENT_CODES = (
+    "steps-to-find-psc-not-yet-completed",
+    "psc-exists-but-not-identified",
+    "psc-details-not-confirmed",
+    "steps-to-find-psc-not-yet-completed-partnership",
+    "psc-exists-but-not-identified-partnership",
+    "psc-details-not-confirmed-partnership",
+)
+
+
+def _psc_unresolved(a: Attributes) -> str | None:
+    codes = a.get("active_psc_statement_codes")
+    if not codes:
+        return None
+    present = [c for c in PSC_UNRESOLVED_STATEMENT_CODES if c in codes.split(",")]
+    if present:
+        return "active PSC statement(s): " + ", ".join(present)
     return None
 
 
@@ -225,6 +257,23 @@ REGISTRY: list[Rule] = [
         "Derived transformation, not a registrar event. Context only; penalises legitimate "
         "startups if misused. Never counts toward totals.",
         _young,
+    ),
+    Rule(
+        "PSC_UNRESOLVED",
+        "Beneficial ownership unresolved",
+        "low",
+        1,
+        "`active_psc_statement_codes` contains any of `steps-to-find-psc-not-yet-completed`, "
+        "`psc-exists-but-not-identified` or `psc-details-not-confirmed`, or their "
+        "`-partnership` variants (the Scottish Limited Partnership form of the same condition) "
+        "- verbatim official statement constants from the persons-with-significant-control-"
+        "statements resource; ceased statements are excluded.",
+        "PSC identification is mid-rollout under ECCTA; an unresolved statement is a "
+        "transparency gap, not proof of wrongdoing. Statement constants are matched literally - "
+        "official spellings (incl. any upstream misspellings) are never normalised. Evidence "
+        "names which statement(s) fired. SLP `-partnership` statements are included because "
+        "SLPs are a high-risk concealed-ownership vehicle.",
+        _psc_unresolved,
     ),
 ]
 

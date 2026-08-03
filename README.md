@@ -22,9 +22,13 @@ supplied by companies; identity verification (ECCTA) is still rolling out.
 
 ```bash
 pip install -e .[dev]
-export CH_API_KEY=...   # free key: developer.company-information.service.gov.uk
+cp .env.example .env    # then put your key in .env (gitignored), or export CH_API_KEY
+# free key: developer.company-information.service.gov.uk -> sign in ->
+# Manage applications -> Create application (Live) -> New REST API key
 
 ukcompany run --input companies.csv        # CSV with a company_number column
+#   (see examples/companies.sample.csv - extra columns ignored, header case-insensitive,
+#    single-column headerless files also accepted)
 ukcompany run --input companies.csv --no-fetch   # re-derive/score from cache only
 ukcompany rules-doc                        # regenerate docs/rules.md
 ukcompany data-dict                        # regenerate docs/data-dictionary.md

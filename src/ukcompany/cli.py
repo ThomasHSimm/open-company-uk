@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import csv
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -27,6 +28,27 @@ from .score import score_all, summarise, write_csv
 from .validate import validate_input
 
 log = logging.getLogger("ukcompany")
+
+
+def load_dotenv(path: str | Path = ".env") -> None:
+    """Minimal .env loader (stdlib only - a dependency would be overkill).
+
+    KEY=value lines; '#' comments and blanks ignored; surrounding quotes
+    stripped. Real environment variables take precedence over the file, so an
+    exported CH_API_KEY still wins - the file is a convenience, not an override.
+    """
+    p = Path(path)
+    if not p.exists():
+        return
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip().strip("'\"")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
 
 DEFAULT_SETTINGS = {
     "paths": {
@@ -102,7 +124,10 @@ def cmd_run(args: argparse.Namespace) -> int:
     if missing:
         print(f"WARNING: {len(missing)} numbers have no cached profile (run without --no-fetch?)")
     insolvency = {n: c for n in numbers if (c := cache.read(n, fetch_mod.INSOLVENCY)) is not None}
-    records = derive_all(profiles, insolvency)
+    officers = {n: c for n in numbers if (c := cache.read(n, fetch_mod.OFFICERS)) is not None}
+    psc = {n: c for n in numbers if (c := cache.read(n, fetch_mod.PSC)) is not None}
+    psc_stmts = {n: c for n in numbers if (c := cache.read(n, fetch_mod.PSC_STATEMENTS)) is not None}
+    records = derive_all(profiles, insolvency, officers, psc, psc_stmts)
     result = score_all(records)
 
     write_csv(records, out_dir / "companies.csv")
@@ -137,6 +162,7 @@ def cmd_rules_doc(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     parser = argparse.ArgumentParser(prog="ukcompany", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)

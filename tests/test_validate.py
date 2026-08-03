@@ -53,3 +53,18 @@ def test_validate_input_report_and_dedup():
 def test_report_summary_names_the_damage():
     report = validate_input(["1234567"])
     assert "FIXED" in report.summary()
+
+
+def test_load_dotenv_env_wins_and_file_fills(tmp_path, monkeypatch):
+    from ukcompany.cli import load_dotenv
+
+    env_file = tmp_path / ".env"
+    env_file.write_text('# comment\nCH_API_KEY="from-file"\nOTHER_VAR=x\n\n')
+    monkeypatch.setenv("CH_API_KEY", "from-env")
+    monkeypatch.delenv("OTHER_VAR", raising=False)
+    load_dotenv(env_file)
+    import os
+
+    assert os.environ["CH_API_KEY"] == "from-env"  # real env takes precedence
+    assert os.environ["OTHER_VAR"] == "x"  # file fills gaps, quotes stripped
+    monkeypatch.delenv("OTHER_VAR", raising=False)

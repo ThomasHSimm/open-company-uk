@@ -1,0 +1,43 @@
+diff -ru a/src/ukcompany/rules.py b/src/ukcompany/rules.py
+--- a/src/ukcompany/rules.py	2026-08-03 17:55:55.626913872 +0000
++++ b/src/ukcompany/rules.py	2026-08-03 17:55:55.589926162 +0000
+@@ -40,7 +40,7 @@
+ class Rule:
+     rule_id: str
+     name: str
+-    severity: str  # "high" | "medium" | "info"
++    severity: str  # "high" | "medium" | "low" | "info" - seriousness of the recorded state
+     tier: int  # verification tier of the underlying field(s); v1 rules are all 1
+     definition: str  # human-readable, goes verbatim into docs/rules.md
+     caveats: str
+@@ -240,9 +240,15 @@
+         "fields (Companies House registers most information without verifying it). Source events",
+         "are recorded facts; rule definitions, thresholds, severities and any aggregation are",
+         "documented analytical judgements. Every indicator is traceable to specified source",
+-        "fields or events and a documented transformation. `info` rules are context and are",
+-        "excluded from every aggregate count. Dissolved/converted/closed companies are handled",
+-        "as exclusions (not screenable), not as flags.",
++        "fields or events and a documented transformation.",
++        "",
++        "Severity grades the SERIOUSNESS of the recorded state, not confidence in it",
++        "(confidence belongs in evidence and caveats): `high` = registrar-recorded adverse",
++        "status or event; `medium` = compliance failure (missed statutory deadline or",
++        "registrar-set problem flag); `low` = minor compliance irregularity - a recorded",
++        "incomplete or unresolved statutory obligation, less serious than a missed deadline;",
++        "`info` = context, excluded from every aggregate count. Dissolved/converted/closed",
++        "companies are handled as exclusions (not screenable), not as flags.",
+         "",
+         "| rule_id | severity | tier | definition | caveats |",
+         "|---|---|---|---|---|",
+diff -ru a/src/ukcompany/score.py b/src/ukcompany/score.py
+--- a/src/ukcompany/score.py	2026-08-03 17:55:55.627414327 +0000
++++ b/src/ukcompany/score.py	2026-08-03 17:55:55.593926162 +0000
+@@ -88,7 +88,7 @@
+             f"not found: {len(result['not_found'])}",
+             f"flags: {len(flags)} "
+             f"(high: {by_sev.get('high', 0)}, medium: {by_sev.get('medium', 0)}, "
+-            f"info: {by_sev.get('info', 0)})",
++            f"low: {by_sev.get('low', 0)}, info: {by_sev.get('info', 0)})",
+             f"companies with >=1 non-info flag: {companies_flagged}",
+         ]
+     )
