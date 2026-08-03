@@ -48,20 +48,25 @@ def _months_between(start: date, end: date) -> int:
     return (end.year - start.year) * 12 + (end.month - start.month)
 
 
-def _id_verification_counts(items: list[dict[str, Any]]) -> tuple[int, int]:
-    """(n_id_verified, n_id_verification_due) over officer / PSC list items.
+def _id_verification_counts(items: list[dict[str, Any]]) -> tuple[int, int, int]:
+    """(n_id_verified, n_id_verification_due, n_id_statement_filed) over officer /
+    PSC list items.
 
     ECCTA identity verification is live in responses under the item's
     `identity_verification_details` block (key names observed live 2026-08; see
     docs/AUDIT.md). We read, defensively:
-      * verified  = the block is present (the appointment is inside the identity-
-        verification regime);
-      * due       = a verification statement is due
+      * verified        = the block is present (the appointment is inside the
+        identity-verification regime);
+      * due             = a verification statement is due
         (`appointment_verification_statement_due_on`) with no completed identity
-        verification (`identity_verified_on` absent).
+        verification (`identity_verified_on` absent);
+      * statement_filed = an appointment verification statement has been filed
+        (`appointment_verification_statement_date` present) - a SEPARATE signal
+        from identity verification: a filed statement does not by itself set
+        `identity_verified_on`, so it does not clear the `due` count.
     Absence of the block means unverified-or-not-yet-due, NOT non-compliance.
     """
-    n_verified = n_due = 0
+    n_verified = n_due = n_statement_filed = 0
     for it in items:
         ivd = it.get("identity_verification_details")
         if not isinstance(ivd, dict):
@@ -71,7 +76,9 @@ def _id_verification_counts(items: list[dict[str, Any]]) -> tuple[int, int]:
             "identity_verified_on"
         ):
             n_due += 1
-    return n_verified, n_due
+        if ivd.get("appointment_verification_statement_date"):
+            n_statement_filed += 1
+    return n_verified, n_due, n_statement_filed
 
 
 def _psc_item_ceased(r: dict[str, Any]) -> bool:
@@ -250,6 +257,7 @@ _OFFICER_KEYS = (
     "officer_churn_24m",
     "n_officers_id_verified",
     "n_officers_id_verification_due",
+    "n_officers_id_statement_filed",
 )
 
 
@@ -278,7 +286,7 @@ def derive_officers(cached: CachedResponse | None) -> dict[str, Any]:
         appointed_on = _parse_date(o.get("appointed_on"))
         if appointed_on is not None and 0 <= _months_between(appointed_on, observed_date) < 24:
             n_appt_24m += 1
-    n_id_verified, n_id_due = _id_verification_counts(items)
+    n_id_verified, n_id_due, n_id_stmt = _id_verification_counts(items)
     return {
         "n_officers_total": len(items),
         "n_officers_active": n_active,
@@ -288,6 +296,7 @@ def derive_officers(cached: CachedResponse | None) -> dict[str, Any]:
         "officer_churn_24m": n_appt_24m + n_resign_24m,
         "n_officers_id_verified": n_id_verified,
         "n_officers_id_verification_due": n_id_due,
+        "n_officers_id_statement_filed": n_id_stmt,
     }
 
 
@@ -320,7 +329,7 @@ def derive_psc(
     zero = 0 if (psc is not None and psc.not_found) else None
     if psc is None or psc.not_found or psc.data is None:
         n_records = n_ceased = n_active_records = zero
-        psc_id_verified = psc_id_due = zero
+        psc_id_verified = psc_id_due = psc_id_stmt = zero
         psc_natures = None
     else:
         records = psc.data.get("items") or []
@@ -328,7 +337,7 @@ def derive_psc(
         # true total: the list resource may omit ceased items, so len(records)
         # alone would understate it - active + ceased is the register total.
         n_records = n_active_records + n_ceased
-        psc_id_verified, psc_id_due = _id_verification_counts(records)
+        psc_id_verified, psc_id_due, psc_id_stmt = _id_verification_counts(records)
         active_records = [r for r in records if not _psc_item_ceased(r)]
         natures = sorted(
             {n for r in active_records for n in (r.get("natures_of_control") or [])}
@@ -366,6 +375,7 @@ def derive_psc(
         "psc_natures_of_control": psc_natures,
         "n_psc_id_verified": psc_id_verified,
         "n_psc_id_verification_due": psc_id_due,
+        "n_psc_id_statement_filed": psc_id_stmt,
     }
 
 
@@ -683,6 +693,16 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "non-compliance. Key names as observed live 2026-08 (see AUDIT).",
     },
     {
+        "field": "n_officers_id_statement_filed",
+        "tier": 2,
+        "source": "officers:items[].identity_verification_details."
+        "appointment_verification_statement_date",
+        "definition": "Appointments with a filed appointment-verification statement.",
+        "caveats": "A SEPARATE signal from identity verification: a filed statement does not set "
+        "identity_verified_on and does not clear n_officers_id_verification_due. Rollout in "
+        "progress.",
+    },
+    {
         "field": "psc_fetch_status",
         "tier": 1,
         "source": "pipeline state (PSC list endpoint fetch outcome)",
@@ -753,6 +773,16 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "(appointment_verification_statement_due_on) and no completed identity_verified_on.",
         "caveats": "Rollout in progress; absence of the block means unverified-or-not-yet-due, not "
         "non-compliance. Key names as observed live 2026-08 (see AUDIT).",
+    },
+    {
+        "field": "n_psc_id_statement_filed",
+        "tier": 2,
+        "source": "psc:items[].identity_verification_details."
+        "appointment_verification_statement_date",
+        "definition": "PSC records with a filed appointment-verification statement.",
+        "caveats": "A SEPARATE signal from identity verification: a filed statement does not set "
+        "identity_verified_on and does not clear n_psc_id_verification_due. Observed live on "
+        "07083592 (statement filed, identity_verified_on absent). Rollout in progress.",
     },
 ]
 

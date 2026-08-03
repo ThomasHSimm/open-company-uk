@@ -170,12 +170,17 @@ def test_officer_identity_verification_counts():
         {"name": "B", "identity_verification_details": {
             "appointment_verification_statement_due_on": "2025-11-18",
             "identity_verified_on": "2025-10-01"}},
+        # statement filed but not identity-verified: still due, and statement_filed
+        {"name": "D", "identity_verification_details": {
+            "appointment_verification_statement_due_on": "2025-11-18",
+            "appointment_verification_statement_date": "2025-10-01"}},
         # no block -> counted in neither (absence != non-compliance)
         {"name": "C"},
     ]
     out = derive_officers(_officers_cached(items))
-    assert out["n_officers_id_verified"] == 2
-    assert out["n_officers_id_verification_due"] == 1
+    assert out["n_officers_id_verified"] == 3  # A, B, D
+    assert out["n_officers_id_verification_due"] == 2  # A and D (filed statement doesn't clear)
+    assert out["n_officers_id_statement_filed"] == 1  # only D
 
 
 def test_derive_all_joins_officers_by_number():

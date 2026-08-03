@@ -35,5 +35,9 @@ ignore = ["E501"]  # long lines handled by formatter judgement at 100
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Put the project root on sys.path so cross-module test imports (tests.conftest,
+# tests.test_client) resolve under the bare `pytest` script too, not only
+# `python -m pytest` (which adds cwd automatically).
+pythonpath = ["."]
 markers = ["live: tests that hit the real Companies House API (skipped in CI)"]
 addopts = "-m 'not live'"

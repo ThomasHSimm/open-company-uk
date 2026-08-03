@@ -264,19 +264,27 @@ def test_psc_identity_verification_counts():
                 {"name": "B", "identity_verification_details": {
                     "appointment_verification_statement_due_on": "2025-12-07",
                     "identity_verified_on": "2025-11-24"}},
+                # statement filed but NOT identity-verified: still counts as due
+                # (statement-filing is a separate signal), and as statement_filed
+                {"name": "D", "identity_verification_details": {
+                    "appointment_verification_statement_due_on": "2025-12-07",
+                    "appointment_verification_statement_date": "2025-11-24"}},
                 # no block at all -> neither
                 {"name": "C"},
             ]
         ),
         _statements([]),
     )
-    assert out["n_psc_id_verified"] == 2  # A and B carry the block
-    assert out["n_psc_id_verification_due"] == 1  # only A is due-and-unverified
+    assert out["n_psc_id_verified"] == 3  # A, B, D carry the block
+    assert out["n_psc_id_verification_due"] == 2  # A and D (statement filed does NOT clear due)
+    assert out["n_psc_id_statement_filed"] == 1  # only D filed a statement
 
 
 def test_psc_verification_fields_none_when_not_fetched():
     out = derive_psc(None, None)
     assert out["n_psc_id_verified"] is None
+    assert out["n_psc_id_statement_filed"] is None
     assert out["psc_natures_of_control"] is None
     out404 = derive_psc(_not_found("psc"), _not_found("psc_statements"))
     assert out404["n_psc_id_verified"] == 0  # cached 404 = legitimately none
+    assert out404["n_psc_id_statement_filed"] == 0

@@ -3,6 +3,63 @@
 Implementation notes and assumptions that need live verification against the
 real Companies House API. Append-only.
 
+## Verification pass — A + B + 1.1c (2026-08-03)
+
+Pre-task verification of the shipped work.
+
+1. **Diff scope.** Cumulative diff vs the first commit touches only
+   derive.py / fetch.py / rules.py / score.py / cli.py / tests/ / docs/ (+
+   pyproject, see below). README.md and tests/test_validate.py changes are in
+   commit `57099d7` ("Inestigate ten firms output"), which predates the agent
+   work (now in `37dbe0f`) — confirmed clean in the working tree, i.e. they are
+   not part of the agent diff.
+2. **`_fetch_paginated` cannot spin.** Two independent termination guarantees:
+   an empty/absent `items` page (`page_items` falsy) breaks immediately — the
+   200-with-empty-items mid-sequence case — and every non-empty iteration
+   strictly grows `len(items)` toward the fixed integer `total`. Even an API that
+   ignores `start_index` and re-serves page 1 terminates (over-collects one page,
+   then exits). One guard, shared across all three endpoints; covered by
+   `test_loop_stops_on_empty_page_when_total_overstated`.
+3. **Synthetic fixtures.** All fixture and inline test names are invented
+   (`SYNTHETIC …`, single letters, `ACTIVE/FORMER OWNER`). No real personal data.
+   (AUDIT.md itself names real *companies* — Carillion, two SLPs — tied to public
+   company numbers; that is public register metadata, not officer/PSC PII.)
+4. **Live pagination vs reality.** Drove `_fetch_paginated` live against real
+   old PLCs with >100 officers: BARCLAYS BANK PLC (01026167) total_results=120,
+   merged 120 across 2 pages (100+20), 120 distinct, 0 dups; BARCLAYS PLC
+   (00048839) total_results=102, merged 102 (100+2, a genuine partial final
+   page), 0 dups. Pagination matches reality.
+   **PSC endpoint 404-vs-empty (decides psc_fetch_status semantics):** the two
+   endpoints are ASYMMETRIC. The PSC *list*
+   (`persons-with-significant-control`) returns **200 with empty `items`** for a
+   company with no PSC record (07133426, NI017846, SL027366/747) — it does NOT
+   404. The *statements* endpoint returns **404** when none are filed (200 only
+   for the two SLPs). Consequence: `psc_fetch_status` (read off the list
+   endpoint) is `ok`/`not_fetched` in practice and essentially never
+   `not_found`; "no PSC" surfaces as a 200 with `psc_n_records=0` →
+   `none_reported`, handled correctly. The `not_found` branch of `derive_psc`
+   remains as defensive-only.
+5. **PSC_UNRESOLVED trigger codes.** Re-verified verbatim against
+   companieshouse/api-enumerations `psc_descriptions.yml` (single-quoted YAML
+   keys): `steps-to-find-psc-not-yet-completed`, `psc-exists-but-not-identified`,
+   `psc-details-not-confirmed` all present and correctly spelled. The notorious
+   misspelling (`signficant`) is in the *different* key
+   `no-individual-or-entity-with-signficant-control` — reaffirming the
+   don't-normalise rule.
+
+**Test-infra fix (pyproject.toml).** Cross-module test imports (`tests.
+test_client`, `tests.conftest`) failed under the bare `pytest` console script
+(`ModuleNotFoundError: No module named 'tests'`) because the project root was not
+on `sys.path` — only `python -m pytest` added it. Added `pythonpath = ["."]` to
+`[tool.pytest.ini_options]`. Out of the 1.1c diff scope but a genuine
+green-suite fix; flagged here.
+
+**Statement-filing attribute (follow-up to the id-verification decision).** Added
+`n_officers_id_statement_filed` / `n_psc_id_statement_filed` (count of
+`appointment_verification_statement_date` present) as their own Tier-2
+attributes; verified/due stay keyed on `identity_verified_on`; no rule keys off
+them. See the resolved assumption under Phase 1.1c.
+
 ## Phase 1.1c — severity semantics + live-finding corrections (2026-08-03)
 
 Driven by the 2026-08 live-batch findings above.
@@ -50,13 +107,14 @@ Driven by the 2026-08 live-batch findings above.
 
 **Assumptions needing live verification**
 
-- **"Completed verification" = `identity_verified_on`.** For `*_id_verification_
-  due` I treat identity verification as complete when `identity_verified_on` is
-  set. Note the PSC block also exposes `appointment_verification_statement_date`
-  (a filed statement) — distinct from identity verification. Under the current
-  rule, a PSC that has filed a statement but has no `identity_verified_on` still
-  counts as "due" (observed on 07083592). Confirm which signal the business
-  wants as "done" before any rule keys off these counts.
+- **"Completed verification" = `identity_verified_on`** (decided). `*_id_
+  verification_due` treats verification as complete only when `identity_verified_
+  on` is set. The distinct "a statement was filed" signal
+  (`appointment_verification_statement_date`) is now captured as its OWN
+  attribute — `n_officers_id_statement_filed` / `n_psc_id_statement_filed` — and
+  deliberately does NOT clear the `due` count. Confirmed live on 07083592 (PSC:
+  statement filed, `identity_verified_on` absent → statement_filed=1 AND due=1).
+  No rule keys off any of these counts.
 - **id_verified counts block presence, not a verified identity.** Per the task's
   definition; it measures "inside the IDV regime", not "identity confirmed".
 - Counts run over ALL list items (active + resigned/ceased), mirroring the
