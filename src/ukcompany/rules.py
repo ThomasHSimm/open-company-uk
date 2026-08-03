@@ -40,7 +40,7 @@ YOUNG_COMPANY_MONTHS = 24  # judgement call: "young" = under 2 years; context on
 class Rule:
     rule_id: str
     name: str
-    severity: str  # "high" | "medium" | "low" | "info"
+    severity: str  # "high" | "medium" | "low" | "info" - seriousness of the recorded state
     tier: int  # verification tier of the underlying field(s); v1 rules are all 1
     definition: str  # human-readable, goes verbatim into docs/rules.md
     caveats: str
@@ -289,9 +289,14 @@ def generate_rules_md() -> str:
         "fields (Companies House registers most information without verifying it). Source events",
         "are recorded facts; rule definitions, thresholds, severities and any aggregation are",
         "documented analytical judgements. Every indicator is traceable to specified source",
-        "fields or events and a documented transformation. `info` rules are context and are",
-        "excluded from every aggregate count. Dissolved/converted/closed companies are handled",
-        "as exclusions (not screenable), not as flags.",
+        "fields or events and a documented transformation.",
+        "Severity grades the SERIOUSNESS of the recorded state, not confidence in it",
+        "(confidence belongs in evidence and caveats): `high` = registrar-recorded adverse",
+        "status or event; `medium` = compliance failure (missed statutory deadline or",
+        "registrar-set problem flag); `low` = minor compliance irregularity - a recorded",
+        "incomplete or unresolved statutory obligation, less serious than a missed deadline;",
+        "`info` = context, excluded from every aggregate count. Dissolved/converted/closed",
+        "companies are handled as exclusions (not screenable), not as flags.",
         "",
         "| rule_id | severity | tier | definition | caveats |",
         "|---|---|---|---|---|",

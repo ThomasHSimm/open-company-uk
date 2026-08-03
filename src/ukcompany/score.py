@@ -88,7 +88,7 @@ def summarise(result: dict[str, list[dict[str, Any]]], n_input: int) -> str:
             f"not found: {len(result['not_found'])}",
             f"flags: {len(flags)} "
             f"(high: {by_sev.get('high', 0)}, medium: {by_sev.get('medium', 0)}, "
-            f"info: {by_sev.get('info', 0)})",
+            f"low: {by_sev.get('low', 0)}, info: {by_sev.get('info', 0)})",
             f"companies with >=1 non-info flag: {companies_flagged}",
         ]
     )

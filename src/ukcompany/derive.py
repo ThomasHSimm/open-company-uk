@@ -13,10 +13,13 @@ Rules for this module:
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from typing import Any
 
 from .cache import CachedResponse
+
+log = logging.getLogger(__name__)
 
 # CH company_status values that mean "no longer a live entity" - these gate
 # screenability (exclusions table) rather than acting as risk flags.
@@ -43,6 +46,75 @@ def _parse_date(s: str | None) -> date | None:
 
 def _months_between(start: date, end: date) -> int:
     return (end.year - start.year) * 12 + (end.month - start.month)
+
+
+def _id_verification_counts(items: list[dict[str, Any]]) -> tuple[int, int]:
+    """(n_id_verified, n_id_verification_due) over officer / PSC list items.
+
+    ECCTA identity verification is live in responses under the item's
+    `identity_verification_details` block (key names observed live 2026-08; see
+    docs/AUDIT.md). We read, defensively:
+      * verified  = the block is present (the appointment is inside the identity-
+        verification regime);
+      * due       = a verification statement is due
+        (`appointment_verification_statement_due_on`) with no completed identity
+        verification (`identity_verified_on` absent).
+    Absence of the block means unverified-or-not-yet-due, NOT non-compliance.
+    """
+    n_verified = n_due = 0
+    for it in items:
+        ivd = it.get("identity_verification_details")
+        if not isinstance(ivd, dict):
+            continue
+        n_verified += 1
+        if ivd.get("appointment_verification_statement_due_on") and not ivd.get(
+            "identity_verified_on"
+        ):
+            n_due += 1
+    return n_verified, n_due
+
+
+def _psc_item_ceased(r: dict[str, Any]) -> bool:
+    """A PSC list item is ceased when the live `ceased` boolean says so; fall
+    back to `ceased_on` presence for older records that predate the boolean."""
+    c = r.get("ceased")
+    if c is not None:
+        return bool(c)
+    return r.get("ceased_on") is not None
+
+
+def _psc_active_ceased(
+    data: dict[str, Any], records: list[dict[str, Any]], company_number: str
+) -> tuple[int, int]:
+    """(n_active, n_ceased) with the precedence the live API demands:
+
+      (a) authoritative top-level `active_count` / `ceased_count`;
+      (b) the per-item `ceased` boolean;
+      (c) `ceased_on` presence (last resort).
+
+    The list resource can omit ceased items entirely, so per-item counting alone
+    undercounts. When the top-level counts and the per-item tally disagree, the
+    top-level counts win and the disagreement is logged (never silently
+    reconciled).
+    """
+    item_ceased = sum(1 for r in records if _psc_item_ceased(r))
+    top_ceased = data.get("ceased_count")
+    top_active = data.get("active_count")
+    if top_ceased is not None:
+        if top_ceased != item_ceased:
+            log.warning(
+                "PSC ceased count mismatch for %s: top-level ceased_count=%s, "
+                "per-item ceased=%s; using top-level.",
+                company_number,
+                top_ceased,
+                item_ceased,
+            )
+        n_ceased = top_ceased
+        n_active = top_active if top_active is not None else max(len(records) - n_ceased, 0)
+    else:
+        n_ceased = item_ceased
+        n_active = len(records) - n_ceased
+    return n_active, n_ceased
 
 
 def derive_profile(cached: CachedResponse) -> dict[str, Any]:
@@ -103,6 +175,9 @@ def derive_profile(cached: CachedResponse) -> dict[str, Any]:
             "has_insolvency_link": bool(links.get("insolvency")),
             "has_insolvency_history": d.get("has_insolvency_history"),
             "has_been_liquidated": d.get("has_been_liquidated"),
+            # legally protected PSCs are withheld from the register - absence of a
+            # visible PSC record can be explained by this, not by "none reported".
+            "has_super_secure_pscs": d.get("has_super_secure_pscs"),
             "registered_office_is_in_dispute": d.get("registered_office_is_in_dispute"),
             "undeliverable_registered_office_address": d.get(
                 "undeliverable_registered_office_address"
@@ -173,6 +248,8 @@ _OFFICER_KEYS = (
     "n_appointments_last_24m",
     "n_resignations_last_24m",
     "officer_churn_24m",
+    "n_officers_id_verified",
+    "n_officers_id_verification_due",
 )
 
 
@@ -201,6 +278,7 @@ def derive_officers(cached: CachedResponse | None) -> dict[str, Any]:
         appointed_on = _parse_date(o.get("appointed_on"))
         if appointed_on is not None and 0 <= _months_between(appointed_on, observed_date) < 24:
             n_appt_24m += 1
+    n_id_verified, n_id_due = _id_verification_counts(items)
     return {
         "n_officers_total": len(items),
         "n_officers_active": n_active,
@@ -208,6 +286,8 @@ def derive_officers(cached: CachedResponse | None) -> dict[str, Any]:
         "n_appointments_last_24m": n_appt_24m,
         "n_resignations_last_24m": n_resign_24m,
         "officer_churn_24m": n_appt_24m + n_resign_24m,
+        "n_officers_id_verified": n_id_verified,
+        "n_officers_id_verification_due": n_id_due,
     }
 
 
@@ -235,17 +315,25 @@ def derive_psc(
     else:
         fetch_status = "ok"
 
-    # PSC list records. None (not a count) when the list was never fetched, so a
-    # missing fetch is not mistaken for "zero PSCs".
+    # PSC list records. `zero` distinguishes "never fetched" (None -> unknown,
+    # not "zero PSCs") from a cached 404 (0 -> legitimately none filed).
+    zero = 0 if (psc is not None and psc.not_found) else None
     if psc is None or psc.not_found or psc.data is None:
-        n_records = 0 if (psc is not None and psc.not_found) else None
-        n_ceased = 0 if (psc is not None and psc.not_found) else None
-        n_active_records = n_records
+        n_records = n_ceased = n_active_records = zero
+        psc_id_verified = psc_id_due = zero
+        psc_natures = None
     else:
         records = psc.data.get("items") or []
-        n_records = len(records)
-        n_ceased = sum(1 for r in records if r.get("ceased_on"))
-        n_active_records = n_records - n_ceased
+        n_active_records, n_ceased = _psc_active_ceased(psc.data, records, psc.company_number)
+        # true total: the list resource may omit ceased items, so len(records)
+        # alone would understate it - active + ceased is the register total.
+        n_records = n_active_records + n_ceased
+        psc_id_verified, psc_id_due = _id_verification_counts(records)
+        active_records = [r for r in records if not _psc_item_ceased(r)]
+        natures = sorted(
+            {n for r in active_records for n in (r.get("natures_of_control") or [])}
+        )
+        psc_natures = ",".join(natures) if natures else None
 
     # Active statement codes: verbatim `statement` values with no ceased_on.
     active_codes: list[str] = []
@@ -275,6 +363,9 @@ def derive_psc(
         "psc_n_ceased": n_ceased,
         "active_psc_statement_codes": ",".join(active_codes) if active_codes else None,
         "psc_information_state": info_state,
+        "psc_natures_of_control": psc_natures,
+        "n_psc_id_verified": psc_id_verified,
+        "n_psc_id_verification_due": psc_id_due,
     }
 
 
@@ -436,6 +527,23 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "caveats": "Spec: 'Please use links.insolvency'.",
     },
     {
+        "field": "has_been_liquidated",
+        "tier": 1,
+        "source": "profile:has_been_liquidated (deprecated)",
+        "definition": "Deprecated boolean; fallback insolvency indicator only.",
+        "caveats": "Inconsistently present in live responses; absence is None (unknown), never "
+        "False - do not coerce.",
+    },
+    {
+        "field": "has_super_secure_pscs",
+        "tier": 1,
+        "source": "profile:has_super_secure_pscs",
+        "definition": "Company has one or more legally protected ('super secure') PSCs whose "
+        "details are withheld from the public register.",
+        "caveats": "A legitimate reason for no visible PSC record; read alongside "
+        "psc_information_state so protected ownership is not misread as none_reported.",
+    },
+    {
         "field": "insolvency_case_types",
         "tier": 1,
         "source": "insolvency:cases[].type",
@@ -558,6 +666,23 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "structures. Attribute only - no rule keys off it in this phase.",
     },
     {
+        "field": "n_officers_id_verified",
+        "tier": 2,
+        "source": "officers:items[].identity_verification_details (present)",
+        "definition": "Officer appointments carrying an ECCTA identity-verification block.",
+        "caveats": "Rollout in progress (2025-2026); absence means unverified-or-not-yet-due, not "
+        "non-compliance. Counts the block's presence, not a completed identity_verified_on.",
+    },
+    {
+        "field": "n_officers_id_verification_due",
+        "tier": 2,
+        "source": "derived from officers:items[].identity_verification_details",
+        "definition": "Appointments with a verification statement due "
+        "(appointment_verification_statement_due_on) and no completed identity_verified_on.",
+        "caveats": "Rollout in progress; absence of the block means unverified-or-not-yet-due, not "
+        "non-compliance. Key names as observed live 2026-08 (see AUDIT).",
+    },
+    {
         "field": "psc_fetch_status",
         "tier": 1,
         "source": "pipeline state (PSC list endpoint fetch outcome)",
@@ -565,7 +690,9 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "list resource.",
         "caveats": "PIPELINE STATE, never a company signal: it records whether we fetched the "
         "resource, not anything about the company. Never appears as flag evidence. The company's "
-        "PSC posture is psc_information_state + active_psc_statement_codes.",
+        "PSC posture is psc_information_state + active_psc_statement_codes. In the 2026-08 live "
+        "batch the psc-statements endpoint returned 404 for every company with no statement "
+        "filed, consistent with 404 = none filed.",
     },
     {
         "field": "psc_n_records",
@@ -601,6 +728,31 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "active statement) / none_reported (neither) / unknown (a resource not fetched).",
         "caveats": "Derived transformation over both PSC resources. 'unknown' is fetch "
         "incompleteness, distinct from 'none_reported'.",
+    },
+    {
+        "field": "psc_natures_of_control",
+        "tier": 2,
+        "source": "psc:items[].natures_of_control (active records)",
+        "definition": "Sorted, distinct, comma-joined natures-of-control across ACTIVE PSC "
+        "records (e.g. ownership-of-shares-25-to-50-percent).",
+        "caveats": "Verbatim enum values, never normalised. Ceased PSC records excluded.",
+    },
+    {
+        "field": "n_psc_id_verified",
+        "tier": 2,
+        "source": "psc:items[].identity_verification_details (present)",
+        "definition": "PSC records carrying an ECCTA identity-verification block.",
+        "caveats": "Rollout in progress (2025-2026); absence means unverified-or-not-yet-due, not "
+        "non-compliance. Counts the block's presence, not a completed identity_verified_on.",
+    },
+    {
+        "field": "n_psc_id_verification_due",
+        "tier": 2,
+        "source": "derived from psc:items[].identity_verification_details",
+        "definition": "PSC records with a verification statement due "
+        "(appointment_verification_statement_due_on) and no completed identity_verified_on.",
+        "caveats": "Rollout in progress; absence of the block means unverified-or-not-yet-due, not "
+        "non-compliance. Key names as observed live 2026-08 (see AUDIT).",
     },
 ]
 

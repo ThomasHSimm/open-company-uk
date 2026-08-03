@@ -27,8 +27,10 @@ def _cached(endpoint: str, data: dict | None, status_code: int = 200) -> CachedR
     )
 
 
-def _psc_list(items: list[dict]) -> CachedResponse:
-    return _cached("psc", {"items": items, "total_results": len(items)})
+def _psc_list(items: list[dict], **top) -> CachedResponse:
+    data = {"items": items, "total_results": len(items)}
+    data.update(top)  # e.g. active_count / ceased_count
+    return _cached("psc", data)
 
 
 def _statements(items: list[dict]) -> CachedResponse:
@@ -173,3 +175,108 @@ def _psc_flags(attrs: dict) -> list[dict]:
     """score_company over an attribute record, keeping only PSC flags."""
     attrs = {"company_number": "00000077", "observed_at": OBSERVED_AT.isoformat(), **attrs}
     return [f for f in score_company(attrs) if f["rule_id"] == "PSC_UNRESOLVED"]
+
+
+# --- ceased counting precedence (correctness fix) ------------------------------
+
+
+def test_ceased_via_ceased_on():
+    out = derive_psc(
+        _psc_list([{"name": "A"}, {"name": "B", "ceased_on": "2022-01-01"}]),
+        _statements([]),
+    )
+    assert out["psc_n_records"] == 2 and out["psc_n_ceased"] == 1
+
+
+def test_ceased_via_ceased_boolean():
+    # Live items carry a `ceased` boolean rather than ceased_on.
+    out = derive_psc(
+        _psc_list([{"name": "A", "ceased": False}, {"name": "B", "ceased": True}]),
+        _statements([]),
+    )
+    assert out["psc_n_records"] == 2 and out["psc_n_ceased"] == 1
+
+
+def test_ceased_boolean_beats_absent_ceased_on():
+    # ceased=True with no ceased_on must still count as ceased (boolean wins).
+    out = derive_psc(_psc_list([{"name": "A", "ceased": True}]), _statements([]))
+    assert out["psc_n_ceased"] == 1
+
+
+def test_top_level_counts_authoritative_when_list_omits_ceased():
+    # List returns only the 1 active PSC; ceased ones are omitted but counted.
+    out = derive_psc(
+        _psc_list([{"name": "A", "ceased": False}], active_count=1, ceased_count=2),
+        _statements([]),
+    )
+    assert out["psc_n_ceased"] == 2
+    assert out["psc_n_records"] == 3  # true total = active + ceased, not len(items)
+    assert out["psc_information_state"] == "identified"  # active_count >= 1
+
+
+def test_top_level_counts_win_on_disagreement_and_warn(caplog):
+    # Per-item tally says 1 ceased; top-level says 3. Top-level wins, warning logged.
+    items = [{"name": "A"}, {"name": "B", "ceased": True}]
+    with caplog.at_level("WARNING"):
+        out = derive_psc(_psc_list(items, active_count=2, ceased_count=3), _statements([]))
+    assert out["psc_n_ceased"] == 3  # top-level, not the per-item 1
+    assert any("ceased count mismatch" in r.message for r in caplog.records)
+
+
+# --- natures of control (verbatim, active only) --------------------------------
+
+
+def test_psc_natures_of_control_active_only_sorted_verbatim():
+    out = derive_psc(
+        _psc_list(
+            [
+                {"name": "A", "natures_of_control": ["ownership-of-shares-75-to-100-percent"]},
+                {"name": "B", "natures_of_control": ["voting-rights-25-to-50-percent"]},
+                # ceased record's natures must be ignored:
+                {"name": "C", "ceased": True, "natures_of_control": ["right-to-appoint-directors"]},
+                # duplicate across active records collapses:
+                {"name": "D", "natures_of_control": ["voting-rights-25-to-50-percent"]},
+            ]
+        ),
+        _statements([]),
+    )
+    assert out["psc_natures_of_control"] == (
+        "ownership-of-shares-75-to-100-percent,voting-rights-25-to-50-percent"
+    )
+
+
+def test_psc_natures_none_when_empty():
+    out = derive_psc(_psc_list([{"name": "A"}]), _statements([]))
+    assert out["psc_natures_of_control"] is None
+
+
+# --- PSC identity verification (ECCTA) -----------------------------------------
+
+
+def test_psc_identity_verification_counts():
+    out = derive_psc(
+        _psc_list(
+            [
+                # verified block present, statement due, not yet identity-verified -> due
+                {"name": "A", "identity_verification_details": {
+                    "appointment_verification_statement_due_on": "2025-12-07"}},
+                # block present, due date AND identity verified -> verified, not due
+                {"name": "B", "identity_verification_details": {
+                    "appointment_verification_statement_due_on": "2025-12-07",
+                    "identity_verified_on": "2025-11-24"}},
+                # no block at all -> neither
+                {"name": "C"},
+            ]
+        ),
+        _statements([]),
+    )
+    assert out["n_psc_id_verified"] == 2  # A and B carry the block
+    assert out["n_psc_id_verification_due"] == 1  # only A is due-and-unverified
+
+
+def test_psc_verification_fields_none_when_not_fetched():
+    out = derive_psc(None, None)
+    assert out["n_psc_id_verified"] is None
+    assert out["psc_natures_of_control"] is None
+    out404 = derive_psc(_not_found("psc"), _not_found("psc_statements"))
+    assert out404["n_psc_id_verified"] == 0  # cached 404 = legitimately none

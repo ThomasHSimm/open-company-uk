@@ -3,6 +3,72 @@
 Implementation notes and assumptions that need live verification against the
 real Companies House API. Append-only.
 
+## Phase 1.1c — severity semantics + live-finding corrections (2026-08-03)
+
+Driven by the 2026-08 live-batch findings above.
+
+**What changed**
+
+- **Severity semantics (docs only).** `generate_rules_md()` now states that
+  severity grades the SERIOUSNESS of the recorded state, not confidence, with an
+  explicit high/medium/low/info gloss; the `Rule.severity` comment mirrors it.
+  `score.py summarise()` now prints the `low` bucket (between medium and info).
+  **No rule's assigned severity changed.** `docs/rules.md` regenerated.
+- **PSC ceased counting — correctness fix.** `derive_psc` no longer relies on
+  `ceased_on` alone. Precedence: (a) top-level `active_count`/`ceased_count`;
+  (b) per-item `ceased` boolean; (c) `ceased_on` presence. The list resource can
+  omit ceased items, so `psc_n_records` is now the register total (active +
+  ceased), not `len(items)`. A disagreement between top-level and per-item tallies
+  logs a WARNING and the top-level count wins (see
+  `test_top_level_counts_win_on_disagreement_and_warn`).
+- **ECCTA identity verification (live now).** New per-company counts from the
+  `identity_verification_details` block on officer and PSC items:
+  `n_officers_id_verified` / `n_officers_id_verification_due` and the PSC pair.
+  Tier 2. Verified = block present; due = `appointment_verification_statement_
+  due_on` set with no `identity_verified_on`.
+- **PSC extras.** `has_super_secure_pscs` (profile flag) and
+  `psc_natures_of_control` (sorted, distinct, verbatim natures across ACTIVE PSC
+  records). No normalisation.
+- **FIELD_DOCS caveats.** Added `has_been_liquidated` ("Inconsistently present …
+  absence is None (unknown), never False - do not coerce"); `psc_fetch_status`
+  now records the 404 = none-filed observation.
+
+**Key names — as observed live (data/raw/, 2026-08), not invented**
+
+- Officer `identity_verification_details` keys seen:
+  `appointment_verification_statement_due_on`, `identity_verified_on`,
+  `appointment_verification_start_on` / `_end_on`,
+  `anti_money_laundering_supervisory_bodies`,
+  `authorised_corporate_service_provider_name`, `preferred_name`.
+- PSC block additionally carries `appointment_verification_statement_date`.
+- PSC list item ceased marker: boolean `ceased` (active sample had
+  `ceased=False`, `ceased_on=None`); top-level `active_count` / `ceased_count`.
+- PSC natures under item `natures_of_control` (list, e.g.
+  `ownership-of-shares-25-to-50-percent`).
+- `has_super_secure_pscs` is a **profile** top-level flag (absent from the PSC
+  list resource top level).
+
+**Assumptions needing live verification**
+
+- **"Completed verification" = `identity_verified_on`.** For `*_id_verification_
+  due` I treat identity verification as complete when `identity_verified_on` is
+  set. Note the PSC block also exposes `appointment_verification_statement_date`
+  (a filed statement) — distinct from identity verification. Under the current
+  rule, a PSC that has filed a statement but has no `identity_verified_on` still
+  counts as "due" (observed on 07083592). Confirm which signal the business
+  wants as "done" before any rule keys off these counts.
+- **id_verified counts block presence, not a verified identity.** Per the task's
+  definition; it measures "inside the IDV regime", not "identity confirmed".
+- Counts run over ALL list items (active + resigned/ceased), mirroring the
+  officer/PSC item counts; verification obligations really attach to live
+  appointments, so revisit if a per-appointment-state split is wanted.
+- **PSC-statements 200-response shape remains live-unverified.** Every
+  psc-statements call in the 2026-08 batch was either a 404 (E&W no-statement
+  companies) or an SLP `statement_only` 200 whose items we read; the full shape
+  of a rich 200 statements response (multiple item fields, ceased statements) has
+  not been seen live. `active_psc_statement_codes` assumes `items[].statement`
+  and `items[].ceased_on`.
+
 ## Live batch verification (2026-08-03)
 
 Ran `ukcompany run --input data/company_test_data.csv` against the live API.

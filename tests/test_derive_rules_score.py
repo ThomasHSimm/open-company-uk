@@ -93,6 +93,33 @@ def test_summary_excludes_info_from_flagged_count(profile_strikeoff):
     assert "companies with >=1 non-info flag: 1" in text
 
 
+def test_summary_breakdown_includes_low():
+    result = {
+        "flags": [{"severity": "low", "company_number": "x"}],
+        "excluded": [],
+        "not_found": [],
+    }
+    text = summarise(result, n_input=1)
+    assert "medium: 0, low: 1, info: 0" in text  # low sits between medium and info
+
+
+def test_has_super_secure_pscs_derived():
+    from datetime import UTC, datetime
+
+    from ukcompany.cache import CachedResponse
+    from ukcompany.derive import derive_profile
+
+    c = CachedResponse(
+        "00000077",
+        "profile",
+        200,
+        datetime(2026, 8, 1, tzinfo=UTC),
+        "fixture://p",
+        {"company_status": "active", "has_super_secure_pscs": True},
+    )
+    assert derive_profile(c)["has_super_secure_pscs"] is True
+
+
 def test_registry_metadata_complete():
     ids = [r.rule_id for r in REGISTRY]
     assert len(ids) == len(set(ids))

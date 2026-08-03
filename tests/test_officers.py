@@ -157,6 +157,25 @@ def test_missing_officers_resource_yields_none():
     out = derive_officers(None)
     assert out["n_officers_total"] is None
     assert out["officer_churn_24m"] is None
+    assert out["n_officers_id_verified"] is None
+    assert out["n_officers_id_verification_due"] is None
+
+
+def test_officer_identity_verification_counts():
+    items = [
+        # ECCTA block present, statement due, not yet identity-verified -> due
+        {"name": "A", "identity_verification_details": {
+            "appointment_verification_statement_due_on": "2025-11-18"}},
+        # block present + identity verified -> verified, not due
+        {"name": "B", "identity_verification_details": {
+            "appointment_verification_statement_due_on": "2025-11-18",
+            "identity_verified_on": "2025-10-01"}},
+        # no block -> counted in neither (absence != non-compliance)
+        {"name": "C"},
+    ]
+    out = derive_officers(_officers_cached(items))
+    assert out["n_officers_id_verified"] == 2
+    assert out["n_officers_id_verification_due"] == 1
 
 
 def test_derive_all_joins_officers_by_number():
