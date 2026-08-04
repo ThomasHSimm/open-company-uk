@@ -409,3 +409,35 @@ severity (a new severity level, not a change to any existing rule).
   for an unconfirmed PSC. If the live data instead uses a variant spelling for
   the individual-vs-entity or partnership cases, the trigger tuple needs the
   extra literals added (verbatim).
+## Insolvency Service agreement-validation harness
+
+`ukcompany validate --labels <csv> [--control <csv>] [--out <path>]` loads the
+Insolvency Service record-level publication, removes bulk cases and
+Administration-to-CVL duplicates as directed by its README, normalises company
+numbers, and evaluates the existing derive-and-score pipeline solely from the
+existing raw cache. It has no fetch path and does not alter rules, severities,
+or company attributes. Reports default under gitignored `data/` because they
+contain company numbers.
+
+The headline recall is deliberately conditional recall among companies still
+assessable in the current Companies House data:
+`flagged_adverse / (flagged_adverse + missed_genuine)`. Cached 404/purged
+companies and positives whose current status has moved back to normal are
+timing/data-availability facts rather than demonstrated pipeline misses, so
+they are excluded, as are records never fetched. Every excluded bucket is
+reported beside the measure so this conditional denominator cannot be mistaken
+for unconditional historical recall. The publication is statistical data, not
+ground truth about an individual company's insolvency, and the harness reports
+agreement between datasets on adverse cases only; solvent winding-ups are not
+present in the labels.
+
+**Bulk encoding and malformed-number correction (2026-08 inspection).** The
+237,392-row CSV contains `is_bulk` values `Y` (5,740 rows), `NA` (51), and blank
+(the large majority), with no `N` values. Label loading therefore excludes only
+an explicit `Y`; the earlier allow-`N` filter would have dropped every positive
+and produced meaningless recall without raising an error. Separately, 599 of
+237,392 company numbers are malformed (including legacy suffix forms, trailing
+letters, embedded spaces, and O/0 transcription errors). They are quarantined
+verbatim in the reported unusable bucket. The loader does not strip suffixes or
+guess character substitutions, because a speculative repair could join to the
+wrong company.

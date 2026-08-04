@@ -26,6 +26,9 @@ from .derive import derive_all, generate_data_dictionary_md
 from .rules import generate_rules_md
 from .score import score_all, summarise, write_csv
 from .validate import validate_input
+from .validation.evaluate import evaluate
+from .validation.labels import load_labels
+from .validation.report import write_report
 
 log = logging.getLogger("ukcompany")
 
@@ -126,7 +129,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     insolvency = {n: c for n in numbers if (c := cache.read(n, fetch_mod.INSOLVENCY)) is not None}
     officers = {n: c for n in numbers if (c := cache.read(n, fetch_mod.OFFICERS)) is not None}
     psc = {n: c for n in numbers if (c := cache.read(n, fetch_mod.PSC)) is not None}
-    psc_stmts = {n: c for n in numbers if (c := cache.read(n, fetch_mod.PSC_STATEMENTS)) is not None}
+    psc_stmts = {
+        n: c for n in numbers if (c := cache.read(n, fetch_mod.PSC_STATEMENTS)) is not None
+    }
     records = derive_all(profiles, insolvency, officers, psc, psc_stmts)
     result = score_all(records)
 
@@ -161,6 +166,28 @@ def cmd_rules_doc(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_validate(args: argparse.Namespace) -> int:
+    settings = load_settings(args.settings)
+    cache = cache_mod.RawCache(settings["paths"]["cache_dir"])
+    labels = load_labels(args.labels)
+    control = read_input_numbers(args.control) if args.control else None
+    result = evaluate(labels.labels, cache, control)
+    output = write_report(result, labels, args.out)
+
+    print("-- insolvency agreement validation (cache only; no fetching) --")
+    print(
+        f"overall conditional recall: {result.recall():.1%}"
+        if result.recall() is not None
+        else "overall conditional recall: n/a"
+    )
+    for case_type in result.case_types():
+        recall = result.recall(case_type)
+        print(f"{case_type}: {recall:.1%}" if recall is not None else f"{case_type}: n/a")
+    print(f"SOLVENT_WINDING_UP errors: {len(result.solvent_winding_up_errors)}")
+    print(f"report: {output}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -181,6 +208,15 @@ def main(argv: list[str] | None = None) -> int:
     p_dd = sub.add_parser("data-dict", help="regenerate docs/data-dictionary.md from field docs")
     p_dd.add_argument("--out", default="docs/data-dictionary.md")
     p_dd.set_defaults(func=cmd_data_dict)
+
+    p_validate = sub.add_parser(
+        "validate", help="evaluate cached scoring against insolvency labels"
+    )
+    p_validate.add_argument("--labels", required=True, help="Insolvency Service record-level CSV")
+    p_validate.add_argument("--control", help="optional CSV of control company numbers")
+    p_validate.add_argument("--out", default="data/insolvency-validation.md")
+    p_validate.add_argument("--settings", default="config/settings.yaml")
+    p_validate.set_defaults(func=cmd_validate)
 
     args = parser.parse_args(argv)
     return args.func(args)
