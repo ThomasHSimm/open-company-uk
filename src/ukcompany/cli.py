@@ -3,6 +3,8 @@
     ukcompany run --input companies.csv          # full pipeline
     ukcompany run --input companies.csv --no-fetch   # re-derive/score from cache only
     ukcompany rules-doc                          # regenerate docs/rules.md
+    ukcompany snapshot fetch                     # cache current monthly bulk snapshot
+    ukcompany snapshot info                      # inspect latest cached snapshot
 
 Input CSV needs a `company_number` column (or pass a single-column file).
 Config (paths etc.) in config/settings.yaml; API key ONLY via CH_API_KEY env.
@@ -57,6 +59,7 @@ DEFAULT_SETTINGS = {
     "paths": {
         "cache_dir": "data/raw",
         "output_dir": "data/processed",
+        "snapshot_dir": "data/snapshot",
     },
     "fetch": {
         "max_age_days": 7,
@@ -188,6 +191,45 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _snapshot_cache_dir(args: argparse.Namespace) -> Path:
+    if args.cache_dir:
+        return Path(args.cache_dir)
+    return Path(load_settings(args.settings)["paths"]["snapshot_dir"])
+
+
+def cmd_snapshot_fetch(args: argparse.Namespace) -> int:
+    from .snapshot.download import download_snapshot
+    from .snapshot.manifest import MANIFEST_NAME, create_manifest, manifest_summary
+
+    cache_dir = _snapshot_cache_dir(args)
+    downloaded = download_snapshot(cache_dir, args.month)
+    manifest_path = cache_dir / downloaded.month / MANIFEST_NAME
+    manifest = create_manifest(downloaded.month, downloaded.paths, downloaded.parts, manifest_path)
+    print(manifest_summary(manifest))
+    print(f"manifest: {manifest_path}")
+    return 0
+
+
+def cmd_snapshot_info(args: argparse.Namespace) -> int:
+    from .snapshot.loader import SnapshotLoader
+    from .snapshot.manifest import MANIFEST_NAME, load_manifest, manifest_summary
+
+    cache_dir = _snapshot_cache_dir(args)
+    if args.month:
+        snapshot_dir = cache_dir / args.month
+    else:
+        candidates = sorted(path.parent for path in cache_dir.glob(f"*/{MANIFEST_NAME}"))
+        if not candidates:
+            raise SystemExit(f"No snapshot manifests found under {cache_dir}")
+        snapshot_dir = candidates[-1]
+    manifest = load_manifest(snapshot_dir / MANIFEST_NAME)
+    print(manifest_summary(manifest))
+    print("columns:")
+    for column in SnapshotLoader(snapshot_dir).columns():
+        print(f"  {column}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -217,6 +259,21 @@ def main(argv: list[str] | None = None) -> int:
     p_validate.add_argument("--out", default="data/insolvency-validation.md")
     p_validate.add_argument("--settings", default="config/settings.yaml")
     p_validate.set_defaults(func=cmd_validate)
+
+    p_snapshot = sub.add_parser("snapshot", help="manage monthly Companies House snapshots")
+    snapshot_sub = p_snapshot.add_subparsers(dest="snapshot_command", required=True)
+
+    p_snapshot_fetch = snapshot_sub.add_parser("fetch", help="download and manifest a snapshot")
+    p_snapshot_fetch.add_argument("--month", help="snapshot month YYYY-MM (default: current)")
+    p_snapshot_fetch.add_argument("--cache-dir")
+    p_snapshot_fetch.add_argument("--settings", default="config/settings.yaml")
+    p_snapshot_fetch.set_defaults(func=cmd_snapshot_fetch)
+
+    p_snapshot_info = snapshot_sub.add_parser("info", help="show manifest and source columns")
+    p_snapshot_info.add_argument("--month", help="snapshot month YYYY-MM (default: latest cached)")
+    p_snapshot_info.add_argument("--cache-dir")
+    p_snapshot_info.add_argument("--settings", default="config/settings.yaml")
+    p_snapshot_info.set_defaults(func=cmd_snapshot_info)
 
     args = parser.parse_args(argv)
     return args.func(args)

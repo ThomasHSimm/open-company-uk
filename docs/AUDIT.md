@@ -441,3 +441,24 @@ letters, embedded spaces, and O/0 transcription errors). They are quarantined
 verbatim in the reported unusable bucket. The loader does not strip suffixes or
 guess character substitutions, because a speculative repair could join to the
 wrong company.
+
+## Phase 2 — Free Company Data Product snapshot infrastructure
+
+Added `ukcompany.snapshot` as general, validation-independent infrastructure.
+It discovers the current `BasicCompanyData-YYYY-MM-01-partN_M.zip` set from the
+Companies House landing page, rejects missing or inconsistent part sets,
+downloads archives atomically into a dated cache, and records source URLs,
+download time, sizes, SHA-256 hashes, and total rows in a JSON manifest. The CLI
+exposes `ukcompany snapshot fetch` and `ukcompany snapshot info`; no live bulk
+download was run during implementation, so the live August 2026 part count
+remains to be recorded by the operator's first fetch.
+
+ZIP contents are extracted on demand to a cached path and scanned full-width as
+a Polars `LazyFrame`; the loader itself never collects the population. Source
+column names remain verbatim. `CompanyNumber` is explicitly forced to Polars
+string type so leading-zero English/Welsh identifiers and prefixed identifiers
+survive unchanged. Polars is a `snapshot` optional extra and is imported only
+inside snapshot operations, so the core install and pipeline do not depend on
+it. The source is Companies House's Free Company Data Product, licensed under
+the Open Government Licence; the landing-page URL is retained in every manifest
+for attribution and provenance.
