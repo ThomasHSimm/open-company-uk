@@ -12,6 +12,66 @@ def _percent(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.1%}"
 
 
+AGE_BAND_ORDER = ("<2y", "2-5y", "5-10y", "10y+", "UNKNOWN")
+
+
+def _control_section(result: EvaluationResult) -> list[str]:
+    lines = ["", "## Stratified control sample", ""]
+    plan = result.control_plan
+    if not result.control_total:
+        lines.append("No control sample was supplied.")
+        return lines
+
+    frame = plan.frame_description if plan and plan.frame_description else "supplied list"
+    lines += [
+        f"Sampling frame: **{frame}**.",
+        "",
+        "**Positive-unlabelled caveat.** No negative labels exist. The Insolvency "
+        "Service publication lists only adverse cases, so the control is an "
+        "*assumed-not-labelled-negative* cohort, not confirmed non-distressed. The "
+        "figure below is a flag-RATE conditional on this frame; it is NOT precision "
+        "and must not be read as a false-positive rate against ground truth.",
+        "",
+    ]
+
+    rate = len(result.control_high_severity) / result.control_total
+    lines.append(
+        f"{len(result.control_high_severity)} of {result.control_total} controls "
+        f"({_percent(rate)}) fired at least one high-severity flag."
+    )
+
+    if plan and (plan.target_counts or plan.achieved_counts):
+        strata = sorted(set(plan.target_counts) | set(plan.achieved_counts))
+        lines += [
+            "",
+            "### Target vs achieved strata (SIC section x age band)",
+            "",
+            "| Section | Age band | Target | Achieved |",
+            "|---|---|---:|---:|",
+        ]
+        for stratum in strata:
+            section, _, band = stratum.partition("|")
+            lines.append(
+                f"| {section} | {band} | {plan.target_counts.get(stratum, 0)} | "
+                f"{plan.achieved_counts.get(stratum, 0)} |"
+            )
+
+    lines += [
+        "",
+        "### Control flag-rate by age band (age as covariate)",
+        "",
+        "| Age band | Controls | High-severity | Flag-rate |",
+        "|---|---:|---:|---:|",
+    ]
+    bands = [b for b in AGE_BAND_ORDER if b in result.control_by_band]
+    bands += sorted(set(result.control_by_band) - set(AGE_BAND_ORDER))
+    for band in bands:
+        total, high = result.control_by_band[band]
+        band_rate = high / total if total else None
+        lines.append(f"| {band} | {total} | {high} | {_percent(band_rate)} |")
+    return lines
+
+
 def render_report(result: EvaluationResult, labels: LabelSet) -> str:
     counts = result.counts()
     lines = [
@@ -74,20 +134,7 @@ def render_report(result: EvaluationResult, labels: LabelSet) -> str:
         f"- `{row.company_number}` — label: {row.raw_case_type}"
         for row in result.solvent_winding_up_errors
     ] or ["Zero errors."]
-    lines += [
-        "",
-        "## Control sample",
-        "",
-    ]
-    if result.control_total:
-        rate = len(result.control_high_severity) / result.control_total
-        lines.append(
-            f"{len(result.control_high_severity)} of {result.control_total} controls "
-            f"({_percent(rate)}) fired at least one high-severity flag. This false-positive "
-            "read is conditional on how the control sample was drawn."
-        )
-    else:
-        lines.append("No control sample was supplied.")
+    lines += _control_section(result)
     lines += [
         "",
         "## Label loading",
@@ -95,7 +142,8 @@ def render_report(result: EvaluationResult, labels: LabelSet) -> str:
         f"Input rows: {labels.input_rows}; retained unique labels: {len(labels.labels)}; "
         f"bulk rows dropped: {labels.dropped_bulk}; Administration-to-CVL rows dropped: "
         f"{labels.dropped_administration_to_cvl}; unusable company numbers: "
-        f"{len(labels.unusable)}; duplicate rows: {labels.duplicate_rows}.",
+        f"{len(labels.unusable)}; field-shifted rows quarantined: {labels.unusable_shifted}; "
+        f"duplicate rows: {labels.duplicate_rows}.",
         "",
         "## Temporal caveat",
         "",

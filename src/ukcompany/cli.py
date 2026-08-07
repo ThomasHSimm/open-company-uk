@@ -169,11 +169,103 @@ def cmd_rules_doc(args: argparse.Namespace) -> int:
     return 0
 
 
+def _draw_snapshot_control(args: argparse.Namespace, labels) -> object:
+    """Draw a stratified control from the cached snapshot and write its numbers.
+
+    The harness is cache-only: this writes the control NUMBERS to a CSV; the
+    operator must fetch them before their flags can be evaluated. No fetch path
+    is added here.
+    """
+    from datetime import date
+
+    from .snapshot.loader import SnapshotLoader
+    from .snapshot.manifest import MANIFEST_NAME, load_manifest
+    from .validation.control import draw_control, stratify_targets, write_control_csv
+
+    cache_dir = Path(load_settings(args.settings)["paths"]["snapshot_dir"])
+    snapshot_dir = _resolve_snapshot_dir(cache_dir, args.snapshot_month)
+    manifest = load_manifest(snapshot_dir / MANIFEST_NAME)
+    snapshot_month = manifest.get("snapshot_month") or args.snapshot_month or ""
+    year, month = (
+        (int(part) for part in snapshot_month.split("-")[:2]) if snapshot_month else (1, 1)
+    )
+    reference = date(year, month, 1)
+
+    try:
+        loader = SnapshotLoader(snapshot_dir)
+        targets = stratify_targets(labels.labels, reference)
+        plan = draw_control(
+            loader,
+            targets,
+            args.control_n,
+            exclude=set(labels.labels),
+            seed=args.seed,
+            reference=reference,
+            snapshot_month=snapshot_month,
+        )
+    except ImportError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    write_control_csv(plan, args.control_out)
+    print(f"-- stratified control drawn from {snapshot_month or 'snapshot'} --")
+    print(f"control numbers written to {args.control_out} ({len(plan.members)} companies)")
+    print("TWO-STEP FLOW (cache-only harness does not fetch):")
+    print(f"  1. ukcompany run --input {args.control_out}")
+    print(f"  2. ukcompany validate --labels {args.labels} --control {args.control_out}")
+    return plan
+
+
+def _write_positives_sample(args: argparse.Namespace, labels) -> None:
+    """Sample recent adverse positives and write their numbers (no fetch)."""
+    from .validation.sample import sample_positives, write_positives_csv
+
+    sample = sample_positives(labels.labels, args.positives_n, args.positives_since, args.seed)
+    write_positives_csv(sample, args.write_positives_sample)
+    print(f"-- positives sample: recent adverse, month_registered >= {args.positives_since} --")
+    print(
+        f"positive numbers written to {args.write_positives_sample} "
+        f"({len(sample.numbers)} of {sample.eligible} eligible)"
+    )
+    if sample.shortfall:
+        print(
+            f"  shortfall: {sample.eligible} eligible is fewer than requested "
+            f"{args.positives_n}; took all eligible"
+        )
+    if sample.by_case_type:
+        print(
+            "  by case_type: "
+            + ", ".join(f"{k}={v}" for k, v in sorted(sample.by_case_type.items()))
+        )
+        print("  by year: " + ", ".join(f"{k}={v}" for k, v in sorted(sample.by_year.items())))
+    print(f"  fetch with: ukcompany run --input {args.write_positives_sample}")
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
     settings = load_settings(args.settings)
     cache = cache_mod.RawCache(settings["paths"]["cache_dir"])
     labels = load_labels(args.labels)
-    control = read_input_numbers(args.control) if args.control else None
+    if args.control_from_snapshot and args.control:
+        raise SystemExit("use either --control or --control-from-snapshot, not both")
+    # Sampling mode: write numbers for a separate fetch, then exit before the
+    # (meaningless, unfetched) evaluation. Symmetric to --control-from-snapshot,
+    # and usable in the same invocation as it.
+    if args.write_positives_sample:
+        if args.control_from_snapshot:
+            _draw_snapshot_control(args, labels)
+        _write_positives_sample(args, labels)
+        print(
+            "Numbers written, not fetched. Fetch the sample(s) above with "
+            "`ukcompany run --input <path>`, then re-run validate with --control."
+        )
+        return 0
+    if args.control_from_snapshot:
+        control = _draw_snapshot_control(args, labels)
+    elif args.control:
+        from .validation.control import read_control_csv
+
+        control = read_control_csv(args.control)
+    else:
+        control = None
     result = evaluate(labels.labels, cache, control)
     output = write_report(result, labels, args.out)
 
@@ -197,6 +289,22 @@ def _snapshot_cache_dir(args: argparse.Namespace) -> Path:
     return Path(load_settings(args.settings)["paths"]["snapshot_dir"])
 
 
+def _resolve_snapshot_dir(cache_dir: Path, month: str | None) -> Path:
+    """Return the snapshot directory for ``month`` (or the latest cached).
+
+    Latest-cached resolution mirrors ``cmd_snapshot_info``: glob the manifest
+    directories and take the last.
+    """
+    from .snapshot.manifest import MANIFEST_NAME
+
+    if month:
+        return cache_dir / month
+    candidates = sorted(path.parent for path in cache_dir.glob(f"*/{MANIFEST_NAME}"))
+    if not candidates:
+        raise SystemExit(f"No snapshot manifests found under {cache_dir}")
+    return candidates[-1]
+
+
 def cmd_snapshot_fetch(args: argparse.Namespace) -> int:
     from .snapshot.download import download_snapshot
     from .snapshot.manifest import MANIFEST_NAME, create_manifest, manifest_summary
@@ -215,13 +323,7 @@ def cmd_snapshot_info(args: argparse.Namespace) -> int:
     from .snapshot.manifest import MANIFEST_NAME, load_manifest, manifest_summary
 
     cache_dir = _snapshot_cache_dir(args)
-    if args.month:
-        snapshot_dir = cache_dir / args.month
-    else:
-        candidates = sorted(path.parent for path in cache_dir.glob(f"*/{MANIFEST_NAME}"))
-        if not candidates:
-            raise SystemExit(f"No snapshot manifests found under {cache_dir}")
-        snapshot_dir = candidates[-1]
+    snapshot_dir = _resolve_snapshot_dir(cache_dir, args.month)
     manifest = load_manifest(snapshot_dir / MANIFEST_NAME)
     print(manifest_summary(manifest))
     print("columns:")
@@ -256,6 +358,37 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_validate.add_argument("--labels", required=True, help="Insolvency Service record-level CSV")
     p_validate.add_argument("--control", help="optional CSV of control company numbers")
+    p_validate.add_argument(
+        "--control-from-snapshot",
+        action="store_true",
+        help="draw a stratified control from the cached snapshot (requires the [snapshot] extra); "
+        "writes numbers to --control-out for a separate fetch, then re-run with --control",
+    )
+    p_validate.add_argument(
+        "--control-n", type=int, default=500, help="target control size for --control-from-snapshot"
+    )
+    p_validate.add_argument(
+        "--control-out",
+        default="data/control-numbers.csv",
+        help="where --control-from-snapshot writes the drawn control numbers",
+    )
+    p_validate.add_argument("--snapshot-month", help="snapshot month YYYY-MM (default: latest)")
+    p_validate.add_argument(
+        "--seed", type=int, default=1, help="draw seed for control and positives (deterministic)"
+    )
+    p_validate.add_argument(
+        "--write-positives-sample",
+        help="sample recent adverse positives to this CSV for a separate fetch, then exit "
+        "(no evaluation); symmetric to --control-from-snapshot and usable in the same call",
+    )
+    p_validate.add_argument(
+        "--positives-n", type=int, default=500, help="cap on the positives sample size"
+    )
+    p_validate.add_argument(
+        "--positives-since",
+        default="2023-01",
+        help="only positives with month_registered >= this YYYY-MM (minimises 404/purged)",
+    )
     p_validate.add_argument("--out", default="data/insolvency-validation.md")
     p_validate.add_argument("--settings", default="config/settings.yaml")
     p_validate.set_defaults(func=cmd_validate)

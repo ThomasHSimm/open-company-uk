@@ -462,3 +462,203 @@ inside snapshot operations, so the core install and pipeline do not depend on
 it. The source is Companies House's Free Company Data Product, licensed under
 the Open Government Licence; the landing-page URL is retained in every manifest
 for attribution and provenance.
+
+## Stratified snapshot control for the validation harness (F-v2b)
+
+Added `ukcompany.validation.control` and wired it into `validate`. The control is
+now DRAWN from the cached snapshot rather than supplied ad hoc, so it mirrors the
+insolvent set's structural distribution instead of being a raw random draw.
+
+**Stratification design.** A raw random control measures how often flags fire in
+the population; a stratified control measures whether flags still separate
+companies that are structurally *similar* to the insolvent set — removing the
+confound that insolvent companies skew young/particular-sector while a random
+control skews old/other-sector (a flag could then "separate" by proxying sector
+or age rather than distress). Positives are distributed over (SIC section ×
+coarse age band); the control is drawn to mirror that distribution.
+
+**Pre-distress-confounders-only rule (the crux).** Stratification touches ONLY
+pre-distress structural confounders: SIC section (SIC-2007 section letter) and a
+coarse age band (`<2y / 2-5y / 5-10y / 10y+ / UNKNOWN`). Nothing downstream of
+distress — `company_status`, accounts, insolvency, charges — is ever a
+stratification or matching dimension; matching on a distress variable would
+silently neuter the test. `CompanyStatus` is used in one place only, as an
+ELIGIBILITY filter defining the sampling frame (only `active` companies; a
+control of already-dissolved companies is not a control). That is a frame
+definition, not a stratum. Age is reported as a covariate (flag-rate broken down
+by age band) and only coarsely banded, never tightly matched.
+
+**One SIC mapping, both sides.** `sic_section_from_code` (in `labels.py`) is a
+fixed published SIC-2007 division→section lookup (e.g. 41–43→F construction,
+47→G retail, 62→J information & communication — NOT C). The label side derives
+each positive's section from the raw `sic07_1_digit` code; the snapshot side
+(`snapshot_sic_section`) parses the leading numeric out of the
+`"62012 - label"` SIC text and routes it through the SAME helper, so both
+cohorts are sectioned identically. The `draw_control` Polars path builds its
+division→section lookup from the same helper.
+
+**Determinism.** The draw is deterministic given `--seed`: per stratum, rows are
+ordered by a seeded hash of the company number and the top-k taken, k =
+round(proportion × n). Same seed + same snapshot ⇒ same control. Under-filled
+strata (fewer eligible companies than target) are visible in the achieved-vs-
+target table.
+
+**Age reference.** Age bands are computed against the snapshot month (the first
+of that month), applied identically to positives and to the snapshot frame —
+never "now". Day thresholds (730 / 1826 / 3653) are shared by the Python label
+side and the Polars snapshot side so both band identically. NEEDS LIVE
+VERIFICATION: the real Insolvency Service `month_registered` encoding — the
+parser accepts `YYYY-MM`, `YYYY-MM-DD`, `DD/MM/YYYY`, `MM/YYYY` and bands
+anything else UNKNOWN; confirm the publication's actual format so positives are
+not silently all-UNKNOWN. Likewise `sic07_1_digit` is assumed to carry a usable
+1-or-2-digit division code; if the real column is a single digit, section
+resolution on the label side is coarser than the snapshot side.
+
+**Real-snapshot column quirk.** The real CH bulk header has leading spaces on
+several names (e.g. `" CompanyNumber"`), unlike the clean fixtures, and the
+loader's dtype override (keyed on the un-spaced name) then misses. `draw_control`
+strips surrounding whitespace from column names lazily (schema only) and casts
+the company-number column to string, so leading-zero and prefixed identifiers
+survive. Verified against the operator's cached `data/snapshot/2026-08`.
+
+**Two-step, cache-only flow (load-bearing).** The harness is cache-only and MUST
+NOT fetch. `draw_control` produces NUMBERS only; the CLI writes them to a CSV
+(`--control-out`, default `data/control-numbers.csv`) with a `.strata.json`
+sidecar (target/achieved counts, frame description, snapshot month) and prints
+the two-step instruction. The operator fetches the control profiles
+(`ukcompany run --input data/control-numbers.csv`) and re-runs
+`validate --control data/control-numbers.csv`. The strata columns and sidecar let
+the re-run report the target-vs-achieved distribution and the by-age-band
+flag-rate without re-touching the snapshot. `--control-from-snapshot` and the
+existing `--control <csv>` are mutually exclusive; `--control <csv>` still
+accepts a plain single-column list (section unknown / band UNKNOWN).
+
+**PU / "assumed negative" framing.** No negative labels exist — the publication
+lists only adverse cases. The control is therefore a positive-unlabelled,
+*assumed-not-labelled-negative* cohort, not a confirmed non-distressed set. The
+report states this in the body: the control figure is a flag-RATE conditional on
+the sampling frame, NOT precision, and must not be read as a false-positive rate
+against ground truth.
+
+**Scope.** Diff limited to `src/ukcompany/validation/` (labels.py, control.py
+new, evaluate.py, report.py), `cli.py`, `tests/test_control.py`, and this file.
+`control.py` is evaluation code and registers nothing in FIELD_DOCS; no rules,
+severities, or scoring changed, so `docs/rules.md` and `docs/data-dictionary.md`
+did not need regeneration.
+
+## Real-file quirk fixes (F-v2c)
+
+Two tightly-scoped fixes for real-file quirks, done before any real validation
+run because both are silent-failure bugs (no error, wrong data).
+
+**Fix 1 — snapshot loader: leading-space headers defeated the dtype override
+(present since F-v2a).** The real CH bulk file has leading whitespace on several
+header names; the company-number column is literally `" CompanyNumber"`. The
+loader's `schema_overrides={"CompanyNumber": pl.String}` keyed on the un-spaced
+name and therefore NEVER MATCHED the real file, so Polars type-INFERRED
+CompanyNumber as int and silently stripped leading zeros on every consumer of
+`scan()` since F-v2a. Fixed in `snapshot/loader.py`: `scan()` now peeks at the
+header row, applies the string override on the RAW (possibly space-prefixed)
+name so it actually fires, then strips whitespace from all column names so
+downstream sees `CompanyNumber` and the COLUMNS mapping resolves. Verified
+against the operator's cached `data/snapshot/2026-08`: `columns()` now returns
+`CompanyNumber` (no leading space), and `00944342` round-trips string-typed with
+its leading zero intact. The synthetic snapshot fixtures were updated to use
+leading-space headers (`" CompanyNumber"`, etc.) mirroring the real file, so the
+existing dtype/leading-zero test now exercises the whitespace path. The local
+strip+cast workaround added to `control.py` in F-v2b was removed - the loader now
+guarantees clean names and a string CompanyNumber for all consumers.
+
+**Fix 2 — labels: field-shifted-row quarantine.** An unescaped comma in a text
+field (e.g. company_name) would shift every later column one place right; the
+tell is a non-date value (a case_type or register location) landing in
+month_registered, giving that row a WRONG case_type and SIC. `labels.py` now
+quarantines such rows: after bulk / Administration-to-CVL / number-normalisation
+handling, when the publication carries month_registered, a value that is not a
+bare `^\d{4}-\d{2}$` month routes the row to a new `unusable_shifted` bucket
+(count + a small sample of offending values) and it never becomes a label. Rows
+are quarantined, never repaired (repair = guessing where the comma was = silent
+mis-banding). The count is surfaced in the report's label-loading line. The gate
+only fires when the month_registered column is present, so older/other
+publications lacking it are unaffected.
+
+**Empirical finding on the current download (NEEDS-NOTING, not a defect).** The
+premise was ~365/237k field-shifted rows. Loading the actual downloaded file
+(`record-level-data.csv`, header:
+`company_number, company_name, register_location, case_type, month_registered,
+sic07_1_digit..sic07_5_digit, is_bulk`; 237,391 rows) found
+`unusable_shifted == 0`: every row is exactly 11 columns (0 extra, 0 short) and
+month_registered is 100% well-formed `YYYY-MM`. This file properly quotes its
+internal commas, so `csv.DictReader` absorbs them and no shift occurs. The
+quarantine gate is therefore correct and defensive but catches nothing in this
+version; the ~365 figure does not reproduce here. Retained regardless, since a
+future/alternate export could be unquoted. Also confirmed on this file: retained
+labels 220,461; dropped_bulk 5,740; Administration-to-CVL 7,102; unusable numbers
+736; duplicates 3,352; and the UNKNOWN age band is 0 of 220,461 (month_registered
+parses cleanly for every retained label, and sic07_1_digit sections without
+falling to unknown at a meaningful rate) - so the still-open sic07_1_digit
+encoding question does NOT bite on this file.
+
+**Scope.** Diff limited to `snapshot/loader.py`, `validation/labels.py`,
+`validation/control.py` (workaround removal only), `validation/report.py` (one
+line), the snapshot fixtures, `tests/`, and this file. No scoring, rules,
+severities, FIELD_DOCS, or stratification logic changed.
+
+## Positives sampling — the missing symmetric step (F-v2d)
+
+The harness could sample a stratified control but had no equivalent for
+POSITIVES, so every run's recall side was null (all 220k labels "not fetched").
+Added `validation/sample.py` and wired `ukcompany validate
+--write-positives-sample <path>` to close the asymmetry.
+
+**Recent-adverse rationale.** The label file has ~220k usable positives spanning
+2012-2024. Fetching all is infeasible (220k API calls) and pointless — old
+positives are mostly dissolved-and-purged (404) or recovered, so they land in the
+excluded/not-assessable buckets, never in recall. The meaningful recall test is a
+few hundred RECENT adverse positives the API can still assess, plus the control.
+`sample_positives` draws eligible = adverse `case_type` (kept:
+compulsory_liquidation, creditors_voluntary_liquidation, administration,
+corporate_voluntary_arrangement; `other`/non-adverse guarded out) AND a usable
+`month_registered` >= `--positives-since` (default 2023-01; positives lacking a
+usable month are excluded). Up to `--positives-n` (default 500) are taken; if
+more eligible than N, a seeded random sample (`--seed`, default 1) — deterministic
+and reproducible; if fewer, all are taken and the shortfall is reported.
+
+**Sampling method (documented choice).** A simple seeded random sample, NOT
+case_type-stratified — deliberately not over-built for v1. The command prints the
+composition (count per case_type, count per year) so the operator sees the spread
+before fetching. Verified on the real file: `--positives-n 500 --positives-since
+2023-01 --seed 1` → 500 of 34,505 eligible, spread creditors_voluntary_liquidation
+402 / compulsory_liquidation 66 / administration 30 / corporate_voluntary_
+arrangement 2, years 2023=373 / 2024=127 (all >= the since-date, confirming the
+recency filter).
+
+**Cache-only preserved.** Like the control, this WRITES NUMBERS only — a
+`company_number` CSV consumable by `ukcompany run --input` (asserted in tests) —
+and then EXITS before the meaningless unfetched evaluation. No fetch path added.
+`--write-positives-sample` is symmetric to `--control-from-snapshot` and usable in
+the same invocation: when both are given, the control is drawn and the positives
+sampled in one call, then it exits. `--positives-since`/`month_registered` here is
+the insolvency-registration month from the publication (recency of the adverse
+event), the same retained field the control stratification uses.
+
+**Full operator flow now that both sides can be sampled.**
+```
+# 1. draw BOTH samples (numbers only, no fetch)
+ukcompany validate --labels record-level-data.csv \
+    --control-from-snapshot --control-n 500 --seed 1 \
+    --write-positives-sample data/positives-sample.csv \
+    --positives-n 500 --positives-since 2023-01
+# 2. fetch both (the only step that hits the API)
+ukcompany run --input data/positives-sample.csv
+ukcompany run --input data/control-numbers.csv
+# 3. the real evaluation, over a real recall denominator
+ukcompany validate --labels record-level-data.csv --control data/control-numbers.csv
+```
+
+**Scope.** Diff limited to `validation/sample.py` (new), `validation/__init__.py`
+(exports), `cli.py` (args + sampling branch), `tests/test_positives_sample.py`,
+one line in `tests/test_insolvency_validation.py` (aligned with the maintainer's
+switch of the label SIC source to `sic07_2_digit`), and this file. No scoring,
+rules, severities, FIELD_DOCS, stratification, or the existing recall/control
+evaluation changed.

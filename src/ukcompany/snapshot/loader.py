@@ -84,12 +84,28 @@ class SnapshotLoader:
         return paths
 
     def scan(self) -> Any:
-        """Return a full-width LazyFrame; callers choose projections and filters."""
+        """Return a full-width LazyFrame; callers choose projections and filters.
+
+        The real Companies House bulk file carries leading whitespace on several
+        header names (the company-number column is literally `" CompanyNumber"`).
+        Column names are stripped immediately after the scan so downstream sees
+        `CompanyNumber` and the COLUMNS mapping resolves. Crucially, the string
+        dtype override is keyed on the raw (possibly space-prefixed) header name
+        so it actually fires - otherwise the column is type-inferred as int and
+        leading zeros are silently stripped.
+        """
         pl = _require_polars()
-        return pl.scan_csv(
-            self._csv_paths(),
-            schema_overrides={COLUMNS["company_number"]: pl.String},
+        paths = self._csv_paths()
+        # Peek at the header row to locate the raw company-number column name,
+        # which may differ from COLUMNS["company_number"] only by whitespace.
+        raw_names = pl.scan_csv(paths).collect_schema().names()
+        number_raw = next(
+            (name for name in raw_names if name.strip() == COLUMNS["company_number"]),
+            COLUMNS["company_number"],
         )
+        frame = pl.scan_csv(paths, schema_overrides={number_raw: pl.String})
+        rename = {name: name.strip() for name in raw_names if name != name.strip()}
+        return frame.rename(rename) if rename else frame
 
     def head(self, n: int = 5) -> Any:
         """Collect only the first ``n`` rows for quick inspection."""

@@ -43,6 +43,50 @@ def test_load_labels_filters_normalises_and_reports_unusable(tmp_path):
     assert loaded.input_rows == 5
 
 
+def test_field_shifted_rows_are_quarantined_not_labelled(tmp_path):
+    path = tmp_path / "labels.csv"
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "company_number",
+                "case_type",
+                "is_bulk",
+                "sic07_2_digit",
+                "month_registered",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(
+            [
+                # Clean row: valid YYYY-MM month -> retained.
+                {
+                    "company_number": "46914",
+                    "case_type": "Compulsory liquidation",
+                    "is_bulk": "",
+                    "sic07_2_digit": "62",
+                    "month_registered": "2016-05",
+                },
+                # Field-shifted row: a case_type string sits in month_registered.
+                {
+                    "company_number": "7654321",
+                    "case_type": "Administration",
+                    "is_bulk": "",
+                    "sic07_2_digit": "London",
+                    "month_registered": "In Administration",
+                },
+            ]
+        )
+
+    loaded = load_labels(path)
+
+    assert set(loaded.labels) == {"00046914"}
+    assert loaded.labels["00046914"].month_registered == "2016-05"
+    assert loaded.labels["00046914"].sic_section == "J"
+    assert loaded.unusable_shifted == 1
+    assert loaded.shifted_samples == ["In Administration"]
+
+
 def _profile(number, status="active", **extra):
     return {
         "company_number": number,
@@ -107,6 +151,7 @@ def test_solvent_winding_up_on_adverse_label_is_loud_error(tmp_path):
                 "dropped_administration_to_cvl": 0,
                 "unusable": [],
                 "duplicate_rows": 0,
+                "unusable_shifted": 0,
             },
         )(),
     )

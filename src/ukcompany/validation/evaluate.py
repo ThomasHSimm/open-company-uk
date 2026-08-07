@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from ukcompany.cache import RawCache
@@ -11,6 +10,7 @@ from ukcompany.fetch import INSOLVENCY, OFFICERS, PROFILE, PSC, PSC_STATEMENTS
 from ukcompany.score import score_company
 from ukcompany.validate import normalise_company_number
 
+from .control import ControlPlan
 from .labels import Label
 
 ADVERSE_RULES = {"INSOLVENCY_ADVERSE", "STATUS_INSOLVENT"}
@@ -41,6 +41,10 @@ class EvaluationResult:
     control_total: int = 0
     control_high_severity: list[str] = field(default_factory=list)
     control_unusable: int = 0
+    # Per age band: [total assessed, number firing a high-severity flag]. Age is
+    # a reported covariate, not a stratification match.
+    control_by_band: dict[str, list[int]] = field(default_factory=dict)
+    control_plan: ControlPlan | None = None
 
     def counts(self, case_type: str | None = None) -> dict[str, int]:
         rows = self.outcomes
@@ -73,9 +77,14 @@ def _cached_record(cache: RawCache, number: str):
 
 
 def evaluate(
-    labels: dict[str, Label], cache: RawCache, control_numbers: Iterable[object] | None = None
+    labels: dict[str, Label], cache: RawCache, control: ControlPlan | None = None
 ) -> EvaluationResult:
-    """Evaluate cached records only. This function contains no fetching path."""
+    """Evaluate cached records only. This function contains no fetching path.
+
+    ``control`` is a drawn (or reloaded) stratified :class:`ControlPlan`. The
+    high-severity flag-rate computation is unchanged; only the source of the
+    control numbers changed (drawn from the snapshot, not supplied ad hoc).
+    """
     result = EvaluationResult()
     for number, label in labels.items():
         record, rule_ids = _cached_record(cache, number)
@@ -98,9 +107,10 @@ def evaluate(
         if "SOLVENT_WINDING_UP" in rule_ids:
             result.solvent_winding_up_errors.append(row)
 
+    result.control_plan = control
     seen: set[str] = set()
-    for raw_number in control_numbers or []:
-        normalised = normalise_company_number(raw_number)
+    for member in control.members if control is not None else []:
+        normalised = normalise_company_number(member.company_number)
         if not normalised.valid:
             result.control_unusable += 1
             continue
@@ -109,10 +119,13 @@ def evaluate(
             continue
         seen.add(normalised.number)
         result.control_total += 1
+        band = result.control_by_band.setdefault(member.age_band, [0, 0])
+        band[0] += 1
         record, rule_ids = _cached_record(cache, normalised.number)
         if record is None or not record.get("found") or record.get("excluded_status"):
             continue
         flags = score_company(record)
         if any(flag["severity"] == "high" for flag in flags):
             result.control_high_severity.append(normalised.number)
+            band[1] += 1
     return result
