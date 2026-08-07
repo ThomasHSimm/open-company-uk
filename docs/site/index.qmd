@@ -1,0 +1,18 @@
+---
+title: "open-company-uk"
+---
+
+An open, reproducible pipeline for deriving transparent company-status, compliance, and
+ownership indicators from free UK Companies House data.
+
+This is methodology, not a company-rating product. Register records cannot establish that a
+company is trustworthy, solvent, or non-fraudulent. The pipeline produces traceable
+attributes and discrete flags, never a composite score, and publishes no named company
+results or personal data.
+
+- [Methodology](methodology.qmd) explains the pipeline, evidence tiers, and severity semantics.
+- [Validation](validation.qmd) describes the positive-unlabelled study design.
+- [Limitations](limitations.qmd) states what the data and method cannot show.
+
+Not affiliated with or endorsed by Companies House or the Insolvency Service. Contains public
+sector information from both bodies licensed under the Open Government Licence v3.0.

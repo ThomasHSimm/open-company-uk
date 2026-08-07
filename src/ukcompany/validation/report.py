@@ -85,32 +85,42 @@ def render_report(result: EvaluationResult, labels: LabelSet) -> str:
         "particular company is insolvent. Solvent liquidations are absent from these labels, so "
         "this report evaluates adverse classification only.",
         "",
-        "The headline measure is **conditional recall among still-assessable companies**: "
+        "The primary result is the **current pipeline disposition of the labelled cohort**: "
+        "how many companies the pipeline excludes, flags, misses, cannot find, or has not "
+        "fetched. Exclusion is a temporal-coverage finding, not a successful detection. "
+        "Conditional recall is a secondary measure among still-screenable companies: "
         "`flagged_adverse / (flagged_adverse + missed_genuine)`. Cached 404/purged companies, "
-        "companies whose current status has moved back to normal, and records never fetched are "
-        "excluded from its denominator. The raw counts below make those exclusions explicit.",
+        "dissolved/closed exclusions, companies whose status has moved back to normal, and "
+        "records never fetched are excluded from its denominator.",
         "",
-        "## Recall by case type",
+        "Because the labels and Companies House generally describe the same filed insolvency "
+        "event, high conditional recall is expected and is not evidence of prediction, broad "
+        "indicator quality, or company trustworthiness.",
         "",
-        "| Case type | Flagged adverse | Genuine miss | Assessable | Conditional recall |",
-        "|---|---:|---:|---:|---:|",
+        "## Cohort disposition by case type",
+        "",
+        "| Case type | Excluded | Flagged adverse | Genuine miss | Screenable assessed | Conditional recall |",
+        "|---|---:|---:|---:|---:|---:|",
     ]
     for case_type in result.case_types():
         row = result.counts(case_type)
         assessable = row["flagged_adverse"] + row["missed_genuine"]
         lines.append(
-            f"| {case_type} | {row['flagged_adverse']} | {row['missed_genuine']} | "
+            f"| {case_type} | {row['excluded']} | {row['flagged_adverse']} | "
+            f"{row['missed_genuine']} | "
             f"{assessable} | {_percent(result.recall(case_type))} |"
         )
     assessable = counts["flagged_adverse"] + counts["missed_genuine"]
     lines += [
-        f"| **Overall** | **{counts['flagged_adverse']}** | **{counts['missed_genuine']}** | "
+        f"| **Overall** | **{counts['excluded']}** | **{counts['flagged_adverse']}** | "
+        f"**{counts['missed_genuine']}** | "
         f"**{assessable}** | **{_percent(result.recall())}** |",
         "",
         "## Full positive-outcome breakdown",
         "",
         "| Outcome | Count | Included in recall denominator? |",
         "|---|---:|---|",
+        f"| Excluded by pipeline (dissolved/closed) | {counts['excluded']} | No |",
         f"| Flagged adverse | {counts['flagged_adverse']} | Yes |",
         f"| Genuine miss | {counts['missed_genuine']} | Yes |",
         f"| Cached 404 / purged | {counts['missed_404']} | No |",

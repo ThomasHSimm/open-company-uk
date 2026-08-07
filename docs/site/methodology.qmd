@@ -1,0 +1,36 @@
+---
+title: "Methodology"
+---
+
+## Pipeline
+
+`open-company-uk` validates supplied company numbers, fetches and caches raw Companies House
+responses, derives a wide attribute table, and applies a rule registry to create discrete
+flags with severity, evidence, and observation time. Cache envelopes retain retrieval
+metadata and content hashes, allowing derivation and scoring to be replayed without network
+access.
+
+The current-state API and dated monthly snapshot have different jobs. API data supplies
+freshness-sensitive company state; the snapshot supplies population context. Neither
+silently overwrites the other, and event dates, retrieval times, and snapshot dates stay
+distinct.
+
+## Evidence tiers
+
+- Tier 1: registrar-recorded statuses, events, and compliance facts suitable for the shipped
+  rule registry.
+- Tier 2: structured but self-reported or identity-related register data that needs
+  qualification, including officer and PSC records.
+- Tier 3: contextual or inferred attributes such as SIC classification.
+
+The authoritative field-by-field tiers, definitions, sources, and caveats are in the
+generated [data dictionary](../data-dictionary.md). Rule definitions and their inputs are in
+the generated [rule reference](../rules.md).
+
+## Severity
+
+Severity grades the **seriousness of the recorded state**, not confidence in the record or
+certainty about a company. `high` marks serious registrar-recorded adverse states/events;
+`medium` marks material compliance failures; `low` marks weaker or less serious concerns;
+`info` supplies context. Confidence and data caveats belong in evidence and documentation.
+There is no composite score.

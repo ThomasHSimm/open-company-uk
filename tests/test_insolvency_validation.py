@@ -108,21 +108,38 @@ def test_evaluate_outcome_buckets_and_conditional_recall(tmp_path):
     cache.write("00000002", "profile", 404, "fixture://404", None)
     cache.write("00000003", "profile", 200, "fixture://moved", _profile("00000003"))
     cache.write("00000004", "profile", 200, "fixture://miss", _profile("00000004", "unknown"))
+    cache.write("00000006", "profile", 200, "fixture://excluded", _profile("00000006", "dissolved"))
     labels = {
         number: Label("compulsory_liquidation", "Compulsory liquidation")
-        for number in ["00000001", "00000002", "00000003", "00000004", "00000005"]
+        for number in ["00000001", "00000002", "00000003", "00000004", "00000005", "00000006"]
     }
 
     result = evaluate(labels, cache)
 
     assert result.counts() == {
         "flagged_adverse": 1,
+        "excluded": 1,
         "missed_404": 1,
         "missed_status_moved": 1,
         "missed_genuine": 1,
         "not_fetched": 1,
     }
     assert result.recall() == 0.5
+
+
+def test_evaluate_is_scoped_to_explicit_positive_cohort(tmp_path):
+    cache = RawCache(tmp_path / "raw")
+    for number in ("00000001", "00000002"):
+        cache.write(number, "profile", 200, "fixture://flagged", _profile(number, "liquidation"))
+    labels = {
+        number: Label("compulsory_liquidation", "Compulsory liquidation")
+        for number in ("00000001", "00000002")
+    }
+
+    result = evaluate(labels, cache, positive_numbers={"00000001"})
+
+    assert len(result.outcomes) == 1
+    assert result.outcomes[0].company_number == "00000001"
 
 
 def test_solvent_winding_up_on_adverse_label_is_loud_error(tmp_path):

@@ -1,0 +1,41 @@
+---
+title: "Validation"
+---
+
+## Study design
+
+The validation harness compares cached pipeline flags with Insolvency Service adverse-case
+labels. It is cache-only: sampling writes company-number lists, the operator fetches those
+lists explicitly, and evaluation then reads cached data. Recent positives are sampled
+because older labelled companies are often dissolved, purged, or recovered.
+
+Conditional recall is the share of assessable labelled adverse companies for which the
+applicable insolvency signal fires. The denominator excludes records that cannot fairly be
+assessed, and every exclusion bucket is reported. Recall is also broken down by case type;
+solvent members' voluntary liquidations do not count as adverse cases.
+
+The primary result is the cohort disposition: how many labelled companies the current
+pipeline excludes as dissolved/closed, flags, misses, cannot find, or has not fetched. The
+positive cohort must be supplied explicitly during evaluation, preventing unrelated entries
+in the shared cache from entering the result. Conditional recall applies only to the
+currently screenable subset. Since the labels and register usually reflect the same filed
+insolvency event, high recall is expected and is not a predictive-performance claim.
+
+The comparison cohort is drawn from active companies in the dated monthly snapshot and
+stratified to the positives by SIC section and coarse company-age band. Those are pre-distress
+structural confounders; downstream outcomes such as insolvency status, filing compliance, or
+charges are never matching dimensions.
+
+## Positive-unlabelled framing
+
+The label publication contains positives, not verified negatives. The control is therefore
+unlabelled and merely assumed not to be labelled positive. Its flag rate is not precision and
+is not a false-positive rate. The design can measure conditional recall and whether signals
+separate from a structurally similar control; it cannot establish accuracy against negative
+ground truth or validate the broader concept of trustworthiness.
+
+## Results
+
+> **Results pending.** No representative live study result is published yet. This section
+> will be populated only after the planned positive and control samples have been fetched,
+> evaluated, and reviewed. No numbers should be inferred from implementation tests.

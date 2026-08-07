@@ -17,6 +17,7 @@ ADVERSE_RULES = {"INSOLVENCY_ADVERSE", "STATUS_INSOLVENT"}
 NORMAL_CURRENT_STATUSES = {"active"}
 OUTCOMES = (
     "flagged_adverse",
+    "excluded",
     "missed_404",
     "missed_status_moved",
     "missed_genuine",
@@ -77,7 +78,10 @@ def _cached_record(cache: RawCache, number: str):
 
 
 def evaluate(
-    labels: dict[str, Label], cache: RawCache, control: ControlPlan | None = None
+    labels: dict[str, Label],
+    cache: RawCache,
+    control: ControlPlan | None = None,
+    positive_numbers: set[str] | None = None,
 ) -> EvaluationResult:
     """Evaluate cached records only. This function contains no fetching path.
 
@@ -86,7 +90,9 @@ def evaluate(
     control numbers changed (drawn from the snapshot, not supplied ad hoc).
     """
     result = EvaluationResult()
-    for number, label in labels.items():
+    cohort = labels.keys() if positive_numbers is None else positive_numbers
+    for number in cohort:
+        label = labels[number]
         record, rule_ids = _cached_record(cache, number)
         if record is None:
             outcome = "not_fetched"
@@ -94,6 +100,11 @@ def evaluate(
         elif not record.get("found"):
             outcome = "missed_404"
             status = None
+        elif record.get("excluded_status"):
+            # Match score_all(): dissolved/closed records are partitioned out
+            # before rules are applied and must never receive validation credit.
+            outcome = "excluded"
+            status = record.get("company_status")
         else:
             status = record.get("company_status")
             if ADVERSE_RULES.intersection(rule_ids):
@@ -104,7 +115,7 @@ def evaluate(
                 outcome = "missed_genuine"
         row = Outcome(number, label.case_type, label.raw_case_type, outcome, status, rule_ids)
         result.outcomes.append(row)
-        if "SOLVENT_WINDING_UP" in rule_ids:
+        if outcome != "excluded" and "SOLVENT_WINDING_UP" in rule_ids:
             result.solvent_winding_up_errors.append(row)
 
     result.control_plan = control

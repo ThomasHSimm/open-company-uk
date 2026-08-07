@@ -3,6 +3,26 @@
 Implementation notes and assumptions that need live verification against the
 real Companies House API. Append-only.
 
+## Current state (as of 2026-08-07)
+
+The core pipeline is built and fixture-tested: strict input validation,
+rate-limited fetch/cache with response provenance and archive-on-change,
+derivation, the rule registry, scoring, and generated rule/data-dictionary
+documentation. Paginated officer and PSC resources, PSC statements, corporate
+annotations, cessation and accounting-reference-date fields, and distinct
+ECCTA identity-verification versus statement-filing counts are represented.
+
+The cache-only insolvency validation harness is also built. It uses conditional
+recall for adverse labels, a recent-positive sampler, and a monthly snapshot
+control stratified by SIC section and company-age band. Because the control is
+unlabelled, this is a positive-unlabelled (PU) design and cannot estimate
+precision. Snapshot infrastructure dynamically discovers complete part sets,
+hashes them in a provenance manifest, and lazily scans full-width data with
+company numbers preserved as strings. A first representative live validation
+run (roughly 500 positives and 500 controls) remains outstanding. Gazette
+integration and the other parked extensions are not implemented; see
+`docs/TASKS.md` for their status and constraints.
+
 ## Verification pass — A + B + 1.1c (2026-08-03)
 
 Pre-task verification of the shipped work.
@@ -662,3 +682,41 @@ one line in `tests/test_insolvency_validation.py` (aligned with the maintainer's
 switch of the label SIC source to `sic07_2_digit`), and this file. No scoring,
 rules, severities, FIELD_DOCS, stratification, or the existing recall/control
 evaluation changed.
+
+## Documentation and Quarto baseline (2026-08-07)
+
+Added `docs/TASKS.md` as the durable task and decision register, including the
+outstanding real validation run, specified Gazette work, parked feature
+classes, rejected sources, and known methodological limits. Added a minimal
+Quarto website skeleton under `docs/site/` covering methodology, validation,
+and limitations without publishing or fabricating results. Refreshed README
+features, status, and CLI examples to reflect the existing validation harness,
+snapshot loader, officer/PSC coverage, and ECCTA fields.
+
+Regenerated `docs/rules.md` with `ukcompany rules-doc` and
+`docs/data-dictionary.md` with `ukcompany data-dict`; both matched their checked-
+in versions exactly. No rules, severities, `FIELD_DOCS`, scoring, or pipeline
+logic changed. CI publishing for the Quarto site remains a ready-to-build task.
+Verification: `pytest` passed 96 tests with the configured live test deselected;
+`ruff check .` passed; and `quarto render docs/site` produced the site successfully.
+
+## Validation reconciliation fix and disposition reframe (2026-08-07)
+
+The first representative run exposed two correctness defects. Validation called
+`score_company()` directly and therefore bypassed `score_all()`'s dissolved/closed exclusion
+gate; it also evaluated every labelled number present in the shared cache rather than the
+explicitly sampled cohort. The 500-company sample consequently credited 297 excluded
+companies as adverse hits, called one excluded company a genuine miss, and admitted one older
+cached positive, producing an invalid 500/501 headline.
+
+Validation now classifies `excluded_status` before examining rule IDs and requires
+`--positives <csv>` in evaluation mode. Numbers absent from retained labels or invalid in the
+positive file fail clearly. The report leads with the full current-pipeline disposition
+(excluded, flagged, missed, unavailable) and treats conditional recall among screenable
+companies as secondary. It also states that label/register agreement on an already-filed
+insolvency event is expected and is not predictive validation. No scoring rule, severity,
+`FIELD_DOCS`, fetch, derive, or production scoring behaviour changed.
+Verification passed with 97 non-live tests (one live test deselected), `ruff check .`, and
+`git diff --check`. The corrected real 500-company report reconciles to 298 excluded, 202
+flagged adverse, zero genuine misses, and zero unavailable/not-fetched positives; conditional
+recall on the 202 screenable companies is 100%, with the same-event caveat above.

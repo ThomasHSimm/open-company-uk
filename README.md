@@ -30,6 +30,15 @@ ukcompany run --input companies.csv        # CSV with a company_number column
 #   (see examples/companies.sample.csv - extra columns ignored, header case-insensitive,
 #    single-column headerless files also accepted)
 ukcompany run --input companies.csv --no-fetch   # re-derive/score from cache only
+ukcompany snapshot fetch --month 2026-08         # cache + manifest a monthly bulk snapshot
+ukcompany snapshot info                          # inspect the latest cached snapshot
+ukcompany validate --labels record-level-data.csv \
+  --control-from-snapshot --control-n 500 \
+  --write-positives-sample data/positives-sample.csv --positives-n 500
+# Fetch the generated lists with `ukcompany run`, then evaluate cache-only:
+ukcompany validate --labels record-level-data.csv \
+  --positives data/positives-sample.csv --control data/control-numbers.csv \
+  --out data/insolvency-validation.md
 ukcompany rules-doc                        # regenerate docs/rules.md
 ukcompany data-dict                        # regenerate docs/data-dictionary.md
 ```
@@ -59,9 +68,11 @@ input list -> [validate] -> [fetch] -> data/raw JSON cache -> [derive] -> attrib
   metadata; every derived value is traceable to a timestamped response;
   re-scoring after rule changes needs zero network access; runs resume for free.
 - **API-first for current state.** The REST API is authoritative for
-  freshness-sensitive fields (status, overdue flags, insolvency). The monthly
-  bulk snapshot is planned as a *dated population-context* source (address
-  frequency, cohort baselines) and never silently overrides API values.
+  freshness-sensitive fields (status, overdue flags, insolvency). Officer and
+  PSC endpoints are fetched in full across pages, including PSC statements and
+  distinct ECCTA identity-verification/statement fields. The monthly bulk
+  snapshot supplies *dated population context* and never silently overrides API
+  values.
 - **Rules are code with metadata.** `src/ukcompany/rules.py` is the judgement
   layer; `docs/rules.md` is generated from it. v1 rules use registrar-recorded
   (Tier 1) fields only; verification tiers per field are in the generated
@@ -69,6 +80,14 @@ input list -> [validate] -> [fetch] -> data/raw JSON cache -> [derive] -> attrib
   toward any aggregate.
 - Rate limiting is conservative (500 req/300s vs the published 600) because
   API keys may be shared across tools.
+- **Validation is cache-only and positive-unlabelled (PU).** It measures
+  conditional recall against Insolvency Service adverse labels and reports flag
+  rates in a snapshot control stratified by SIC section and age band. With no
+  negative labels, that flag rate is not precision or a false-positive rate.
+- **Snapshots are reproducible inputs.** All dynamically discovered monthly
+  parts must be complete; archives are hashed in a provenance manifest and
+  scanned full-width and lazily with Polars, preserving company numbers as
+  strings.
 
 ## Data protection and publication policy
 
@@ -81,14 +100,17 @@ private.
 
 ## Status / roadmap
 
-Phase 0–1 (this): validation, rate-limited client, cache, profile-derived
-attributes, profile-based rules, CLI, tests (fixture-based, no live calls in CI).
+Built: the core fetch/cache/derive/rule pipeline; paginated officers and PSC
+records and statements; ECCTA verification attributes; the insolvency
+validation harness and samplers; and the manifested, lazy Polars monthly
+snapshot loader. The first representative validation run still needs to be
+performed and interpreted.
 
-Planned: officers + filing history with pagination (officer churn,
-statutory-deadline reconstruction for repeat late filing), PSC statement
-categorical, Gazette winding-up petitions, disqualified-directors cross-check,
-monthly snapshot ingest via Polars for population-relative features. See
-`docs/plan.md`.
+Next specified integration: corporate Gazette winding-up petitions and orders.
+Other candidate features and their evidence/bias constraints are tracked in
+[`docs/TASKS.md`](docs/TASKS.md); methodology pages live in
+[`docs/site/`](docs/site/). Filing-history deadline reconstruction and the
+Gazette/disqualified-director extensions are not yet built.
 
 Not affiliated with or endorsed by Companies House. Contains public sector
 information licensed under the Open Government Licence v3.0.

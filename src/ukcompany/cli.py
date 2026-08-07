@@ -211,7 +211,10 @@ def _draw_snapshot_control(args: argparse.Namespace, labels) -> object:
     print(f"control numbers written to {args.control_out} ({len(plan.members)} companies)")
     print("TWO-STEP FLOW (cache-only harness does not fetch):")
     print(f"  1. ukcompany run --input {args.control_out}")
-    print(f"  2. ukcompany validate --labels {args.labels} --control {args.control_out}")
+    print(
+        f"  2. ukcompany validate --labels {args.labels} "
+        f"--positives <positives.csv> --control {args.control_out}"
+    )
     return plan
 
 
@@ -266,14 +269,37 @@ def cmd_validate(args: argparse.Namespace) -> int:
         control = read_control_csv(args.control)
     else:
         control = None
-    result = evaluate(labels.labels, cache, control)
+    if not args.positives:
+        raise SystemExit(
+            "--positives is required for evaluation so unrelated records in the shared cache "
+            "cannot enter the labelled cohort"
+        )
+    positive_report = validate_input(read_input_numbers(args.positives))
+    if positive_report.invalid:
+        raise SystemExit(f"invalid company number(s) in --positives: {positive_report.summary()}")
+    positive_numbers = set(positive_report.numbers)
+    missing_labels = positive_numbers - labels.labels.keys()
+    if missing_labels:
+        examples = ", ".join(sorted(missing_labels)[:5])
+        raise SystemExit(
+            f"{len(missing_labels)} --positives number(s) are absent from the retained labels "
+            f"(examples: {examples})"
+        )
+    result = evaluate(labels.labels, cache, control, positive_numbers)
     output = write_report(result, labels, args.out)
 
     print("-- insolvency agreement validation (cache only; no fetching) --")
+    counts = result.counts()
     print(
-        f"overall conditional recall: {result.recall():.1%}"
+        "positive cohort disposition: "
+        f"excluded={counts['excluded']}, flagged_adverse={counts['flagged_adverse']}, "
+        f"genuine_miss={counts['missed_genuine']}, cached_404={counts['missed_404']}, "
+        f"status_moved={counts['missed_status_moved']}, not_fetched={counts['not_fetched']}"
+    )
+    print(
+        f"screenable-subset conditional recall: {result.recall():.1%}"
         if result.recall() is not None
-        else "overall conditional recall: n/a"
+        else "screenable-subset conditional recall: n/a"
     )
     for case_type in result.case_types():
         recall = result.recall(case_type)
@@ -358,6 +384,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_validate.add_argument("--labels", required=True, help="Insolvency Service record-level CSV")
     p_validate.add_argument("--control", help="optional CSV of control company numbers")
+    p_validate.add_argument(
+        "--positives",
+        help="CSV of the exact positive cohort to evaluate (required in evaluation mode)",
+    )
     p_validate.add_argument(
         "--control-from-snapshot",
         action="store_true",

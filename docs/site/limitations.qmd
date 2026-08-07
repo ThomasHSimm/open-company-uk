@@ -1,0 +1,22 @@
+---
+title: "Limitations"
+---
+
+- Companies House describes its register as unverified information supplied by companies.
+  ECCTA identity verification is rolling out and does not retrospectively verify all officer
+  or PSC identities.
+- Officer/PSC same-person joins are fuzzy when based on names and partial dates of birth.
+  Personal data remains local and is not published by this project.
+- Validation is positive-unlabelled: it measures conditional recall, not precision. The
+  assumed-negative control has no negative ground truth.
+- Insolvency is an adjacent proxy for the broader and subjective idea of trustworthiness.
+  Detecting insolvency does not validate trustworthiness, fraud, creditworthiness, or future
+  solvency.
+- API current state, monthly snapshot state, and Insolvency Service labels from the 2012–2024
+  window are three distinct time bases. Apparent disagreement can reflect timing rather than
+  a pipeline error.
+- Absence of a flag is weak evidence. Rules cover defined recorded facts and do not form a
+  composite score or comprehensive due-diligence conclusion.
+
+Not affiliated with or endorsed by Companies House or the Insolvency Service. Contains public
+sector information from both bodies licensed under the Open Government Licence v3.0.

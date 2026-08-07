@@ -1,0 +1,16 @@
+project:
+  type: website
+
+website:
+  title: "open-company-uk methodology"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - methodology.qmd
+      - validation.qmd
+      - limitations.qmd
+
+format:
+  html:
+    toc: true
