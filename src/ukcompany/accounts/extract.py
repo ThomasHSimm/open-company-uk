@@ -38,6 +38,7 @@ OBSERVATION_COLUMNS = (
     "made_up_to_date",
     "raw_value",
     "scale",
+    "sign",
     "numeric_value",
     "is_current",
 )
@@ -163,6 +164,7 @@ def connect_store(path: str | Path) -> sqlite3.Connection:
             made_up_to_date TEXT NOT NULL,
             raw_value TEXT NOT NULL,
             scale INTEGER NOT NULL,
+            sign TEXT,
             numeric_value TEXT,
             is_current INTEGER NOT NULL
         );
@@ -184,6 +186,9 @@ def connect_store(path: str | Path) -> sqlite3.Connection:
             concept TEXT NOT NULL,
             numeric_value TEXT,
             raw_value TEXT NOT NULL,
+            scale INTEGER NOT NULL,
+            sign TEXT,
+            currency TEXT,
             source_archive TEXT NOT NULL,
             source_member TEXT NOT NULL,
             UNIQUE(company, period_end, concept, source_archive, source_member)
@@ -240,6 +245,7 @@ def _store_filing(
                 filing.made_up_to_date,
                 fact.raw_value,
                 fact.scale,
+                fact.sign,
                 fact.numeric_value,
                 int(fact.is_current),
             )
@@ -247,7 +253,7 @@ def _store_filing(
         ),
     )
     connection.executemany(
-        "INSERT OR IGNORE INTO legacy_dimensional_fallbacks VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR IGNORE INTO legacy_dimensional_fallbacks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             (
                 filing.company,
@@ -255,6 +261,9 @@ def _store_filing(
                 fallback.concept,
                 fallback.numeric_value,
                 fallback.raw_value,
+                fallback.scale,
+                fallback.sign,
+                fallback.currency,
                 archive.name,
                 source_member,
             )
@@ -431,6 +440,12 @@ def render_extraction_report(connection: sqlite3.Connection) -> str:
             "FROM observations WHERE dimension IS NULL) GROUP BY concept"
         )
     )
+    any_fill = dict(
+        connection.execute(
+            "SELECT concept, COUNT(*) FROM (SELECT DISTINCT company, period_end, concept "
+            "FROM observations) GROUP BY concept"
+        )
+    )
     lines = [
         "# Accounts extraction report",
         "",
@@ -475,14 +490,18 @@ def render_extraction_report(connection: sqlite3.Connection) -> str:
             "",
             "## Non-dimensional total fill rates",
             "",
-            "| Concept | Company/period records | Fill rate |",
-            "|---|---:|---:|",
+            "| Concept | Genuine-total records | Genuine-total rate | Any-observation records | Any-observation rate |",
+            "|---|---:|---:|---:|---:|",
         ]
     )
     for concept in TARGET_CONCEPTS:
         count = fill.get(concept, 0)
         rate = 100 * count / records if records else 0
-        lines.append(f"| `{concept}` | {count:,} | {rate:.1f}% |")
+        any_count = any_fill.get(concept, 0)
+        any_rate = 100 * any_count / records if records else 0
+        lines.append(
+            f"| `{concept}` | {count:,} | {rate:.1f}% | {any_count:,} | {any_rate:.1f}% |"
+        )
     lines.extend(
         [
             "",

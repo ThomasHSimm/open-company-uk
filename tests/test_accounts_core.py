@@ -41,6 +41,7 @@ def test_clean_total_scale_sign_currency_and_current_period() -> None:
 
     assert [row.numeric_value for row in result.observations] == ["1000", "-1234", "-1234"]
     assert [row.is_current for row in result.observations] == [True, True, False]
+    assert result.observations[1].sign == "-"
     assert {row.currency for row in result.observations} == {"GBP"}
     assert result.integrity.kept_total == 3
     assert result.integrity.closes()
@@ -171,3 +172,20 @@ def test_legacy_dimensional_fallback_is_audit_only() -> None:
     assert [(row.dimension, row.member) for row in result.observations] == [
         ("CreditorsDimension", "WithinOneYear")
     ]
+
+
+def test_self_closing_nil_fact_is_seen_and_does_not_consume_next_fact() -> None:
+    data = filing(
+        '<ix:nonFraction name="uk:Equity" contextRef="current" unitRef="gbp" xsi:nil="true"/>',
+        fact("CashBankOnHand", "7"),
+    )
+
+    result = extract_filing(data, "1", "20231231")
+
+    assert [(row.concept, row.numeric_value) for row in result.observations] == [
+        ("Equity", None),
+        ("CashBankOnHand", "7"),
+    ]
+    assert result.integrity.target_facts_seen == 2
+    assert result.integrity.kept_total == 2
+    assert result.integrity.closes()

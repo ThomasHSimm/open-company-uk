@@ -10,3 +10,8 @@ accounts:
   store_path: data/accounts/accounts.sqlite
   long_output: data/accounts/accounts-long.parquet
   extraction_report: docs/accounts-extraction.md
+  wide_output: data/accounts/accounts-wide.parquet
+  wide_provenance_output: data/accounts/accounts-wide-provenance.parquet
+  member_histogram: docs/accounts-member-frequency.csv
+  reconciliation_output: docs/accounts-component-reconciliation.csv
+  qa_report: docs/accounts-qa.md

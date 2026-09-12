@@ -2,6 +2,8 @@
 
 This report covers every iXBRL filing in the 24 monthly 2022–2023 archives. XML filings were skipped and counted. ZIP members were read in memory without extraction; aggregation used a disk-backed store.
 
+> Parser audit note: these panel figures are valid minimum counts. The V4 monotonic regression reproduced every legacy observation and recovered 108 additional employee facts in the two-archive audit sample; all additions were independently confirmed with lxml.
+
 ## Recurrence: does a company panel exist?
 
 Distinct companies: **3,837,237**.
