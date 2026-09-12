@@ -8,6 +8,13 @@ fetch:
 accounts:
   downloads_dir: ~/Downloads
   store_path: data/accounts/accounts.sqlite
+  base_url: https://download.companieshouse.gov.uk/archive
+  keep_zips: false
+  download_chunk_size: 8388608
+  download_retries: 2
+  download_backoff_seconds: 5
+  download_timeout_seconds: 120
+  coverage_report: docs/accounts-coverage.md
   long_output: data/accounts/accounts-long.parquet
   extraction_report: docs/accounts-extraction.md
   column_map: config/accounts-wide-columns.json

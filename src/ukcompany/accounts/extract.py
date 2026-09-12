@@ -206,6 +206,15 @@ def _stored_archive(connection: sqlite3.Connection, archive: ArchiveSpec) -> tup
     ).fetchone()
 
 
+def archive_recorded_complete(connection: sqlite3.Connection, name: str) -> bool:
+    """Check completion using only the manifest, even when the ZIP was deleted."""
+    row = connection.execute(
+        "SELECT 1 FROM processed_archives WHERE archive_name = ? AND complete = 1",
+        (name,),
+    ).fetchone()
+    return row is not None
+
+
 def archive_is_complete(connection: sqlite3.Connection, archive: ArchiveSpec) -> bool:
     stored = _stored_archive(connection, archive)
     if not stored or not stored[2]:
