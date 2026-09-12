@@ -1,0 +1,27 @@
+{
+  "totals": [
+    "Equity",
+    "NetCurrentAssetsLiabilities",
+    "CurrentAssets",
+    "Creditors",
+    "CashBankOnHand",
+    "Debtors",
+    "PropertyPlantEquipment",
+    "TotalAssetsLessCurrentLiabilities",
+    "AverageNumberEmployeesDuringPeriod"
+  ],
+  "members": [
+    {
+      "concept": "Equity",
+      "dimension": "EquityClassesDimension",
+      "member": "ShareCapital",
+      "column": "equity_share_capital"
+    },
+    {
+      "concept": "Equity",
+      "dimension": "EquityClassesDimension",
+      "member": "RetainedEarningsAccumulatedLosses",
+      "column": "equity_retained_earnings"
+    }
+  ]
+}

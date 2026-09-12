@@ -63,10 +63,11 @@ All target concepts are included. Frequencies count unreconciled LONG observatio
 | `PropertyPlantEquipment` | `PropertyPlantEquipmentClassesDimension` | `Buildings` | 2 | 1 | 2 |
 | `TotalAssetsLessCurrentLiabilities` | `RestatementsFirstTimeAdoptionDimension` | `RestatedAmount` | 12 | 12 | 12 |
 
-## Required human decisions
+## Reviewed decisions and remaining gates
 
-- Select the final WIDE member column map from the histogram; no map is inferred here.
-- Decide whether `PropertyPlantEquipment` members should be promoted to WIDE.
+- The v1 WIDE map is now reviewed: all nine genuine totals plus Share Capital and Retained Earnings Equity members.
+- `PropertyPlantEquipment` members are deferred to v2 pending a reviewed class-normalisation map.
+- Creditors members remain gated pending larger-sample reconciliation characterisation.
 - Run reconnaissance around 2010, 2013, and 2016 before choosing an effective historical start year.
 - Approve the Kaggle framing and OGL v3.0 attribution wording before publication.
 

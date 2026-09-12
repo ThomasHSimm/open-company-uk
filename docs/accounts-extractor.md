@@ -22,28 +22,13 @@ This writes the member-frequency histogram and total-versus-component reconcilia
 
 ## Pivot WIDE
 
-The pivot requires an explicit JSON column map; the repository intentionally contains no default member map:
-
-```json
-{
-  "totals": ["Equity", "CashBankOnHand"],
-  "members": [
-    {
-      "concept": "Creditors",
-      "dimension": "MaturitiesOrExpirationPeriodsDimension",
-      "member": "WithinOneYear",
-      "column": "creditors_within_one_year"
-    }
-  ]
-}
-```
+The pivot uses the reviewed [`config/accounts-wide-columns.json`](../config/accounts-wide-columns.json) by default. It contains all nine genuine totals and the approved Share Capital and Retained Earnings Equity members. An alternative reviewed map can be supplied with `--column-map`.
 
 For predictive work, use:
 
 ```bash
 ukcompany-accounts pivot \
   --long data/accounts/accounts-long.parquet \
-  --column-map reviewed-map.json \
   --mode as_first_reported
 ```
 
@@ -57,7 +42,7 @@ Missing values remain null. Monetary facts whose resolved unit is not GBP are re
 
 Creditors are dimensionally dominant. Genuine non-dimensional Creditors totals occurred in only about 4% of company-periods in the two-archive validation sample. The earlier panel report's approximately 52% was a conflated legacy metric that promoted some agreeing dimensional-only groups.
 
-A null WIDE `Creditors` total therefore does **not** mean that the filing omitted creditor information. Published tables should use explicitly reviewed Creditors member columns, particularly the maturity or current/non-current classifications.
+A null WIDE `Creditors` total therefore does **not** mean that the filing omitted creditor information. Creditors member columns remain gated on larger-sample reconciliation characterisation, so v1 intentionally carries no broad Creditors signal beyond the rare genuine total.
 
 ## Limitations and publication gates
 
@@ -68,4 +53,4 @@ A null WIDE `Creditors` total therefore does **not** mean that the filing omitte
 - Equity missingness varies by more than ten percentage points across months and is non-random.
 - `as_first_reported` is the required publication mode for predictive datasets. `latest` has look-ahead leakage.
 - A random regex-versus-lxml parser-agreement audit is required before starting a full-history extraction.
-- The final WIDE member map, inclusion of PropertyPlantEquipment members, effective start year, and Kaggle/OGL wording all require human approval.
+- The v1 WIDE map is approved. PropertyPlantEquipment members are deferred pending class normalisation, Creditors members remain gated on larger-sample reconciliation characterisation, and the effective start year and Kaggle/OGL wording still require human approval.

@@ -150,6 +150,40 @@ def test_column_map_is_input_and_validated(tmp_path: Path) -> None:
         WideColumnMap(("Equity",), (MemberColumn("Creditors", "D", "M", "Equity"),)).validate()
 
 
+def test_repository_reviewed_map_contains_only_approved_members() -> None:
+    loaded = load_column_map("config/accounts-wide-columns.json")
+
+    assert loaded.totals == (
+        "Equity",
+        "NetCurrentAssetsLiabilities",
+        "CurrentAssets",
+        "Creditors",
+        "CashBankOnHand",
+        "Debtors",
+        "PropertyPlantEquipment",
+        "TotalAssetsLessCurrentLiabilities",
+        "AverageNumberEmployeesDuringPeriod",
+    )
+    assert loaded.members == (
+        MemberColumn(
+            "Equity",
+            "EquityClassesDimension",
+            "ShareCapital",
+            "equity_share_capital",
+        ),
+        MemberColumn(
+            "Equity",
+            "EquityClassesDimension",
+            "RetainedEarningsAccumulatedLosses",
+            "equity_retained_earnings",
+        ),
+    )
+    assert all(
+        item.dimension != "RestatementsFirstTimeAdoptionDimension"
+        for item in loaded.members
+    )
+
+
 def test_member_histogram_and_total_component_reconciliation() -> None:
     frame = long_frame()
     extra = pl.DataFrame(

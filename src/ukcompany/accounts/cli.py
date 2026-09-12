@@ -23,6 +23,7 @@ DEFAULTS = {
     "store_path": "data/accounts/accounts.sqlite",
     "long_output": "data/accounts/accounts-long.parquet",
     "extraction_report": "docs/accounts-extraction.md",
+    "column_map": "config/accounts-wide-columns.json",
     "wide_output": "data/accounts/accounts-wide.parquet",
     "wide_provenance_output": "data/accounts/accounts-wide-provenance.parquet",
     "member_histogram": "docs/accounts-member-frequency.csv",
@@ -70,7 +71,7 @@ def cmd_extract(args: argparse.Namespace) -> int:
 
 def cmd_pivot(args: argparse.Namespace) -> int:
     settings = load_accounts_settings(args.settings)
-    mapping = load_column_map(args.column_map)
+    mapping = load_column_map(args.column_map or settings["column_map"])
     long_path = Path(args.long or settings["long_output"]).expanduser()
     wide = Path(args.output or settings["wide_output"]).expanduser()
     provenance = Path(
@@ -111,7 +112,10 @@ def build_parser() -> argparse.ArgumentParser:
     extract.set_defaults(func=cmd_extract)
     pivot = commands.add_parser("pivot", help="create WIDE and cell provenance Parquets")
     pivot.add_argument("--long")
-    pivot.add_argument("--column-map", required=True)
+    pivot.add_argument(
+        "--column-map",
+        help="reviewed JSON map; defaults to accounts.column_map in settings",
+    )
     pivot.add_argument("--mode", choices=("latest", "as_first_reported"), required=True)
     pivot.add_argument("--output")
     pivot.add_argument("--provenance-output")
