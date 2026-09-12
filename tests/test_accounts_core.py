@@ -152,3 +152,22 @@ def test_context_local_names_and_company_identifier_preserve_leading_zeros() -> 
     assert contexts["member"].member == "OrdinarySharesMember"
     assert result.company == "00123456"
     assert result.tagged_companies == frozenset({"00987654"})
+
+
+def test_legacy_dimensional_fallback_is_audit_only() -> None:
+    data = filing(
+        """<xbrli:context id="member"><xbrli:scenario>
+          <xbrldi:explicitMember dimension="uk:CreditorsDimension">uk:WithinOneYear
+          </xbrldi:explicitMember></xbrli:scenario><xbrli:period>
+          <xbrli:instant>2023-12-31</xbrli:instant></xbrli:period></xbrli:context>""",
+        fact("Creditors", "12", context="member"),
+    )
+
+    result = extract_filing(data, "1", "20231231")
+
+    assert [(row.concept, row.numeric_value) for row in result.legacy_fallbacks] == [
+        ("Creditors", "12")
+    ]
+    assert [(row.dimension, row.member) for row in result.observations] == [
+        ("CreditorsDimension", "WithinOneYear")
+    ]

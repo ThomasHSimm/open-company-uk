@@ -5,3 +5,8 @@ paths:
   output_dir: data/processed
 fetch:
   max_age_days: 7   # re-fetch cached responses older than this
+accounts:
+  downloads_dir: ~/Downloads
+  store_path: data/accounts/accounts.sqlite
+  long_output: data/accounts/accounts-long.parquet
+  extraction_report: docs/accounts-extraction.md

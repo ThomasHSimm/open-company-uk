@@ -83,6 +83,16 @@ class FactObservation:
     is_current: bool
 
 
+@dataclass(frozen=True)
+class LegacyFallback:
+    """Dimensional-only value the reconnaissance code labelled as a total."""
+
+    concept: str
+    period_end: str
+    numeric_value: str | None
+    raw_value: str
+
+
 @dataclass
 class IntegrityCounts:
     target_facts_seen: int = 0
@@ -134,6 +144,7 @@ class ExtractedFiling:
     made_up_to_date: str
     tagged_companies: frozenset[str]
     observations: tuple[FactObservation, ...]
+    legacy_fallbacks: tuple[LegacyFallback, ...]
     integrity: IntegrityCounts
 
 
@@ -283,6 +294,7 @@ def extract_filing(data: bytes, company: str, made_up_to_date: str) -> Extracted
     groups: dict[tuple[str, str, str | None, str | None], list[_CandidateFact]] = defaultdict(
         list
     )
+    legacy_groups: dict[tuple[str, str], list[tuple[bool, str, str | None]]] = defaultdict(list)
     observed_periods: set[str] = set()
 
     for raw_attrs, body in IX_FACT_RE.findall(data):
@@ -301,16 +313,24 @@ def extract_filing(data: bytes, company: str, made_up_to_date: str) -> Extracted
             integrity.bad_period_refs += 1
             continue
         observed_periods.add(context.period_end)
+        try:
+            scale = int(attrs.get("scale", "0") or 0)
+        except ValueError:
+            scale = 0
+        numeric_value = normalise_number(raw_value, scale, attrs.get("sign", ""))
+        legacy_groups[(concept, context.period_end)].append(
+            (
+                context.kind == ContextKind.NON_DIMENSIONAL,
+                raw_value,
+                numeric_value,
+            )
+        )
         if context.kind == ContextKind.MULTI_MEMBER:
             integrity.skipped_multimember += 1
             continue
         if context.kind == ContextKind.TYPED:
             integrity.skipped_typed += 1
             continue
-        try:
-            scale = int(attrs.get("scale", "0") or 0)
-        except ValueError:
-            scale = 0
         unit_ref = attrs.get("unitref", "")
         measure = units.get(unit_ref)
         currency = None if concept == EMPLOYEE_CONCEPT else measure
@@ -324,7 +344,7 @@ def extract_filing(data: bytes, company: str, made_up_to_date: str) -> Extracted
             context,
             raw_value,
             scale,
-            normalise_number(raw_value, scale, attrs.get("sign", "")),
+            numeric_value,
             currency,
         )
         key = (concept, context.period_end, context.dimension, context.member)
@@ -334,11 +354,23 @@ def extract_filing(data: bytes, company: str, made_up_to_date: str) -> Extracted
     observations: list[FactObservation] = []
     for candidates in groups.values():
         _emit_group(candidates, observations, integrity, current_period)
+    legacy_fallbacks = []
+    for (concept, period_end), candidates in legacy_groups.items():
+        if any(non_dimensional for non_dimensional, _raw, _numeric in candidates):
+            continue
+        values = {
+            ("NUM", numeric) if numeric is not None else ("RAW", raw)
+            for _non_dimensional, raw, numeric in candidates
+        }
+        if len(values) == 1:
+            _non_dimensional, raw, numeric = candidates[0]
+            legacy_fallbacks.append(LegacyFallback(concept, period_end, numeric, raw))
     integrity.assert_closes()
     return ExtractedFiling(
         company,
         made_up_to_date,
         frozenset(tagged_companies),
         tuple(observations),
+        tuple(legacy_fallbacks),
         integrity,
     )
