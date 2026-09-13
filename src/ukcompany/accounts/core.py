@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import re
 from collections import defaultdict
+from collections.abc import Collection
 from dataclasses import dataclass, fields
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -72,6 +73,9 @@ class ContextPeriod:
 @dataclass(frozen=True)
 class FactObservation:
     concept: str
+    fact_kind: str
+    fact_sequence: int
+    status: str
     period_end: str
     raw_value: str
     scale: int
@@ -98,7 +102,7 @@ class LegacyFallback:
 
 @dataclass
 class IntegrityCounts:
-    target_facts_seen: int = 0
+    facts_seen: int = 0
     kept_total: int = 0
     kept_member: int = 0
     collapsed_duplicate: int = 0
@@ -123,12 +127,12 @@ class IntegrityCounts:
         )
 
     def closes(self) -> bool:
-        return self.accounted() == self.target_facts_seen
+        return self.accounted() == self.facts_seen
 
     def assert_closes(self) -> None:
         if not self.closes():
             raise AssertionError(
-                f"fact accounting does not close: seen={self.target_facts_seen}, "
+                f"fact accounting does not close: seen={self.facts_seen}, "
                 f"accounted={self.accounted()}"
             )
 
@@ -154,6 +158,8 @@ class ExtractedFiling:
 @dataclass(frozen=True)
 class _CandidateFact:
     concept: str
+    fact_kind: str
+    fact_sequence: int
     context: ContextPeriod
     raw_value: str
     scale: int
@@ -227,13 +233,13 @@ def extract_contexts(data: bytes) -> tuple[dict[str, ContextPeriod], int]:
 
 
 def extract_units(data: bytes) -> dict[str, str]:
-    """Resolve simple unit IDs to local measure names such as GBP or pure."""
+    """Resolve unit IDs; compound units stay non-currency strings."""
     units: dict[str, str] = {}
     for raw_attrs, body in UNIT_RE.findall(data):
         unit_id = parse_attrs(raw_attrs).get("id")
-        measure_match = MEASURE_RE.search(body)
-        if unit_id and measure_match:
-            units[unit_id] = local_name(text_content(measure_match.group(1)))
+        measures = [local_name(text_content(match)) for match in MEASURE_RE.findall(body)]
+        if unit_id and measures:
+            units[unit_id] = "/".join(measures)
     return units
 
 
@@ -256,6 +262,46 @@ def normalise_number(raw: str, scale: int, sign: str = "") -> str | None:
     return format(number, "f")
 
 
+def normalise_scope(scope: str | Collection[str]) -> frozenset[str] | None:
+    """Return None for all concepts, otherwise a validated local-name set."""
+    if isinstance(scope, str):
+        if scope.strip().lower() == "all":
+            return None
+        values = [item.strip() for item in scope.split(",")]
+    else:
+        values = [str(item).strip() for item in scope]
+    concepts = frozenset(item for item in values if item)
+    if not concepts:
+        raise ValueError("concept scope must be 'all' or a non-empty concept list")
+    return concepts
+
+
+def _is_currency_measure(measure: str | None) -> bool:
+    return bool(measure and re.fullmatch(r"[A-Z]{3}", measure.upper()))
+
+
+def _observation(
+    candidate: _CandidateFact,
+    status: str,
+    current_period: str,
+) -> FactObservation:
+    return FactObservation(
+        candidate.concept,
+        candidate.fact_kind,
+        candidate.fact_sequence,
+        status,
+        candidate.context.period_end,
+        candidate.raw_value,
+        candidate.scale,
+        candidate.sign,
+        candidate.numeric_value,
+        candidate.context.dimension,
+        candidate.context.member,
+        candidate.currency,
+        candidate.context.period_end == current_period,
+    )
+
+
 def _emit_group(
     candidates: list[_CandidateFact],
     observations: list[FactObservation],
@@ -266,32 +312,34 @@ def _emit_group(
     if len({candidate.agreement_key() for candidate in candidates}) != 1:
         if first.context.kind == ContextKind.NON_DIMENSIONAL:
             integrity.ambiguous_nondimensional += len(candidates)
+            status = "conflict_nondimensional"
         else:
             integrity.member_value_conflict += len(candidates)
+            status = "conflict_member"
+        observations.extend(
+            _observation(candidate, status, current_period) for candidate in candidates
+        )
         return
     if first.context.kind == ContextKind.NON_DIMENSIONAL:
         integrity.kept_total += 1
     else:
         integrity.kept_member += 1
     integrity.collapsed_duplicate += len(candidates) - 1
-    observations.append(
-        FactObservation(
-            first.concept,
-            first.context.period_end,
-            first.raw_value,
-            first.scale,
-            first.sign,
-            first.numeric_value,
-            first.context.dimension,
-            first.context.member,
-            first.currency,
-            first.context.period_end == current_period,
-        )
-    )
+    observations.append(_observation(first, "selected", current_period))
 
 
-def extract_filing(data: bytes, company: str, made_up_to_date: str) -> ExtractedFiling:
-    """Extract target facts from one iXBRL filing and close fact accounting."""
+def extract_filing(
+    data: bytes,
+    company: str,
+    made_up_to_date: str,
+    *,
+    scope: str | Collection[str] = "all",
+    kinds: str = "all",
+) -> ExtractedFiling:
+    """Extract in-scope facts from one iXBRL filing and close fact accounting."""
+    concepts = normalise_scope(scope)
+    if kinds not in {"all", "numeric-only"}:
+        raise ValueError("kinds must be 'all' or 'numeric-only'")
     contexts, _invalid_context_periods = extract_contexts(data)
     units = extract_units(data)
     integrity = IntegrityCounts()
@@ -304,17 +352,19 @@ def extract_filing(data: bytes, company: str, made_up_to_date: str) -> Extracted
     ] = defaultdict(list)
     observed_periods: set[str] = set()
 
-    for _tag, raw_attrs, body in IX_FACT_RE.findall(data):
+    for fact_sequence, (raw_tag, raw_attrs, body) in enumerate(IX_FACT_RE.findall(data)):
         attrs = parse_attrs(raw_attrs)
         concept = local_name(attrs.get("name", ""))
         raw_value = text_content(body)
         if concept == COMPANY_CONCEPT:
             if raw_value:
                 tagged_companies.add(raw_value)
+        fact_kind = "numeric" if raw_tag.lower() == b"nonfraction" else "non-numeric"
+        if not concept or (concepts is not None and concept not in concepts):
             continue
-        if concept not in TARGET_SET:
+        if kinds == "numeric-only" and fact_kind != "numeric":
             continue
-        integrity.target_facts_seen += 1
+        integrity.facts_seen += 1
         context = contexts.get(attrs.get("contextref", ""))
         if context is None:
             integrity.bad_period_refs += 1
@@ -325,24 +375,33 @@ def extract_filing(data: bytes, company: str, made_up_to_date: str) -> Extracted
         except ValueError:
             scale = 0
         sign = attrs.get("sign") or None
-        numeric_value = normalise_number(raw_value, scale, sign or "")
+        numeric_value = (
+            normalise_number(raw_value, scale, sign or "")
+            if fact_kind == "numeric"
+            else None
+        )
         unit_ref = attrs.get("unitref", "")
         measure = units.get(unit_ref)
-        currency = None if concept == EMPLOYEE_CONCEPT else measure
-        legacy_groups[(concept, context.period_end)].append(
-            (
-                context.kind == ContextKind.NON_DIMENSIONAL,
-                raw_value,
-                numeric_value,
-                scale,
-                sign,
-                currency,
-            )
+        currency = (
+            measure.upper()
+            if concept != EMPLOYEE_CONCEPT and _is_currency_measure(measure)
+            else None
         )
-        if concept != EMPLOYEE_CONCEPT:
+        if concept in TARGET_SET:
+            legacy_groups[(concept, context.period_end)].append(
+                (
+                    context.kind == ContextKind.NON_DIMENSIONAL,
+                    raw_value,
+                    numeric_value,
+                    scale,
+                    sign,
+                    currency,
+                )
+            )
+        if fact_kind == "numeric" and concept != EMPLOYEE_CONCEPT:
             if unit_ref and measure is None:
                 integrity.unresolved_unit_refs += 1
-            elif measure and measure.upper() != "GBP":
+            elif currency and currency != "GBP":
                 integrity.non_gbp_facts += 1
         if context.kind == ContextKind.MULTI_MEMBER:
             integrity.skipped_multimember += 1
@@ -352,6 +411,8 @@ def extract_filing(data: bytes, company: str, made_up_to_date: str) -> Extracted
             continue
         candidate = _CandidateFact(
             concept,
+            fact_kind,
+            fact_sequence,
             context,
             raw_value,
             scale,

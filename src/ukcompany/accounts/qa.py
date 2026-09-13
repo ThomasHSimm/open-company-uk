@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .core import EMPLOYEE_CONCEPT
+from .core import EMPLOYEE_CONCEPT, TARGET_CONCEPTS
 from .pivot import require_polars
 
 SOURCE_KEYS = (
@@ -18,10 +18,19 @@ SOURCE_KEYS = (
 )
 
 
+def selected_target_facts(long_frame):
+    pl = require_polars()
+    selected = long_frame.filter(pl.col("concept").is_in(TARGET_CONCEPTS))
+    if "status" in selected.columns:
+        selected = selected.filter(pl.col("status") == "selected")
+    return selected
+
+
 def member_histogram(long_frame):
     pl = require_polars()
     return (
-        long_frame.filter(pl.col("dimension").is_not_null())
+        selected_target_facts(long_frame)
+        .filter(pl.col("dimension").is_not_null())
         .group_by("concept", "dimension", "member")
         .agg(
             pl.len().alias("observations"),
@@ -35,7 +44,7 @@ def member_histogram(long_frame):
 def total_component_reconciliation(long_frame, relative_tolerance: float = 1e-6):
     """Compare reported totals with member sums within the same source filing."""
     pl = require_polars()
-    numeric = long_frame.filter(
+    numeric = selected_target_facts(long_frame).filter(
         pl.col("numeric_value").is_not_null()
         & ((pl.col("currency") == "GBP") | (pl.col("concept") == EMPLOYEE_CONCEPT))
     ).with_columns(pl.col("numeric_value").cast(pl.Float64, strict=False).alias("value"))
@@ -104,7 +113,7 @@ def render_qa_report(histogram, reconciliation, *, source: str) -> str:
             "",
             "## Member-frequency histogram",
             "",
-            "All target concepts are included. Frequencies count unreconciled LONG observations; this table is the evidence for a human-selected WIDE member map.",
+            "All target concepts are included. Frequencies count only Stage 1 observations tagged `selected`; conflict rows remain in the archive for a Stage 2 policy. This table is the evidence for a human-selected WIDE member map.",
             "",
             "| Concept | Dimension | Member | Observations | Companies | Company-periods |",
             "|---|---|---|---:|---:|---:|",

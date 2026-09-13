@@ -9,8 +9,11 @@ import yaml
 
 from .backfill import DEFAULT_BASE_URL, parse_month, run_backfill
 from .extract import (
+    archive_recorded_complete,
     connect_store,
     discover_archives,
+    export_archive_parquet,
+    export_completed_archives,
     export_parquet,
     parse_archive,
     process_archive,
@@ -29,7 +32,10 @@ DEFAULTS = {
     "download_backoff_seconds": 5.0,
     "download_timeout_seconds": 120.0,
     "coverage_report": "docs/accounts-coverage.md",
-    "long_output": "data/accounts/accounts-long.parquet",
+    "scope": "all",
+    "kinds": "all",
+    "monthly_output_dir": "data/accounts/long",
+    "long_input": "data/accounts/long/accounts-long-*.parquet",
     "extraction_report": "docs/accounts-extraction.md",
     "column_map": "config/accounts-wide-columns.json",
     "wide_output": "data/accounts/accounts-wide.parquet",
@@ -60,6 +66,13 @@ def month_argument(value: str) -> tuple[int, int]:
         raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
+def configured_scope(argument: str | None, settings: dict[str, object]) -> str | list[str]:
+    value = argument if argument is not None else settings["scope"]
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return str(value)
+
+
 def cmd_extract(args: argparse.Namespace) -> int:
     settings = load_accounts_settings(args.settings)
     archives = (
@@ -70,20 +83,41 @@ def cmd_extract(args: argparse.Namespace) -> int:
     if not archives:
         raise SystemExit("no Accounts_Monthly_Data archives found")
     store = setting_path(args.store or settings["store_path"])
-    output = setting_path(args.output or settings["long_output"])
+    output_dir = setting_path(args.output_dir or settings["monthly_output_dir"])
     report = setting_path(args.report or settings["extraction_report"])
+    scope = configured_scope(args.scope, settings)
+    kinds = str(args.kinds or settings["kinds"])
     connection = connect_store(store)
     try:
         for index, archive in enumerate(archives, 1):
             print(f"[{index}/{len(archives)}] {archive.name}", flush=True)
-            process_archive(connection, archive, limit=args.limit_per_zip)
-        print("Exporting LONG Parquet...", flush=True)
-        export_parquet(connection, output)
+            process_archive(
+                connection,
+                archive,
+                limit=args.limit_per_zip,
+                scope=scope,
+                kinds=kinds,
+            )
+            if archive_recorded_complete(
+                connection, archive.name, scope=scope, kinds=kinds
+            ):
+                export_archive_parquet(
+                    connection,
+                    archive.name,
+                    output_dir,
+                    scope=scope,
+                    kinds=kinds,
+                )
+        if args.monolithic_output:
+            print("Exporting opt-in monolithic LONG Parquet...", flush=True)
+            export_parquet(connection, setting_path(args.monolithic_output))
         report.parent.mkdir(parents=True, exist_ok=True)
         report.write_text(render_extraction_report(connection), encoding="utf-8")
     finally:
         connection.close()
-    print(f"LONG: {output}")
+    print(f"Monthly LONG directory: {output_dir}")
+    if args.monolithic_output:
+        print(f"Monolithic LONG: {setting_path(args.monolithic_output)}")
     print(f"Report: {report}")
     return 0
 
@@ -91,7 +125,7 @@ def cmd_extract(args: argparse.Namespace) -> int:
 def cmd_pivot(args: argparse.Namespace) -> int:
     settings = load_accounts_settings(args.settings)
     mapping = load_column_map(str(args.column_map or settings["column_map"]))
-    long_path = setting_path(args.long or settings["long_output"])
+    long_path = setting_path(args.long or settings["long_input"])
     wide = setting_path(args.output or settings["wide_output"])
     provenance = setting_path(args.provenance_output or settings["wide_provenance_output"])
     pivot_parquet(long_path, mapping, args.mode, wide, provenance)
@@ -102,7 +136,7 @@ def cmd_pivot(args: argparse.Namespace) -> int:
 
 def cmd_qa(args: argparse.Namespace) -> int:
     settings = load_accounts_settings(args.settings)
-    long_path = setting_path(args.long or settings["long_output"])
+    long_path = setting_path(args.long or settings["long_input"])
     histogram = setting_path(args.histogram or settings["member_histogram"])
     reconciliation = setting_path(args.reconciliation or settings["reconciliation_output"])
     report = setting_path(args.report or settings["qa_report"])
@@ -118,9 +152,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     store = setting_path(args.store or settings["store_path"])
     downloads = setting_path(args.downloads or settings["downloads_dir"])
     coverage = setting_path(args.coverage_report or settings["coverage_report"])
-    output = setting_path(args.output or settings["long_output"])
+    output_dir = setting_path(args.output_dir or settings["monthly_output_dir"])
     extraction_report = setting_path(args.report or settings["extraction_report"])
     keep_zips = bool(settings["keep_zips"]) if args.keep_zips is None else args.keep_zips
+    scope = configured_scope(args.scope, settings)
+    kinds = str(args.kinds or settings["kinds"])
     connection = connect_store(store)
     try:
         summary = run_backfill(
@@ -128,6 +164,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             args.from_month,
             args.to_month,
             downloads=downloads,
+            output_dir=output_dir,
             base_url=str(args.base_url or settings["base_url"]),
             keep_zips=keep_zips,
             limit_per_zip=args.limit_per_zip,
@@ -136,30 +173,65 @@ def cmd_run(args: argparse.Namespace) -> int:
             backoff=float(settings["download_backoff_seconds"]),
             timeout=float(settings["download_timeout_seconds"]),
             report_output=coverage,
+            scope=scope,
+            kinds=kinds,
         )
-        print("Exporting LONG Parquet...", flush=True)
-        export_parquet(connection, output)
+        if args.monolithic_output:
+            print("Exporting opt-in monolithic LONG Parquet...", flush=True)
+            export_parquet(connection, setting_path(args.monolithic_output))
         extraction_report.parent.mkdir(parents=True, exist_ok=True)
         extraction_report.write_text(render_extraction_report(connection), encoding="utf-8")
     finally:
         connection.close()
-    print(f"LONG: {output}")
+    print(f"Monthly LONG directory: {output_dir}")
+    if args.monolithic_output:
+        print(f"Monolithic LONG: {setting_path(args.monolithic_output)}")
     print(f"Extraction report: {extraction_report}")
     print(f"Coverage report: {coverage}")
     return int(summary.has_gaps)
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    settings = load_accounts_settings(args.settings)
+    store = setting_path(args.store or settings["store_path"])
+    output_dir = setting_path(args.output_dir or settings["monthly_output_dir"])
+    scope = configured_scope(args.scope, settings)
+    kinds = str(args.kinds or settings["kinds"])
+    connection = connect_store(store)
+    try:
+        outputs = export_completed_archives(
+            connection,
+            output_dir,
+            start=args.from_month,
+            end=args.to_month,
+            scope=scope,
+            kinds=kinds,
+        )
+        if args.monolithic_output:
+            export_parquet(connection, setting_path(args.monolithic_output))
+    finally:
+        connection.close()
+    print(f"Monthly Parquets written: {len(outputs):,}")
+    print(f"Monthly LONG directory: {output_dir}")
+    if args.monolithic_output:
+        print(f"Monolithic LONG: {setting_path(args.monolithic_output)}")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--settings", default="config/settings.yaml")
     commands = parser.add_subparsers(dest="command", required=True)
-    extract = commands.add_parser("extract", help="extract monthly ZIPs into LONG Parquet")
+    extract = commands.add_parser("extract", help="extract ZIPs into per-month LONG Parquets")
     extract.add_argument("archives", nargs="*", help="ZIP paths; otherwise discover downloads")
     extract.add_argument("--downloads")
     extract.add_argument("--store")
-    extract.add_argument("--output")
+    extract.add_argument("--output-dir")
+    extract.add_argument("--monolithic-output")
     extract.add_argument("--report")
     extract.add_argument("--limit-per-zip", type=int)
+    extract.add_argument("--scope", help="all or a comma-separated local-name list")
+    extract.add_argument("--kinds", choices=("all", "numeric-only"))
     extract.set_defaults(func=cmd_extract)
     run = commands.add_parser("run", help="fetch, extract, then safely delete a month range")
     run.add_argument(
@@ -182,9 +254,21 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--keep-zips", action=argparse.BooleanOptionalAction, default=None)
     run.add_argument("--limit-per-zip", type=int)
     run.add_argument("--coverage-report")
-    run.add_argument("--output")
+    run.add_argument("--output-dir")
+    run.add_argument("--monolithic-output")
     run.add_argument("--report")
+    run.add_argument("--scope", help="all or a comma-separated local-name list")
+    run.add_argument("--kinds", choices=("all", "numeric-only"))
     run.set_defaults(func=cmd_run)
+    export = commands.add_parser("export", help="rewrite completed per-month Parquets")
+    export.add_argument("--store")
+    export.add_argument("--output-dir")
+    export.add_argument("--from", dest="from_month", metavar="YYYY-MM", type=month_argument)
+    export.add_argument("--to", dest="to_month", metavar="YYYY-MM", type=month_argument)
+    export.add_argument("--monolithic-output")
+    export.add_argument("--scope", help="all or a comma-separated local-name list")
+    export.add_argument("--kinds", choices=("all", "numeric-only"))
+    export.set_defaults(func=cmd_export)
     pivot = commands.add_parser("pivot", help="create WIDE and cell provenance Parquets")
     pivot.add_argument("--long")
     pivot.add_argument(

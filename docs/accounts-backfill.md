@@ -15,14 +15,15 @@ download to hidden .part
   → atomically rename
   → extract into SQLite
   → confirm manifest complete
+  → stream that month to its own Parquet
   → delete only if downloaded by this process and retention is off
 ```
 
-The existing `extract` command is unchanged and remains the command for disk-only archives.
+The existing `extract` command remains the disk-only entry point. Under the Stage 1 contract it now writes the same per-month outputs and uses the same scope-aware manifest.
 
 ## Coverage and exit status
 
-`docs/accounts-coverage.md` is rewritten after every classified month, including immediately before an accounting failure is re-raised. It lists:
+`docs/accounts-coverage.md` is rewritten after every classified month, including immediately before an accounting failure is re-raised. A month is not complete for cleanup purposes until its configured scope is manifest-complete and its monthly Parquet has been written. The report lists:
 
 - present and manifest-complete months;
 - completed archives deleted or kept;
@@ -47,6 +48,8 @@ Runtime settings live under `accounts` in `config/settings.yaml`:
 - `download_timeout_seconds`; and
 - `coverage_report`.
 
+Stage 1 archive settings add `scope` (`all` or a concept list), `kinds` (`all` or `numeric-only`), `monthly_output_dir`, and the `long_input` glob used by downstream consumers.
+
 The CLI can override the range, downloads directory, store, base URL, ZIP retention, output paths, and development sample limit. `--no-keep-zips` overrides a configured `keep_zips: true`.
 
 ## Known boundaries
@@ -55,4 +58,4 @@ The CLI can override the range, downloads directory, store, base URL, ZIP retent
 - Downloads restart from byte zero after interruption. HTTP range resume is out of scope for v1.
 - Prefetch and parallel extraction are out of scope because they increase peak ZIP storage.
 - Central-directory validation catches truncation and structural corruption without decompressing 1–2 GB archives. Companies House publishes no checksum for cryptographic verification.
-- ZIP deletion does not limit SQLite/WAL growth or the working space needed for Parquet export.
+- ZIP deletion does not limit SQLite/WAL growth or the working space needed for each monthly Parquet export.

@@ -15,7 +15,10 @@ accounts:
   download_backoff_seconds: 5
   download_timeout_seconds: 120
   coverage_report: docs/accounts-coverage.md
-  long_output: data/accounts/accounts-long.parquet
+  scope: all
+  kinds: all
+  monthly_output_dir: data/accounts/long
+  long_input: data/accounts/long/accounts-long-*.parquet
   extraction_report: docs/accounts-extraction.md
   column_map: config/accounts-wide-columns.json
   wide_output: data/accounts/accounts-wide.parquet

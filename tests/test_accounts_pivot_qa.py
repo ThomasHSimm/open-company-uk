@@ -15,6 +15,7 @@ def long_frame() -> pl.DataFrame:
         "currency": "GBP",
         "source_archive": "archive.zip",
         "scale": 0,
+        "status": "selected",
     }
     rows = [
         {
@@ -82,6 +83,20 @@ def long_frame() -> pl.DataFrame:
             "source_year": 2022,
             "source_month": 2,
             "source_member": "cash.html",
+            "made_up_to_date": "20221231",
+            "is_current": 1,
+        },
+        {
+            **defaults,
+            "company": "00123456",
+            "period_end": "2022-12-31",
+            "concept": "CurrentAssets",
+            "numeric_value": "999",
+            "raw_value": "999",
+            "status": "conflict_nondimensional",
+            "source_year": 2022,
+            "source_month": 2,
+            "source_member": "conflict.html",
             "made_up_to_date": "20221231",
             "is_current": 1,
         },

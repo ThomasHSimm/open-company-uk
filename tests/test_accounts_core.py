@@ -47,6 +47,43 @@ def test_clean_total_scale_sign_currency_and_current_period() -> None:
     assert result.integrity.closes()
 
 
+def test_all_scope_non_target_text_and_restricted_numeric_scope() -> None:
+    data = filing(
+        fact("CustomMetric", "7"),
+        '<ix:nonNumeric name="uk:EntityTradingStatus" contextRef="current">'
+        "Dormant company</ix:nonNumeric>",
+        '<ix:nonNumeric name="uk:ReportingPeriodEndDate" contextRef="current">'
+        "2023-12-31</ix:nonNumeric>",
+        fact("Equity", "10"),
+    )
+
+    all_facts = extract_filing(data, "1", "20231231")
+    restricted = extract_filing(
+        data,
+        "1",
+        "20231231",
+        scope=["CustomMetric", "EntityTradingStatus"],
+        kinds="numeric-only",
+    )
+
+    assert [
+        (row.concept, row.fact_kind, row.raw_value, row.numeric_value, row.status)
+        for row in all_facts.observations
+    ] == [
+        ("CustomMetric", "numeric", "7", "7", "selected"),
+        ("EntityTradingStatus", "non-numeric", "Dormant company", None, "selected"),
+        ("ReportingPeriodEndDate", "non-numeric", "2023-12-31", None, "selected"),
+        ("Equity", "numeric", "10", "10", "selected"),
+    ]
+    assert [(row.concept, row.numeric_value) for row in restricted.observations] == [
+        ("CustomMetric", "7")
+    ]
+    assert all_facts.integrity.facts_seen == 4
+    assert restricted.integrity.facts_seen == 1
+    assert all_facts.integrity.closes()
+    assert restricted.integrity.closes()
+
+
 def test_total_conflict_and_agreeing_duplicate_have_separate_buckets() -> None:
     result = extract_filing(
         filing(
@@ -59,8 +96,10 @@ def test_total_conflict_and_agreeing_duplicate_have_separate_buckets() -> None:
         "20231231",
     )
 
-    assert [(row.concept, row.numeric_value) for row in result.observations] == [
-        ("CurrentAssets", "50")
+    assert [(row.concept, row.numeric_value, row.status) for row in result.observations] == [
+        ("Equity", "100", "conflict_nondimensional"),
+        ("Equity", "101", "conflict_nondimensional"),
+        ("CurrentAssets", "50", "selected"),
     ]
     assert result.integrity.ambiguous_nondimensional == 2
     assert result.integrity.kept_total == 1
@@ -95,9 +134,14 @@ def test_single_members_uniform_capture_dedupe_and_conflict() -> None:
 
     result = extract_filing(data, "1", "20231231")
 
-    assert [(row.concept, row.member, row.numeric_value) for row in result.observations] == [
-        ("Creditors", "WithinOneYear", "20"),
-        ("Debtors", "TradeDebtors", "9"),
+    assert [
+        (row.concept, row.member, row.numeric_value, row.status)
+        for row in result.observations
+    ] == [
+        ("Creditors", "WithinOneYear", "20", "selected"),
+        ("Creditors", "AfterOneYear", "30", "conflict_member"),
+        ("Creditors", "AfterOneYear", "31", "conflict_member"),
+        ("Debtors", "TradeDebtors", "9", "selected"),
     ]
     assert result.integrity.kept_member == 2
     assert result.integrity.collapsed_duplicate == 1
@@ -186,6 +230,6 @@ def test_self_closing_nil_fact_is_seen_and_does_not_consume_next_fact() -> None:
         ("Equity", None),
         ("CashBankOnHand", "7"),
     ]
-    assert result.integrity.target_facts_seen == 2
+    assert result.integrity.facts_seen == 2
     assert result.integrity.kept_total == 2
     assert result.integrity.closes()

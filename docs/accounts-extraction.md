@@ -1,5 +1,7 @@
 # Accounts extraction report
 
+> Historical nine-concept regression sample. The current Stage 1 default is the full-fact archive; see `accounts-stage1-validation.md` for its two-archive validation. The `target_facts_seen` label below predates its rename to `facts_seen`.
+
 ## Run summary
 
 - Archives represented: 2

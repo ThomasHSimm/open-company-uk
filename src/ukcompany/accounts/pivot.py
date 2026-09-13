@@ -91,6 +91,8 @@ def pivot_long(long_frame, mapping: WideColumnMap, mode: PivotMode):
     mapping.validate()
     if mode not in {"latest", "as_first_reported"}:
         raise ValueError(f"unknown pivot mode: {mode}")
+    if "status" in long_frame.columns:
+        long_frame = long_frame.filter(pl.col("status") == "selected")
     usable = long_frame.filter(
         (pl.col("concept") == EMPLOYEE_CONCEPT) | (pl.col("currency") == "GBP")
     )

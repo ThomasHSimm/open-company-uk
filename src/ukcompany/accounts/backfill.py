@@ -6,7 +6,7 @@ import calendar
 import sqlite3
 import time
 import zipfile
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -16,6 +16,7 @@ import requests
 from .extract import (
     ArchiveSpec,
     archive_recorded_complete,
+    export_archive_parquet,
     parse_archive,
     process_archive,
 )
@@ -229,6 +230,7 @@ def run_backfill(
     end: tuple[int, int],
     *,
     downloads: str | Path,
+    output_dir: str | Path,
     base_url: str = DEFAULT_BASE_URL,
     keep_zips: bool = False,
     limit_per_zip: int | None = None,
@@ -237,6 +239,8 @@ def run_backfill(
     backoff: float = 5.0,
     timeout: float = 120.0,
     report_output: str | Path | None = None,
+    scope: str | Collection[str] = "all",
+    kinds: str = "all",
 ) -> BackfillSummary:
     """Serially fetch, extract, and conditionally delete an inclusive month range."""
     if limit_per_zip is not None and limit_per_zip <= 0:
@@ -246,7 +250,30 @@ def run_backfill(
     outcomes: list[MonthOutcome] = []
     for year, month in months:
         name = archive_name(year, month)
-        if archive_recorded_complete(connection, name):
+        if archive_recorded_complete(connection, name, scope=scope, kinds=kinds):
+            try:
+                export_archive_parquet(
+                    connection,
+                    name,
+                    output_dir,
+                    overwrite=False,
+                    scope=scope,
+                    kinds=kinds,
+                )
+            except (OSError, RuntimeError, ValueError, sqlite3.Error) as exc:
+                _record(
+                    outcomes,
+                    MonthOutcome(
+                        year,
+                        month,
+                        name,
+                        MonthStatus.FAILED,
+                        manifest_complete=True,
+                        error=f"monthly export failed: {exc}",
+                    ),
+                    report_output,
+                )
+                continue
             _record(
                 outcomes,
                 MonthOutcome(year, month, name, MonthStatus.SKIPPED_COMPLETE, True),
@@ -294,7 +321,13 @@ def run_backfill(
 
         archive: ArchiveSpec = parse_archive(fetched.path)
         try:
-            process_archive(connection, archive, limit=limit_per_zip)
+            process_archive(
+                connection,
+                archive,
+                limit=limit_per_zip,
+                scope=scope,
+                kinds=kinds,
+            )
         except AssertionError as exc:
             _record(
                 outcomes,
@@ -310,10 +343,21 @@ def run_backfill(
             )
             continue
 
-        complete = archive_recorded_complete(connection, name)
+        complete = archive_recorded_complete(connection, name, scope=scope, kinds=kinds)
         if limit_per_zip is not None:
-            status = MonthStatus.PARTIAL_KEPT
-        elif not complete:
+            _record(
+                outcomes,
+                MonthOutcome(
+                    year,
+                    month,
+                    name,
+                    MonthStatus.PARTIAL_KEPT,
+                    bytes_received=fetched.bytes_received,
+                ),
+                report_output,
+            )
+            continue
+        if not complete:
             _record(
                 outcomes,
                 MonthOutcome(
@@ -326,7 +370,30 @@ def run_backfill(
                 report_output,
             )
             continue
-        elif fetched.downloaded_this_run and not keep_zips:
+        try:
+            export_archive_parquet(
+                connection,
+                name,
+                output_dir,
+                scope=scope,
+                kinds=kinds,
+            )
+        except (OSError, RuntimeError, ValueError, sqlite3.Error) as exc:
+            _record(
+                outcomes,
+                MonthOutcome(
+                    year,
+                    month,
+                    name,
+                    MonthStatus.FAILED,
+                    manifest_complete=True,
+                    bytes_received=fetched.bytes_received,
+                    error=f"monthly export failed: {exc}",
+                ),
+                report_output,
+            )
+            continue
+        if fetched.downloaded_this_run and not keep_zips:
             try:
                 fetched.path.unlink()
             except OSError as exc:
@@ -426,7 +493,7 @@ def render_coverage_report(outcomes: list[MonthOutcome] | tuple[MonthOutcome, ..
             "## Storage and verification limitations",
             "",
             "- The workflow bounds downloaded-ZIP storage to approximately one monthly archive, but the SQLite store and WAL grow across the run.",
-            "- Final Parquet export also needs temporary working space in addition to its output file.",
+            "- Each monthly Parquet export needs temporary working space in addition to its output file.",
             "- Downloads are checked against `Content-Length` when supplied and must contain a readable ZIP central directory. Companies House publishes no per-file checksum, so cryptographic source verification is unavailable.",
             "- Interrupted downloads restart from byte zero; HTTP range resume and prefetch/parallel extraction are intentionally out of scope for v1.",
             "",

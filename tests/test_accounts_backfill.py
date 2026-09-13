@@ -75,6 +75,7 @@ def test_full_range_downloads_extracts_deletes_and_reports_coverage(tmp_path: Pa
             (2022, 1),
             (2022, 2),
             downloads=downloads,
+            output_dir=tmp_path / "monthly",
             base_url=base_url,
             retries=0,
             report_output=report,
@@ -85,7 +86,11 @@ def test_full_range_downloads_extracts_deletes_and_reports_coverage(tmp_path: Pa
         MonthStatus.COMPLETED_DELETED,
     ]
     assert not list(downloads.glob("*.zip"))
-    assert connection.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 2
+    assert connection.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 4
+    assert sorted(path.name for path in (tmp_path / "monthly").glob("*.parquet")) == [
+        "accounts-long-2022-01.parquet",
+        "accounts-long-2022-02.parquet",
+    ]
     assert archive_recorded_complete(connection, archive_name(2022, 1))
     assert archive_recorded_complete(connection, archive_name(2022, 2))
     text = report.read_text()
@@ -107,6 +112,7 @@ def test_keep_zips_retains_downloaded_archive(tmp_path: Path) -> None:
             (2022, 1),
             (2022, 1),
             downloads=tmp_path / "downloads",
+            output_dir=tmp_path / "monthly",
             base_url=base_url,
             keep_zips=True,
             retries=0,
@@ -130,6 +136,7 @@ def test_limited_run_is_partial_and_never_deletes(tmp_path: Path) -> None:
             (2022, 1),
             (2022, 1),
             downloads=tmp_path / "downloads",
+            output_dir=tmp_path / "monthly",
             base_url=base_url,
             limit_per_zip=1,
             retries=0,
@@ -153,6 +160,7 @@ def test_manually_staged_archive_is_extracted_but_never_deleted(tmp_path: Path) 
         (2022, 1),
         (2022, 1),
         downloads=downloads,
+        output_dir=tmp_path / "monthly",
         base_url="http://127.0.0.1:1",
         retries=0,
     )
@@ -194,6 +202,7 @@ def test_short_download_is_failed_and_404_is_absent(tmp_path: Path) -> None:
             (2022, 1),
             (2022, 2),
             downloads=downloads,
+            output_dir=tmp_path / "monthly",
             base_url=f"http://{host}:{port}",
             retries=0,
             report_output=report,
@@ -227,6 +236,7 @@ def test_completed_month_skips_fetch_and_startup_removes_stale_part(
         (2022, 1),
         (2022, 1),
         downloads=downloads,
+        output_dir=tmp_path / "monthly",
         base_url="http://127.0.0.1:1",
         keep_zips=True,
         retries=0,
@@ -243,6 +253,7 @@ def test_completed_month_skips_fetch_and_startup_removes_stale_part(
         (2022, 1),
         (2022, 1),
         downloads=downloads,
+        output_dir=tmp_path / "monthly",
         base_url="http://127.0.0.1:1",
     )
 
@@ -270,6 +281,7 @@ def test_failed_extraction_keeps_downloaded_zip(
             (2022, 1),
             (2022, 1),
             downloads=tmp_path / "downloads",
+            output_dir=tmp_path / "monthly",
             base_url=base_url,
             retries=0,
         )
@@ -300,6 +312,7 @@ def test_accounting_nonclosure_aborts_and_keeps_zip(
                 (2022, 1),
                 (2022, 1),
                 downloads=tmp_path / "downloads",
+                output_dir=tmp_path / "monthly",
                 base_url=base_url,
                 retries=0,
                 report_output=report,
@@ -307,6 +320,40 @@ def test_accounting_nonclosure_aborts_and_keeps_zip(
 
     assert (tmp_path / "downloads" / name).exists()
     assert "fact accounting does not close" in report.read_text()
+    connection.close()
+
+
+def test_abort_in_second_month_leaves_first_month_parquet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    for month in (1, 2):
+        make_archive(source / archive_name(2022, month))
+    connection = connect_store(tmp_path / "store.sqlite")
+    real_process = backfill.process_archive
+
+    def stop_on_february(connection, archive, **kwargs):
+        if archive.month == 2:
+            raise AssertionError("stop after first month")
+        return real_process(connection, archive, **kwargs)
+
+    monkeypatch.setattr(backfill, "process_archive", stop_on_february)
+    with serve_directory(source) as base_url:
+        with pytest.raises(AssertionError, match="after first month"):
+            run_backfill(
+                connection,
+                (2022, 1),
+                (2022, 2),
+                downloads=tmp_path / "downloads",
+                output_dir=tmp_path / "monthly",
+                base_url=base_url,
+                retries=0,
+            )
+
+    assert (tmp_path / "monthly" / "accounts-long-2022-01.parquet").exists()
+    assert not (tmp_path / "downloads" / archive_name(2022, 1)).exists()
+    assert (tmp_path / "downloads" / archive_name(2022, 2)).exists()
     connection.close()
 
 
@@ -329,12 +376,44 @@ def test_incomplete_manifest_never_allows_deletion(
             (2022, 1),
             (2022, 1),
             downloads=tmp_path / "downloads",
+            output_dir=tmp_path / "monthly",
             base_url=base_url,
             retries=0,
         )
 
     assert summary.outcomes[0].status == MonthStatus.FAILED
     assert "complete manifest" in str(summary.outcomes[0].error)
+    assert (tmp_path / "downloads" / name).exists()
+    connection.close()
+
+
+def test_failed_monthly_export_keeps_downloaded_zip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    name = archive_name(2022, 1)
+    make_archive(source / name)
+    connection = connect_store(tmp_path / "store.sqlite")
+
+    def fail_export(*_args: object, **_kwargs: object) -> None:
+        raise OSError("synthetic monthly export failure")
+
+    monkeypatch.setattr(backfill, "export_archive_parquet", fail_export)
+    with serve_directory(source) as base_url:
+        summary = run_backfill(
+            connection,
+            (2022, 1),
+            (2022, 1),
+            downloads=tmp_path / "downloads",
+            output_dir=tmp_path / "monthly",
+            base_url=base_url,
+            retries=0,
+        )
+
+    assert summary.outcomes[0].status == MonthStatus.FAILED
+    assert summary.outcomes[0].manifest_complete
+    assert "monthly export failed" in str(summary.outcomes[0].error)
     assert (tmp_path / "downloads" / name).exists()
     connection.close()
 
@@ -368,12 +447,14 @@ def test_absent_and_failed_months_are_retried_on_next_run(
         (2022, 1),
         (2022, 2),
         downloads=downloads,
+        output_dir=tmp_path / "monthly",
     )
     second = run_backfill(
         connection,
         (2022, 1),
         (2022, 2),
         downloads=downloads,
+        output_dir=tmp_path / "monthly",
     )
 
     assert first.has_gaps
@@ -448,6 +529,7 @@ def test_fetch_archive_rejects_bad_arguments(tmp_path: Path) -> None:
             (2022, 1),
             (2022, 1),
             downloads=tmp_path,
+            output_dir=tmp_path / "monthly",
             limit_per_zip=0,
         )
     connection.close()

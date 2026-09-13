@@ -73,6 +73,8 @@ Denominator: distinct company/period records containing at least one locked conc
 - Reduced Parquet size: 0.56 GiB
 - Reduction ratio: **94.8× smaller**
 
+> These size figures apply only to the historical nine-concept slim table. Stage 1 now defaults to every numeric and non-numeric inline-XBRL fact and writes per-month Parquets; the 2–3 GB / 94.8× planning assumption must not be applied to the full-fact archive.
+
 ## Integrity
 
 - XML filings skipped: 11,175

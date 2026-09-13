@@ -15,7 +15,7 @@ This is diagnostic only. No reported value is corrected or replaced. Agreement u
 
 ## Member-frequency histogram
 
-All target concepts are included. Frequencies count unreconciled LONG observations; this table is the evidence for a human-selected WIDE member map.
+All target concepts are included. Frequencies count only Stage 1 observations tagged `selected`; conflict rows remain in the archive for a Stage 2 policy. This table is the evidence for a human-selected WIDE member map.
 
 | Concept | Dimension | Member | Observations | Companies | Company-periods |
 |---|---|---|---:|---:|---:|
