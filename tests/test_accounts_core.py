@@ -164,7 +164,7 @@ def test_multi_typed_bad_context_and_non_gbp_accounting_close() -> None:
         fact("Equity", "2", context="typed"),
         fact("Equity", "3", context="missing"),
         fact("Equity", "4", unit="eur"),
-        fact("AverageNumberEmployeesDuringPeriod", "5", unit="eur"),
+        fact("AverageNumberEmployeesDuringPeriod", "5", unit="people"),
     )
 
     result = extract_filing(data, "00000001", "20231231")
@@ -175,6 +175,7 @@ def test_multi_typed_bad_context_and_non_gbp_accounting_close() -> None:
     assert result.integrity.non_gbp_facts == 1
     assert result.integrity.closes()
     assert [row.currency for row in result.observations] == ["EUR", None]
+    assert [row.unit for row in result.observations] == ["EUR", "pure"]
 
 
 def test_context_local_names_and_company_identifier_preserve_leading_zeros() -> None:

@@ -37,6 +37,19 @@ Per-month Parquets are therefore the Stage 1 archive contract. No default comman
 
 ## Conflict policy boundary
 
-Stage 1 records every fact from a conflicting non-dimensional or same-member group and supplies no preferred value. Grouping remains strict to `(concept, period_end, dimension, member)`: different dimensions and members are separate selected components, never competing values. Agreeing duplicates remain collapsed to one selected observation.
+Stage 1 records every fact from a conflicting non-dimensional or same-member group and supplies no preferred value. Grouping remains strict to `(concept, period_end, context_kind, dimension, member)`: instant/duration contexts and different dimensions or members are separate selected components, never competing values. Agreeing duplicates remain collapsed to one selected observation.
 
 Existing QA and reviewed WIDE consumers use only `status = selected`. A future model-specific Stage 2 may choose another conflict policy, concept scope, or missingness treatment without re-reading the source HTML/ZIP archives.
+
+## Full-fact read verification and concept inventory
+
+The same two-month sample was re-read with resolved source units and instant/duration context metadata retained on every observation. The report-only verification found:
+
+- Non-numeric facts with non-null `numeric_value`: **0 of 60,684**.
+- Numeric facts with a missing or unresolved `unit`: **0 of 49,099**.
+- Mixed numeric/non-numeric concepts: **0**.
+- Mixed instant/duration concepts: **0**.
+- Concepts with incompatible unit families: **2** — `AverageNumberEmployeesDuringPeriod` (`GBP`, `pure`) and `ParValueShare` (`EUR`, `GBP`, `pure`, `shares`). These source-tagging inconsistencies are retained and flagged, not corrected.
+- Name-versus-kind review flags: **1** — `OutstandingPre-paidContributionsToDefinedContributionPlanReportingDate` is numeric despite its date-like suffix.
+
+The 494-row [`accounts-concept-inventory.csv`](accounts-concept-inventory.csv) is the observation-sorted parameter list; [`accounts-concept-inventory.md`](accounts-concept-inventory.md) gives the audit and anomaly surface. Only the nine core concepts are validated for fill-rate and reconciliation. The other concepts are captured but unvalidated, and rare concepts require inventory and source-filing review before use.

@@ -19,6 +19,7 @@ from .extract import (
     process_archive,
     render_extraction_report,
 )
+from .inventory import write_concept_inventory
 from .pivot import load_column_map, pivot_parquet
 from .qa import write_qa
 
@@ -37,6 +38,8 @@ DEFAULTS = {
     "monthly_output_dir": "data/accounts/long",
     "long_input": "data/accounts/long/accounts-long-*.parquet",
     "extraction_report": "docs/accounts-extraction.md",
+    "concept_inventory_csv": "docs/accounts-concept-inventory.csv",
+    "concept_inventory_report": "docs/accounts-concept-inventory.md",
     "column_map": "config/accounts-wide-columns.json",
     "wide_output": "data/accounts/accounts-wide.parquet",
     "wide_provenance_output": "data/accounts/accounts-wide-provenance.parquet",
@@ -218,6 +221,31 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_inventory(args: argparse.Namespace) -> int:
+    settings = load_accounts_settings(args.settings)
+    store = setting_path(args.store or settings["store_path"])
+    csv_output = setting_path(args.csv or settings["concept_inventory_csv"])
+    report_output = setting_path(args.report or settings["concept_inventory_report"])
+    connection = connect_store(store)
+    try:
+        inventory = write_concept_inventory(
+            connection,
+            csv_output,
+            report_output,
+        )
+    finally:
+        connection.close()
+    print(f"Concepts inventoried: {len(inventory.rows):,}")
+    print(f"Concept inventory CSV: {csv_output}")
+    print(f"Concept inventory report: {report_output}")
+    return int(
+        bool(
+            inventory.audit.non_numeric_coercions
+            or inventory.audit.numeric_unit_gaps
+        )
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--settings", default="config/settings.yaml")
@@ -269,6 +297,13 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("--scope", help="all or a comma-separated local-name list")
     export.add_argument("--kinds", choices=("all", "numeric-only"))
     export.set_defaults(func=cmd_export)
+    inventory = commands.add_parser(
+        "inventory", help="write the Stage 1 concept dictionary and read-correctness audit"
+    )
+    inventory.add_argument("--store")
+    inventory.add_argument("--csv")
+    inventory.add_argument("--report")
+    inventory.set_defaults(func=cmd_inventory)
     pivot = commands.add_parser("pivot", help="create WIDE and cell provenance Parquets")
     pivot.add_argument("--long")
     pivot.add_argument(

@@ -6,6 +6,7 @@ import polars as pl
 
 from ukcompany.accounts.core import TARGET_CONCEPTS
 from ukcompany.accounts.extract import (
+    OBSERVATION_SCHEMA_VERSION,
     archive_recorded_complete,
     connect_store,
     discover_archives,
@@ -116,6 +117,9 @@ def test_monthly_export_filters_one_archive_batches_and_standalone_rewrites(
     assert not stale_parts.exists()
     assert frame["source_archive"].unique().to_list() == [specs[0].name]
     assert frame.height == 2
+    equity = frame.filter(pl.col("concept") == "Equity").row(0, named=True)
+    assert equity["unit"] == "GBP"
+    assert equity["context_kind"] == "instant"
     assert any("WHERE source_archive =" in statement for statement in statements)
     january.unlink()
     outputs = export_completed_archives(connection, tmp_path / "monthly", start=(2023, 1))
@@ -190,6 +194,32 @@ def test_pre_stage1_manifest_is_never_treated_as_complete(tmp_path: Path) -> Non
 
     assert connection.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 1
     assert connection.execute("SELECT fact_sequence FROM observations").fetchone()[0] == 0
+    connection.close()
+
+
+def test_prior_observation_schema_is_reextracted_not_exported(tmp_path: Path) -> None:
+    archive_path = tmp_path / "Accounts_Monthly_Data-July2020.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("Prod1_2007_00123456_20201231.html", minimal_filing())
+    connection = connect_store(tmp_path / "store.sqlite")
+    spec = parse_archive(archive_path)
+    process_archive(connection, spec, progress_every=0)
+    connection.execute(
+        "UPDATE processed_archives SET fact_schema_version = 1 WHERE archive_name = ?",
+        (spec.name,),
+    )
+    connection.commit()
+
+    assert not archive_recorded_complete(connection, spec.name)
+    assert export_completed_archives(connection, tmp_path / "stale-export") == []
+    result = process_archive(connection, spec, progress_every=0)
+
+    assert result is not None
+    assert connection.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 2
+    assert (
+        manifest_rows(connection)[0]["fact_schema_version"]
+        == OBSERVATION_SCHEMA_VERSION
+    )
     connection.close()
 
 

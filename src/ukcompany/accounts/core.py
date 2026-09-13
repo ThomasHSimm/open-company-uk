@@ -31,7 +31,7 @@ CONTEXT_RE = re.compile(
     re.I | re.S,
 )
 PERIOD_RE = re.compile(
-    rb"<\s*(?:[\w.-]+:)?(?:instant|endDate)\b[^>]*>(.*?)</",
+    rb"<\s*(?:[\w.-]+:)?(instant|endDate)\b[^>]*>(.*?)</",
     re.I | re.S,
 )
 EXPLICIT_MEMBER_RE = re.compile(
@@ -68,6 +68,7 @@ class ContextPeriod:
     kind: ContextKind
     dimension: str | None = None
     member: str | None = None
+    context_kind: str = "instant"
 
 
 @dataclass(frozen=True)
@@ -77,12 +78,14 @@ class FactObservation:
     fact_sequence: int
     status: str
     period_end: str
+    context_kind: str
     raw_value: str
     scale: int
     sign: str | None
     numeric_value: str | None
     dimension: str | None
     member: str | None
+    unit: str | None
     currency: str | None
     is_current: bool
 
@@ -165,12 +168,13 @@ class _CandidateFact:
     scale: int
     sign: str | None
     numeric_value: str | None
+    unit: str | None
     currency: str | None
 
     def agreement_key(self) -> tuple[str, str | None, str]:
         value = self.numeric_value if self.numeric_value is not None else self.raw_value
         kind = "NUM" if self.numeric_value is not None else "RAW"
-        return kind, self.currency, value
+        return kind, self.unit, value
 
 
 def local_name(qname: str) -> str:
@@ -207,15 +211,22 @@ def extract_contexts(data: bytes) -> tuple[dict[str, ContextPeriod], int]:
         period_match = PERIOD_RE.search(body)
         if not context_id or not period_match:
             continue
-        period_end = valid_date(text_content(period_match.group(1)))
+        period_end = valid_date(text_content(period_match.group(2)))
         if not period_end:
             invalid_periods += 1
             continue
+        context_kind = (
+            "instant" if period_match.group(1).lower() == b"instant" else "duration"
+        )
         members = EXPLICIT_MEMBER_RE.findall(body)
         if TYPED_MEMBER_RE.search(body):
-            context = ContextPeriod(period_end, ContextKind.TYPED)
+            context = ContextPeriod(
+                period_end, ContextKind.TYPED, context_kind=context_kind
+            )
         elif len(members) >= 2:
-            context = ContextPeriod(period_end, ContextKind.MULTI_MEMBER)
+            context = ContextPeriod(
+                period_end, ContextKind.MULTI_MEMBER, context_kind=context_kind
+            )
         elif len(members) == 1:
             member_attrs, member_body = members[0]
             dimension = local_name(parse_attrs(member_attrs).get("dimension", "")) or None
@@ -225,9 +236,12 @@ def extract_contexts(data: bytes) -> tuple[dict[str, ContextPeriod], int]:
                 ContextKind.SINGLE_MEMBER,
                 dimension,
                 member,
+                context_kind,
             )
         else:
-            context = ContextPeriod(period_end, ContextKind.NON_DIMENSIONAL)
+            context = ContextPeriod(
+                period_end, ContextKind.NON_DIMENSIONAL, context_kind=context_kind
+            )
         contexts[context_id] = context
     return contexts, invalid_periods
 
@@ -291,12 +305,14 @@ def _observation(
         candidate.fact_sequence,
         status,
         candidate.context.period_end,
+        candidate.context.context_kind,
         candidate.raw_value,
         candidate.scale,
         candidate.sign,
         candidate.numeric_value,
         candidate.context.dimension,
         candidate.context.member,
+        candidate.unit,
         candidate.currency,
         candidate.context.period_end == current_period,
     )
@@ -344,9 +360,9 @@ def extract_filing(
     units = extract_units(data)
     integrity = IntegrityCounts()
     tagged_companies: set[str] = set()
-    groups: dict[tuple[str, str, str | None, str | None], list[_CandidateFact]] = defaultdict(
-        list
-    )
+    groups: dict[
+        tuple[str, str, str, str | None, str | None], list[_CandidateFact]
+    ] = defaultdict(list)
     legacy_groups: dict[
         tuple[str, str], list[tuple[bool, str, str | None, int, str | None, str | None]]
     ] = defaultdict(list)
@@ -382,11 +398,8 @@ def extract_filing(
         )
         unit_ref = attrs.get("unitref", "")
         measure = units.get(unit_ref)
-        currency = (
-            measure.upper()
-            if concept != EMPLOYEE_CONCEPT and _is_currency_measure(measure)
-            else None
-        )
+        currency = measure.upper() if _is_currency_measure(measure) else None
+        resolved_unit = currency or measure
         if concept in TARGET_SET:
             legacy_groups[(concept, context.period_end)].append(
                 (
@@ -398,8 +411,8 @@ def extract_filing(
                     currency,
                 )
             )
-        if fact_kind == "numeric" and concept != EMPLOYEE_CONCEPT:
-            if unit_ref and measure is None:
+        if fact_kind == "numeric":
+            if not unit_ref or measure is None:
                 integrity.unresolved_unit_refs += 1
             elif currency and currency != "GBP":
                 integrity.non_gbp_facts += 1
@@ -418,9 +431,16 @@ def extract_filing(
             scale,
             sign,
             numeric_value,
+            resolved_unit,
             currency,
         )
-        key = (concept, context.period_end, context.dimension, context.member)
+        key = (
+            concept,
+            context.period_end,
+            context.context_kind,
+            context.dimension,
+            context.member,
+        )
         groups[key].append(candidate)
 
     current_period = max(observed_periods, default="")

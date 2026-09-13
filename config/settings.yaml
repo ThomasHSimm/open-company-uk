@@ -20,6 +20,8 @@ accounts:
   monthly_output_dir: data/accounts/long
   long_input: data/accounts/long/accounts-long-*.parquet
   extraction_report: docs/accounts-extraction.md
+  concept_inventory_csv: docs/accounts-concept-inventory.csv
+  concept_inventory_report: docs/accounts-concept-inventory.md
   column_map: config/accounts-wide-columns.json
   wide_output: data/accounts/accounts-wide.parquet
   wide_provenance_output: data/accounts/accounts-wide-provenance.parquet

@@ -38,8 +38,10 @@ OBSERVATION_COLUMNS = (
     "fact_kind",
     "fact_sequence",
     "status",
+    "context_kind",
     "dimension",
     "member",
+    "unit",
     "currency",
     "source_year",
     "source_month",
@@ -52,6 +54,7 @@ OBSERVATION_COLUMNS = (
     "numeric_value",
     "is_current",
 )
+OBSERVATION_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -170,8 +173,10 @@ def connect_store(path: str | Path) -> sqlite3.Connection:
             fact_kind TEXT NOT NULL,
             fact_sequence INTEGER NOT NULL,
             status TEXT NOT NULL,
+            context_kind TEXT NOT NULL,
             dimension TEXT,
             member TEXT,
+            unit TEXT,
             currency TEXT,
             source_year INTEGER NOT NULL,
             source_month INTEGER NOT NULL,
@@ -193,6 +198,7 @@ def connect_store(path: str | Path) -> sqlite3.Connection:
             integrity_json TEXT NOT NULL,
             scope_json TEXT,
             kinds TEXT,
+            fact_schema_version INTEGER,
             export_scope_json TEXT,
             export_kinds TEXT,
             export_observation_count INTEGER
@@ -227,6 +233,12 @@ def connect_store(path: str | Path) -> sqlite3.Connection:
         connection.execute(
             "ALTER TABLE observations ADD COLUMN status TEXT NOT NULL DEFAULT 'selected'"
         )
+    if "context_kind" not in observation_columns:
+        connection.execute(
+            "ALTER TABLE observations ADD COLUMN context_kind TEXT NOT NULL DEFAULT 'unknown'"
+        )
+    if "unit" not in observation_columns:
+        connection.execute("ALTER TABLE observations ADD COLUMN unit TEXT")
     manifest_columns = {
         item[1] for item in connection.execute("PRAGMA table_info(processed_archives)")
     }
@@ -234,6 +246,10 @@ def connect_store(path: str | Path) -> sqlite3.Connection:
         connection.execute("ALTER TABLE processed_archives ADD COLUMN scope_json TEXT")
     if "kinds" not in manifest_columns:
         connection.execute("ALTER TABLE processed_archives ADD COLUMN kinds TEXT")
+    if "fact_schema_version" not in manifest_columns:
+        connection.execute(
+            "ALTER TABLE processed_archives ADD COLUMN fact_schema_version INTEGER"
+        )
     if "export_scope_json" not in manifest_columns:
         connection.execute("ALTER TABLE processed_archives ADD COLUMN export_scope_json TEXT")
     if "export_kinds" not in manifest_columns:
@@ -287,7 +303,8 @@ def _scope_covers(
 
 def _stored_archive(connection: sqlite3.Connection, archive: ArchiveSpec) -> tuple | None:
     return connection.execute(
-        "SELECT archive_size, member_count, complete, scope_json, kinds "
+        "SELECT archive_size, member_count, complete, scope_json, kinds, "
+        "fact_schema_version "
         "FROM processed_archives "
         "WHERE archive_name = ?",
         (archive.name,),
@@ -303,11 +320,15 @@ def archive_recorded_complete(
 ) -> bool:
     """Check completion using only the manifest, even when the ZIP was deleted."""
     row = connection.execute(
-        "SELECT scope_json, kinds FROM processed_archives "
+        "SELECT scope_json, kinds, fact_schema_version FROM processed_archives "
         "WHERE archive_name = ? AND complete = 1",
         (name,),
     ).fetchone()
-    return row is not None and _scope_covers(row[0], row[1], scope, kinds)
+    return (
+        row is not None
+        and row[2] == OBSERVATION_SCHEMA_VERSION
+        and _scope_covers(row[0], row[1], scope, kinds)
+    )
 
 
 def archive_is_complete(
@@ -318,9 +339,14 @@ def archive_is_complete(
     kinds: str = "all",
 ) -> bool:
     stored = _stored_archive(connection, archive)
-    if not stored or not stored[2] or not _scope_covers(stored[3], stored[4], scope, kinds):
+    if (
+        not stored
+        or not stored[2]
+        or stored[5] != OBSERVATION_SCHEMA_VERSION
+        or not _scope_covers(stored[3], stored[4], scope, kinds)
+    ):
         return False
-    archive_size, member_count, _complete, _scope, _kinds = stored
+    archive_size, member_count, _complete, _scope, _kinds, _schema = stored
     with zipfile.ZipFile(archive.path) as source:
         actual_members = len(source.infolist())
     if archive_size != archive.path.stat().st_size or member_count != actual_members:
@@ -350,8 +376,10 @@ def _store_filing(
                 fact.fact_kind,
                 fact.fact_sequence,
                 fact.status,
+                fact.context_kind,
                 fact.dimension,
                 fact.member,
+                fact.unit,
                 fact.currency,
                 archive.year,
                 archive.month,
@@ -402,12 +430,14 @@ def _write_manifest(
     connection.execute(
         "INSERT INTO processed_archives "
         "(archive_name, archive_size, member_count, observation_count, complete, "
-        "integrity_json, scope_json, kinds, export_scope_json, export_kinds, "
-        "export_observation_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL) "
+        "integrity_json, scope_json, kinds, fact_schema_version, export_scope_json, "
+        "export_kinds, export_observation_count) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL) "
         "ON CONFLICT(archive_name) DO UPDATE SET archive_size=excluded.archive_size, "
         "member_count=excluded.member_count, observation_count=excluded.observation_count, "
         "complete=excluded.complete, integrity_json=excluded.integrity_json, "
-        "scope_json=excluded.scope_json, kinds=excluded.kinds, export_scope_json=NULL, "
+        "scope_json=excluded.scope_json, kinds=excluded.kinds, "
+        "fact_schema_version=excluded.fact_schema_version, export_scope_json=NULL, "
         "export_kinds=NULL, export_observation_count=NULL",
         (
             archive.name,
@@ -418,6 +448,7 @@ def _write_manifest(
             json.dumps(integrity.as_dict(), sort_keys=True),
             scope_json(scope),
             kinds,
+            OBSERVATION_SCHEMA_VERSION,
         ),
     )
     connection.commit()
@@ -441,11 +472,14 @@ def process_archive(
         return None
     stored = _stored_archive(connection, archive)
     has_legacy_rows = connection.execute(
-        "SELECT 1 FROM observations WHERE source_archive = ? AND fact_sequence = -1 LIMIT 1",
+        "SELECT 1 FROM observations WHERE source_archive = ? "
+        "AND (fact_sequence = -1 OR context_kind = 'unknown') LIMIT 1",
         (archive.name,),
     ).fetchone()
     if stored and (
-        has_legacy_rows or not _scope_covers(stored[3], stored[4], scope, kinds)
+        has_legacy_rows
+        or stored[5] != OBSERVATION_SCHEMA_VERSION
+        or not _scope_covers(stored[3], stored[4], scope, kinds)
     ):
         connection.execute("DELETE FROM observations WHERE source_archive = ?", (archive.name,))
         connection.execute(
@@ -607,11 +641,17 @@ def export_archive_parquet(
     """Stream one manifest-complete archive to its own monthly Parquet."""
     row = connection.execute(
         "SELECT complete, scope_json, kinds, observation_count, export_scope_json, "
-        "export_kinds, export_observation_count FROM processed_archives "
+        "export_kinds, export_observation_count, fact_schema_version "
+        "FROM processed_archives "
         "WHERE archive_name = ?",
         (archive_name,),
     ).fetchone()
-    if row is None or not row[0] or not _scope_covers(row[1], row[2], scope, kinds):
+    if (
+        row is None
+        or not row[0]
+        or row[7] != OBSERVATION_SCHEMA_VERSION
+        or not _scope_covers(row[1], row[2], scope, kinds)
+    ):
         raise ValueError(f"archive is not manifest-complete: {archive_name}")
     destination = monthly_parquet_path(output_dir, archive_name)
     export_current = row[4] == row[1] and row[5] == row[2] and row[6] == row[3]
@@ -781,7 +821,8 @@ def render_extraction_report(connection: sqlite3.Connection) -> str:
             f"- Unparseable filings: {integrity.unparseable_filings:,}",
             f"- Company-number mismatches: {integrity.company_mismatches:,}",
             f"- Non-GBP monetary facts: {integrity.non_gbp_facts:,}",
-            f"- Unresolved monetary unit references: {integrity.unresolved_unit_refs:,}",
+            f"- Missing or unresolved numeric unit references: "
+            f"{integrity.unresolved_unit_refs:,}",
             "",
             "## Non-dimensional total fill rates",
             "",
@@ -828,6 +869,7 @@ def render_extraction_report(connection: sqlite3.Connection) -> str:
             "",
             "- Stage 1 now defaults to every inline-XBRL fact, including non-numeric text. Expect roughly 5–10 times the nine-concept slim-table volume; plan against per-month files, never a materialised all-history frame.",
             "- Conflict-tagged observations are retained without a preferred value. Stage 2 must choose a model-specific conflict policy and must not treat them as selected.",
+            "- Every resolved numeric unit is retained in `unit`; `currency` is populated only when that unit is an ISO-style three-letter currency code.",
             "- Archives before 2019 remain unvalidated. Do not describe this dataset as 2008–2025 until reconnaissance is run around 2010, 2013, and 2016.",
             "- XML filings are counted but not extracted; the validated 2019–2025 samples were overwhelmingly iXBRL.",
             "- Currency units are resolved in LONG. Non-GBP monetary observations are retained and flagged here; WIDE excludes them by default rather than converting currency.",

@@ -43,7 +43,7 @@ ukcompany-accounts extract archive.zip \
   --kinds numeric-only
 ```
 
-Non-numeric facts retain text in `raw_value` and have null `numeric_value`. The default all-fact archive is expected to be roughly 5–10 times larger than the old nine-concept slim table; the two-archive development sample was 4.1 times larger. Never materialise all history in memory.
+Non-numeric facts retain text in `raw_value` and have null `numeric_value`. Numeric facts retain their resolved source `unit`; `currency` is populated separately only for three-letter currency measures. `context_kind` distinguishes instant from duration contexts. The default all-fact archive is expected to be roughly 5–10 times larger than the old nine-concept slim table; the two-archive development sample was 4.1 times larger. Never materialise all history in memory.
 
 Each complete month is streamed from SQLite to `data/accounts/long/accounts-long-YYYY-MM.parquet`. A killed run leaves every earlier completed month usable. Re-create completed monthly files without re-reading the ZIPs with:
 
@@ -58,7 +58,17 @@ ukcompany-accounts export \
   --monolithic-output data/accounts/accounts-long-all.parquet
 ```
 
-Every LONG row has `status`: `selected`, `conflict_nondimensional`, or `conflict_member`. All source facts in a conflicting group are retained; none is preferred. Agreeing duplicates remain one selected row. Conflict grouping never crosses `(dimension, member)`, so different economic components are never merged. Stage 2—not Stage 1—chooses a model-specific conflict policy.
+Every LONG row has `status`: `selected`, `conflict_nondimensional`, or `conflict_member`. All source facts in a conflicting group are retained; none is preferred. Agreeing duplicates remain one selected row. Conflict grouping never crosses context kind or `(dimension, member)`, so instant/duration facts and different economic components are never merged. Stage 2—not Stage 1—chooses a model-specific conflict policy.
+
+## Generate the concept inventory
+
+```bash
+ukcompany-accounts inventory
+```
+
+This writes `docs/accounts-concept-inventory.csv`, the observation-sorted parameter list, and `docs/accounts-concept-inventory.md`, the read-correctness audit and anomaly summary. It checks text coercion, numeric unit coverage, mixed fact kinds, incompatible unit families, mixed instant/duration usage, and name-versus-kind mismatches. It is report-only: findings are never used to alter stored source values.
+
+Only the nine core concepts have been validated for fill-rate and reconciliation. The roughly 485 additional concepts are captured but unvalidated; check the inventory and source filing before trusting a rare concept.
 
 ## Generate QA before choosing WIDE columns
 
