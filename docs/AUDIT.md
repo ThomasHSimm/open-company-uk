@@ -720,3 +720,42 @@ Verification passed with 97 non-live tests (one live test deselected), `ruff che
 `git diff --check`. The corrected real 500-company report reconciles to 298 excluded, 202
 flagged adverse, zero genuine misses, and zero unavailable/not-fetched positives; conditional
 recall on the 202 screenable companies is 100%, with the same-event caveat above.
+
+## PSC bulk snapshot recon (2026-09-18)
+
+Executed docs/recon-psc.md over ALL 32 parts of the PSC snapshot. New files:
+`scripts/recon_psc.py`, `docs/recon-psc.md` (brief + measured Results), generated
+`docs/recon-psc-results.json` and `docs/recon-psc-results.md`. No package, rules,
+severities, FIELD_DOCS, or test changes.
+
+**Snapshot substitution (NEEDS-NOTING).** The brief's prior evidence used snapshot
+2026-09-11, which Companies House no longer serves (only the current day's snapshot is
+published). All 32 parts of 2026-09-18 were downloaded (~13 GB extracted, in
+`~/Downloads/psc-snapshot-2026-09-18/`); the staged single 09-11 part was left untouched
+and unused. The script refuses to run over mixed snapshot dates or an incomplete part set.
+
+**Headline findings.** 15,952,486 records, 0 bad lines, 404 s. Statement records DO exist
+in the product (922,564; parts 31–32 only; part 32 holds no PSC records at all, just
+statements + 108 exemptions + one `totals#` trailer) — the prior "no statements" finding
+was an artifact of probing part 2. Ceased records retained (16.6%, effectively all
+2016–2026), so point-in-time reconstruction is feasible from regime start. Product spans
+10,917,257 companies (~2× the live register) — it retains non-live companies. Person-key
+connectivity overall is 28.8% of keys on ≥2 records (vs 3.7% measured within one part).
+Partitioning: positional slices of a non-random internal ordering; per-part rates unusable.
+
+**Documented choices (recorded in the JSON `normalisation` block).** UK country value set;
+postcode raw vs normalised regexes; registration-number resolution = strip/upper direct
+lookup plus zero-pad-to-8 for digit-only values; "active" = no `ceased_on` and `ceased`
+flag not true; crosstab "ceased" = `ceased_on` presence; person key =
+(forename, surname, DOB year, DOB month) hashed blake2b-64 in memory only, never persisted.
+Join base is BasicCompanyData 2026-08-01 vs PSC 2026-09-18 (~7-week skew) and excludes
+dissolved companies — both depress the reported join rates; treat 54.2%/77.9% as lower
+bounds for a same-date join.
+
+**Privacy check.** Generated md greps clean for forename/surname/address_line/
+date_of_birth. In the JSON the only hits are required key-NAME presence counters in
+`data_keys` and one methodology string; no personal values in any output.
+
+**Verification.** `ruff check` clean; full `pytest` 136 passed, 1 live deselected. Ran
+concurrently with the accounts Stage 1 production extraction (separate task; writes only
+under `data/accounts/`).

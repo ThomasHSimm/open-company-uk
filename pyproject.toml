@@ -16,11 +16,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.5", "polars>=1.0"]
+dev = ["pytest>=8.0", "ruff>=0.5", "polars>=1.0", "lxml>=5.0"]
 snapshot = ["polars>=1.0"]
 
 [project.scripts]
 ukcompany = "ukcompany.cli:main"
+ukcompany-accounts = "ukcompany.accounts.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

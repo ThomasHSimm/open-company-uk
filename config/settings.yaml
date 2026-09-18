@@ -5,3 +5,26 @@ paths:
   output_dir: data/processed
 fetch:
   max_age_days: 7   # re-fetch cached responses older than this
+accounts:
+  downloads_dir: ~/Downloads
+  store_path: data/accounts/accounts.sqlite
+  base_url: https://download.companieshouse.gov.uk/archive
+  keep_zips: false
+  download_chunk_size: 8388608
+  download_retries: 2
+  download_backoff_seconds: 5
+  download_timeout_seconds: 120
+  coverage_report: docs/accounts-coverage.md
+  scope: all
+  kinds: all
+  monthly_output_dir: data/accounts/long
+  long_input: data/accounts/long/accounts-long-*.parquet
+  extraction_report: docs/accounts-extraction.md
+  concept_inventory_csv: docs/accounts-concept-inventory.csv
+  concept_inventory_report: docs/accounts-concept-inventory.md
+  column_map: config/accounts-wide-columns.json
+  wide_output: data/accounts/accounts-wide.parquet
+  wide_provenance_output: data/accounts/accounts-wide-provenance.parquet
+  member_histogram: docs/accounts-member-frequency.csv
+  reconciliation_output: docs/accounts-component-reconciliation.csv
+  qa_report: docs/accounts-qa.md
