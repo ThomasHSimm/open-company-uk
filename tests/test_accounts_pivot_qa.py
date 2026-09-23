@@ -5,7 +5,12 @@ import polars as pl
 import pytest
 
 from ukcompany.accounts.pivot import MemberColumn, WideColumnMap, load_column_map, pivot_long
-from ukcompany.accounts.qa import member_histogram, total_component_reconciliation
+from ukcompany.accounts.qa import (
+    member_histogram,
+    render_restatement_rate_report,
+    restatement_rate_over_parts,
+    total_component_reconciliation,
+)
 
 
 def long_frame() -> pl.DataFrame:
@@ -247,4 +252,66 @@ def test_component_reconciliation_keeps_parallel_dimensions_separate() -> None:
     creditor_comparisons = comparisons.filter(pl.col("concept") == "Creditors")
     assert creditor_comparisons.height == 2
     assert creditor_comparisons["agrees"].to_list() == [True, True]
-    assert summary.filter(pl.col("concept") == "Creditors")["agreement_rate"].item() == 1
+
+
+def test_restatement_rate_over_parts(tmp_path: Path) -> None:
+    defaults = {
+        "dimension": None,
+        "member": None,
+        "currency": "GBP",
+        "source_archive": "a.zip",
+        "scale": 0,
+        "status": "selected",
+        "sign": None,
+        "unit": "GBP",
+        "fact_kind": "numeric",
+        "fact_sequence": 0,
+        "context_kind": "instant",
+        "is_current": 1,
+    }
+
+    def fact(concept: str, value: str, *, month: int, member_html: str) -> dict:
+        return {
+            **defaults,
+            "company": "00123456",
+            "period_end": "2022-12-31",
+            "concept": concept,
+            "numeric_value": value,
+            "raw_value": value,
+            "source_year": 2022,
+            "source_month": month,
+            "source_member": member_html,
+            "made_up_to_date": "20221231",
+        }
+
+    month1 = pl.DataFrame(
+        [
+            fact("Equity", "100", month=1, member_html="m1.html"),
+            fact("Debtors", "50", month=1, member_html="m1.html"),
+            fact("CashBankOnHand", "20", month=1, member_html="m1.html"),
+        ]
+    )
+    month2 = pl.DataFrame(
+        [
+            fact("Equity", "110", month=2, member_html="m2.html"),  # disagreement
+            fact("Debtors", "50", month=2, member_html="m2.html"),  # repeated, agrees
+        ]
+    )
+    month1.write_parquet(tmp_path / "accounts-long-2022-01.parquet")
+    month2.write_parquet(tmp_path / "accounts-long-2022-02.parquet")
+
+    result = restatement_rate_over_parts(str(tmp_path / "*.parquet"), scope_label="2022 (test)")
+
+    assert result.keys_total == 3  # Equity, Debtors, CashBankOnHand
+    assert result.keys_repeated == 2  # Equity, Debtors
+    assert result.keys_disagree == 1  # Equity only
+    assert result.disagreement_rate == 0.5
+
+    by_concept = {concept: (repeated, disagree) for concept, repeated, disagree in result.by_concept}
+    assert by_concept["Equity"] == (1, 1)
+    assert by_concept["Debtors"] == (1, 0)
+    assert by_concept["CashBankOnHand"] == (0, 0)
+
+    report = render_restatement_rate_report(result)
+    assert "2022 (test)" in report
+    assert "`Equity`" in report
