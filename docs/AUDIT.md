@@ -759,3 +759,479 @@ date_of_birth. In the JSON the only hits are required key-NAME presence counters
 **Verification.** `ruff check` clean; full `pytest` 136 passed, 1 live deselected. Ran
 concurrently with the accounts Stage 1 production extraction (separate task; writes only
 under `data/accounts/`).
+
+## Accounts pipeline consolidation — memory-bounded downstream, disposable store, URL fix (2026-09-21)
+
+Executed the build prompt's six decisions against the real 30-archive corpus (469,072,180
+observations, 221 GB scratch store, since verified and left for human go/no-go on
+deletion). Diffs: `extract.py`, `backfill.py`, `pivot.py`, `qa.py`, `inventory.py`,
+`cli.py`, plus new tests. No rules, severities, or scoring changed.
+
+**Immediate actions.** Stopped the in-flight full-store `PRAGMA integrity_check` (would
+have scanned 221 GB of scratch bytes that are not the deliverable). Added
+`extract.verify_monthly_parquet`/`verify_all_monthly_parquets` and a new `ukcompany-accounts
+verify` command comparing each manifest's `observation_count` against the actual archived
+Parquet row count — the real completeness check after the unclean reboot, and the
+permanent replacement for a full-store scan going forward (important once Decision 2 makes
+the store disposable). Result: **30 of 30 archives verified, all matched.**
+
+**Decision 1 (BLOCKING) — memory-bounded pivot/QA/inventory.** `pivot_parquet`/`write_qa`
+previously called `pl.read_parquet`/eager reads over the full corpus; this is what caused
+the mid-task reboot (a bare re-run of the naive eager pivot was independently confirmed to
+get OOM-killed at ~30 GB RSS, taking VS Code's shared-process and extension host down with
+it — same cgroup). Root-caused empirically, not by inference:
+- A pure lazy `pl.scan_parquet(glob) + filters + collect(engine="streaming")` plan for
+  pivot's mapped-cell reduction still measured >20 GB RSS. Diagnosis: Polars' streaming
+  engine did not keep the `join` + `sort/unique(maintain_order=True)` chain bounded across
+  a 30-file multi-scan; explicit column projection helped only marginally.
+- Fix actually adopted: process one monthly Parquet at a time, reducing each to its small
+  mapped-cell/target-concept slice before ever touching the next file (`pivot_long_over_parts`
+  in `pivot.py`, `member_histogram_over_parts`/`total_component_reconciliation_over_parts`
+  in `qa.py`). For reconciliation specifically, `SOURCE_KEYS` includes `source_archive`, so
+  the total-vs-component join is provably file-local — it can never match across files —
+  which is what makes a per-file join-then-concat exact, not an approximation.
+- All three CLI commands (`pivot`, `qa`, `inventory`) now report peak RSS
+  (`pivot.track_peak_rss`, a `resource.getrusage` high-water-mark reader — exact for a
+  one-shot CLI process, no sampling needed).
+- **Measured on the real 30-archive corpus, each run in an isolated `systemd-run --scope
+  -p MemoryMax=` cgroup** (adopted after two more OOM kills during tuning — cgroup memory
+  limits cap real resident memory and confine a kill to that scope, unlike `ulimit -v`,
+  which was found to produce false failures from Rust/Polars allocator address-space
+  reservations unrelated to actual usage):
+  - `pivot --mode as_first_reported`: **24.4 GB peak**, wide 8,147,294 rows.
+  - `qa`: **15.2 GB peak**.
+  - `inventory` (2,592 concepts, up from the 494 validated at slim-table scale): **9.2 GB
+    peak**.
+  - Only `qa` and `inventory` land under the brief's ~15 GB aspirational target; `pivot`
+    exceeds it (24.4 GB) despite the per-file rework, because even the mapped/GBP/
+    is_current-filtered cross-month cell set is ~47M rows and Polars' multi-column sort
+    over that (three string sort keys) measured ~2.2× its input as a hard floor — tested
+    and rejected: categorical-encoding the sort keys (made it worse, +1.5 GB just for the
+    cast) and a conflict-set/anti-join split (near-zero true duplication in this corpus, so
+    it doesn't shrink the sort's input). All three commands complete safely with real
+    headroom under the machine's ~30 GB when run in an isolated cgroup; recommend this as
+    the standing invocation pattern for future full-history runs (see below).
+  - `inventory`'s per-concept `companies` (distinct-company) count is a **documented lower
+    bound at full 2,592-concept scale**: the exact cross-file distinct-company set measured
+    338M+ (concept, company) pairs before dedup (bigger than pivot's problem, because
+    inventory keeps every concept and every currency, not just 9 WIDE-mapped ones); an
+    incremental anti-join to drop already-seen pairs was tested and still trended toward
+    ~250-300M rows by extrapolation. Reported value is the max companies-per-concept seen
+    in any *single* archive (always ≤ the true value), computed cheaply
+    (`group_by(concept).agg(n_unique).max()` per file) and flagged as such in both the
+    dataclass (`companies_are_lower_bound`) and the rendered report.
+- `inventory.py` gained a fully independent Parquet-based path
+  (`build_concept_inventory_from_parts`/`write_concept_inventory_from_parts`) alongside the
+  unchanged, still-tested SQLite path (`build_concept_inventory`); `ukcompany-accounts
+  inventory` now defaults to `--long` (Parquets) and only uses `--store` when explicitly
+  given, since Decision 2 means a store may not exist to query.
+
+**Decision 4 — numeric/non-numeric split and employee GBP anomaly (real findings, not
+placeholders).** Corpus-wide: **211,964,906 numeric (45.2%) / 257,107,274 non-numeric
+(54.8%)** — the input to the `numeric-only` scope dial; not switched here, per instruction.
+Employee-count GBP-unit anomaly: **2,871,233** `AverageNumberEmployeesDuringPeriod` facts
+resolved to a GBP unit instead of a plain count — median value **1.0**, only 95 facts at or
+above the 100,000 "clearly monetary" threshold. This closely matches the build brief's own
+prior estimate ("~a quarter of employee coverage") — 2.87M of ~9.8M total employee records
+is ~29%. The pivot does not filter employee facts by currency regardless of this finding
+(unchanged, per instruction).
+
+**Decision 2 — disposable per-month scratch store, opt-in.** Added
+`extract.process_archive_disposable` (extracts one archive into a throwaway
+`.{archive}.scratch.sqlite`, exports its Parquet, copies only the small
+`processed_archives` manifest row into the caller's persistent connection, then deletes the
+scratch files) and threaded a `disposable_store: bool = False` /
+`--disposable-store` flag through `run_backfill` / `ukcompany-accounts run`. Default stays
+monolithic (unchanged behaviour, all existing tests pass unmodified) to avoid a breaking
+change to the tested contract; disposable mode is the documented recommendation for future
+full-history runs. Known, documented trade-off: once a month's scratch store is discarded,
+that month cannot be re-exported at a different `scope`/`kinds` without re-extracting from
+the ZIP — the existing "skip complete, re-export on scope change" branch does not apply in
+this mode, so `cmd_run` prints an explicit note that observation-level extraction-report
+stats are not populated (manifest-only) and points at `inventory` (Parquet-based) instead.
+Verified with a new test asserting `observations` never accumulates under disposable mode
+and that a second run resumes purely from the manifest (mocked `fetch_archive` raises if
+called for an already-complete month).
+
+**Decision 3 — download URL, corrected via live probing, not the brief's assumption.** The
+Companies House download host actually splits monthly archives across **two** live
+locations, confirmed by direct HTTP probing (not previously exercised — all 30 archives
+this session were manually staged, never fetched by this code):
+`download.companieshouse.gov.uk/Accounts_Monthly_Data-{Month}{Year}.zip` (root) 200s for a
+rolling recent window (confirmed 2022-08 through 2026-08, 404s for 2016/2010), while
+`.../archive/...` 200s for older months (confirmed 2010, 2016, 2022-01) and 404s for the
+newest (2025-08, 2026-07/08). The brief's premise — "root is correct, `/archive/` is wrong"
+— does not hold; **both are needed**, and the pre-existing code hardcoded `/archive/` for
+every request, meaning it would have silently 404'd on every recent month. Fixed:
+`fetch_archive` now tries `base_url` (now defaulting to the root) and falls back to
+`historic_base_url` (`/archive/`, still the default fallback) on a 404, so the boundary
+between the two live locations — which shifts monthly — never has to be hardcoded or
+guessed. All 12 existing tests that pass a local `base_url` were updated to also pass
+`historic_base_url=None`, since the prior default would otherwise have made every 404 in a
+test fall through to a live network call — caught before it shipped by a genuine test hang
+against the real server, not by inspection.
+
+**Decision 5 — verified at full 2,592-concept scale (this session's inventory rewrite).**
+Read-correctness audit numbers are corpus-wide via `inventory`: zero non-numeric facts
+carrying a `numeric_value`, only 1 concept (`MissingUnit`-style single-archive case; see
+`docs/accounts-concept-inventory.md` for the live numbers) with a numeric-unit gap at this
+scale — full anomaly tables (mixed kind, incompatible units, mixed context, name/kind
+mismatch) regenerated from the real corpus, not the 494-concept sample.
+
+**Decision 6 — restatement metrics, scope reduced from 2022-2023 to a 6-month window
+(documented, not silent).** Added `qa.restatement_metrics_over_parts` /
+`render_restatement_report` / `ukcompany-accounts restatement`, which requires an explicit
+`--scope-label` naming the continuous range used (never let it default to something that
+could be mistaken for a full-archive claim). The full 2022-2023 (24-file, ~90M-row target-
+concept) span was attempted and measured to exceed 25 GB even after isolating the
+restatement key-count group-by into its own function (freed before the two pivot calls);
+root cause is the same as the `inventory` companies problem — grouping by a key
+(`company, period_end, concept, dimension, member`) whose cardinality approaches the row
+count requires a hash table sized close to the full row count, which is not the same
+"few-groups" shape as the other per-file reductions in this session. Reduced to a
+genuinely-continuous **2022-01 through 2022-06** window, which measured **14.9 GB peak**
+end-to-end (key-count pass + both pivot modes). Real result at that scope:
+`docs/accounts-restatement-2022-h1.md` — restatement rate **0.04%** overall (0.01%-0.06% by
+concept), and a materially larger finding: `latest` WIDE non-null cell counts run
+**~1.8-1.9× `as_first_reported`'s** across every mapped column (e.g. Equity 2,567,529 vs
+1,394,991) — i.e., choosing `as_first_reported` for predictive publication (as the existing
+docs already mandate) roughly halves usable cell coverage relative to `latest`, which the
+human should weigh alongside the look-ahead risk `latest` carries. The full 2022-2023
+computation remains a flagged follow-up (needs either a bigger machine, an out-of-core
+group-by, or a smarter incremental key-elimination algorithm — the anti-join approach
+tried for `inventory`'s companies problem does not obviously transfer, since restatement
+keys are drawn from a much larger key space to begin with).
+
+**Safety practice adopted mid-session.** After the pivot rewrite's first (still-buggy)
+version reproduced the original OOM and took down VS Code's shared-process/extension host
+a second time, every further full-corpus experiment in this session ran inside
+`systemd-run --user --scope -p MemoryMax=<N>G -p MemorySwapMax=0`, which caps real resident
+memory (unlike `ulimit -v`, which measures virtual address space and produced false
+failures from allocator reservations) and confines any OOM kill to that one scope rather
+than triggering a system-wide sweep. Recommend this as the standing invocation pattern for
+`pivot`/`qa`/`inventory`/`restatement` on full-history-scale corpora going forward,
+regardless of the peak-memory numbers reported above, until a smaller machine's actual
+budget is known.
+
+**Not done / explicitly flagged, not decided.** Per the build prompt's "flag, don't
+decide": did NOT switch `accounts.kinds` to `numeric-only` (Decision 4's split is the
+input, not the decision). Did NOT fetch any month outside the existing 30-archive sample
+(Decision 3's fix makes future fetches correct; no new download range was requested or
+run). Did NOT delete the 221 GB scratch store — `verify` confirms the Parquets are safe to
+treat as the archive, but deletion is left to the human's explicit go/no-go as instructed.
+
+**Verification.** `ruff check .` clean; full `pytest` 138 passed, 1 live deselected
+(including a new disposable-store resumability test and a new restatement-metrics test
+with tiny synthetic Parquet fixtures). All full-scale numbers above are from real runs
+against the actual 30-archive corpus, not estimates.
+
+## Close the accounts import chapter — retracted figure, real restatement rate, approximate companies, limitations note (2026-09-21)
+
+Small, bounded follow-up per the build prompt of the same name. No extraction, `scope`,
+`kinds`, or pivot changes; no full-history run. Diffs: `qa.py`, `inventory.py`, `cli.py`,
+tests, plus docs. `ruff check .` clean; full `pytest` 139 passed, 1 live deselected.
+
+**Retraction.** The 0.04% restatement figure from the previous session
+(`docs/accounts-restatement-2022-h1.md`, a Jan–Jun 2022 window) is **wrong and deleted, not
+merely superseded**: a period and its later comparative are ~12 months apart, so a 6-month
+window structurally cannot contain a restatement — it measured a near-empty population,
+not restatement behaviour. Do not cite it; the file is removed.
+
+**Real 2022–2023 restatement rate, via a month-ordered running tally, not a group-by.**
+The previous group-by approach (grouping by a nearly-row-cardinality key) was confirmed to
+exceed 25 GB even isolated in its own function — the same failure shape as `inventory`'s
+companies problem. Replaced entirely: `qa.restatement_rate_over_parts` processes the 24
+continuous 2022–2023 archives oldest-to-newest, holding only a plain Python dict of
+first-seen values keyed `(company, period_end, concept)` (state proportional to distinct
+keys, not raw fact-row count). Matches the panel check's definition
+(`docs/panel-check.md`): non-dimensional (`dimension IS NULL`), `status == 'selected'`,
+numeric, the nine target concepts. Measured **17.8 GB peak** (above the brief's "a few GB"
+estimate — Python dict/tuple/string object overhead is heavier than raw data volume; still
+comfortably run in an isolated cgroup) — DuckDB fallback was not needed. Real result:
+**49,159,979 distinct keys, 13,553,889 repeated, 7.93% disagree** — closely matching the
+independent legacy panel check's 7.94%, which validates both pipelines. `Creditors`
+repeated-key count (106,740) is far below the panel check's 1,393,444 because the panel
+check's legacy pipeline promoted a single non-conflicting *dimensional* value as a total
+substitute ("legacy dimensional fallback"); this computation strictly requires
+`dimension IS NULL`, matching the task's literal definition and the archive's documented
+~4% genuine non-dimensional Creditors rate — noted directly in
+`docs/accounts-restatement-2022-2023.md` so the discrepancy isn't read as an error. CLI:
+`ukcompany-accounts restatement` no longer touches the pivot machinery at all (dropped the
+`as_first_reported`-vs-`latest` WIDE cell-count comparison along with the old
+group-by-based function, since it required running the pivot twice and was not asked for
+in this task — out of scope per the brief's explicit "does not... rewrite the pivot").
+
+**Inventory `companies`: `approx_n_unique`, not a lower bound.** The prior lower-bound
+approach (max companies-per-concept seen in any single archive, from a per-file loop) is
+replaced by `pl.approx_n_unique` (HyperLogLog, ~2% typical error, fixed sketch size per
+group) folded directly into the existing cheap `group_by("concept")` pass — measured
+**2 s / ~2 GB** for the full 2,592-concept corpus, eliminating the whole per-file
+`companies_parts` loop this required before. `ConceptInventory.companies_are_approximate`
+replaces `companies_are_lower_bound`; the rendered report's caveat updated to match. Full
+real re-run: **8.4 GB peak** (down from 9.2 GB under the old approach, and simpler code).
+
+**Limitations note committed.** `docs/accounts-limitations.md` (new) — the chapter's
+close-out: what the archive keeps (all-fact, every concept, as-read, verified no coerced
+non-numeric values), what's validated (nine core concepts only) vs. captured-but-unvalidated
+(~2,580 concepts), the non-numeric text retention rationale (~15.35 GB logical, kept
+because most boilerplate compresses well), the coverage-sample caveat (continuous
+2022–2023 plus six lone months), and the known downstream-handled quirks (employee
+GBP-unit anomaly, 2020→2021 reporting-regime break, Creditors dimensionality, restatement
+rate). Also records what was kept/skipped/deferred this chapter, matching the brief's own
+framing.
+
+**Verification.** All full-scale numbers above are from real runs against the actual
+30-archive corpus, each in an isolated `systemd-run --scope -p MemoryMax=` cgroup per the
+practice adopted in the previous session. `ruff check .` clean; `pytest` 139 passed
+(3 new/changed tests: inventory's parts-based approx-companies test, the restatement
+running-tally test replacing the old group-by test).
+
+**Flag, don't decide (unchanged).** numeric-only vs all-fact, fetch range, and the 221 GB
+store deletion remain human/later calls; none were touched.
+
+## Full-history accounts backfill (2026-09-23)
+
+Executed the "full-history accounts backfill" build prompt: extend the 30-archive sample to
+continuous full history with bounded disk throughout, then recompute snapshot and
+longitudinal outputs out-of-core so they don't OOM at full scale. Diffs: `backfill.py`
+(tests only — logic was already correct), `extract.py` (`export_manifest`), `cli.py`
+(`export-manifest` command; `--engine`/`--duckdb-memory-gb` on `pivot`/`restatement`/`qa`),
+new `ooc.py` (DuckDB out-of-core engine), new `scripts/parser_agreement_audit.py`,
+`config/settings.yaml` (bug fix, see below), tests, docs. No rules, severities, or scoring
+touched — not applicable to this pipeline.
+
+### Pre-flight gates
+
+**Gate 1 — URL fallback correctness.** Read (not modified) `fetch_archive`/`_fetch_from_url`:
+the two-location fallback added in the prior chapter was already correct — `base_url` tried
+first, `historic_base_url` only on an ABSENT (404) result, never on other error types. Only a
+dedicated test was missing; added `test_fetch_archive_falls_back_to_historic_url_on_404` and
+`test_fetch_archive_reports_absent_only_after_both_paths_404` to
+`tests/test_accounts_backfill.py`.
+
+**Gate 1 corollary — a real, launch-blocking bug found by checking the gate, not by a
+crash.** `config/settings.yaml`'s `accounts.base_url` was still `https://download.
+companieshouse.gov.uk/archive` — the pre-two-location value. Since this exactly matched
+`HISTORIC_BASE_URL`, `fetch_archive`'s own dedup guard (`if historic_base_url.rstrip('/') !=
+base_url.rstrip('/')`) would have silently skipped adding the historic candidate as a second
+attempt, meaning *any* month only available at the root path (essentially all recent months)
+would have been wrongly reported ABSENT. Fixed: `base_url` set to the bare root; verified via
+`load_accounts_settings()` that the two URLs were distinct before the real run launched.
+
+**Gate 2 — manifest survives store deletion.** Added `extract.export_manifest(source,
+destination)`, reusing the existing `_MANIFEST_COLUMNS`/upsert pattern. Ran it for real
+against the live 221 GB store before deletion (30 manifest rows copied to
+`data/accounts/manifest.sqlite`), then re-verified via `ukcompany-accounts verify` (30/30
+passed) before deleting the store. Added a regression test,
+`test_exported_manifest_alone_skips_already_complete_months`, which mocks `fetch_archive` to
+raise if called, proving a second run against *only* the exported manifest file (no store)
+correctly skips already-complete months.
+
+**Gate 3 — disk reclaim.** With the manifest safely exported and re-verified, deleted the
+221 GB `data/accounts/accounts.sqlite` (+ `-wal`/`-shm`) after explicit human confirmation,
+freeing headroom for the full-history run (`--disposable-store` was used throughout, so no
+new monolithic store was ever created in its place).
+
+**Gate 4 — effective start year, decided from live evidence, not assumed.** Companies House
+technically serves monthly archives back to 2010, but iXBRL adoption was gradual: live
+probing found 0% iXBRL in 2010, rising through roughly 3%–56% across 2011–2013, reaching
+~97% by 2014. Presented this curve to the human via a direct question; **2014 was chosen as
+the effective start year** — pre-2014 months are left unfetched, not because the server
+lacks them but because they would need a distinct, much-lower-fill-rate validation pass this
+chapter did not do.
+
+**Gate 4 corollary — parser-agreement audit** (`scripts/parser_agreement_audit.py`, new).
+Independently re-parses a sample of real filings with `lxml.etree.XMLParser(recover=True,
+huge_tree=True)` and compares the resulting (concept, contextRef, text) fact set against the
+production regex (`IX_FACT_RE`) — the risk being facts the regex silently never finds at all
+on early-year filing-software markup it was never tuned against (the extraction invariant
+`facts_seen == accounted` only proves nothing is lost *after* a fact is found). Ran against
+real downloaded archives: 2013 (300 filings) → 98.0% exact agreement; 2022 (200–500 filings)
+→ 82.5%. **Zero disagreements in either sample involved any of the nine target concepts.**
+All disagreements were either CRLF/LF line-ending normalisation (benign) or a confirmed
+regex limitation: a non-greedy `(.*?)</\s*ix:\1\s*>` match on an outer `ix:nonNumeric`
+element terminates early when a same-named element is nested inside it (e.g. a date fact
+embedded mid-narrative), truncating the outer element's captured text — confined to
+non-numeric narrative concepts, not fixed (out of scope; flagged for future non-numeric-
+concept work). One implementation bug caught and fixed while building the audit tool itself:
+the lxml-side text extraction originally used `" ".join(text.split())`, which collapses all
+internal whitespace and produced false-positive "disagreements" on every multi-line
+narrative fact; corrected to mirror `core.py`'s own `text_content()` exactly (only replace
+nbsp, strip ends).
+
+### Two OOM incidents during development
+
+**Incident 1 (my fault).** Ran an unbounded (no cgroup) diagnostic script comparing an
+in-development `pivot_duckdb` against the real corpus *while* the legitimate backfill ran in
+the background. It OOM'd at ~26.6 GB anon-rss, and because neither process was cgroup-
+isolated, the kernel OOM-killer took down the entire shared VS Code cgroup as collateral,
+killing both the diagnostic script and the legitimate backfill task. Root-caused via
+`journalctl -k` (confirmed no reboot), disclosed directly when asked, and the backfill was
+immediately resumed under a properly-tracked background task — it correctly skipped the
+already-completed months via the persistent manifest. This is what hardened the standing
+practice (carried over from the prior chapter, reinforced here): every full-scale operation
+from this point on ran inside `systemd-run --user --scope -p MemoryMax=<N>G -p
+MemorySwapMax=0`.
+
+**Incident 2 (contained, not my process's fault — the cgroup did its job).** The full-scale
+concept inventory first OOM'd at a 15 GB cap; retried at 25 GB and succeeded at 17.5 GB peak.
+No collateral damage — confined entirely to its own scope, confirming the cgroup isolation
+practice actually works as intended (contrast with Incident 1, where the same OOM shape
+*without* isolation took down an unrelated process).
+
+**March 2014 orphaned ZIP (an accepted design trade-off, not a bug).** Incident 1 struck in
+the narrow window after `March2014.zip` had fully downloaded and verified but before
+extraction/export and ZIP deletion completed. On resume, `fetch_archive`'s
+"already-present, valid ZIP → `DOWNLOADED`, `downloaded_this_run=False`" short-circuit
+correctly-but-conservatively treated it as not-downloaded-by-this-invocation (the same logic
+that protects genuinely user-staged files from deletion — see
+`test_manually_staged_archive_is_extracted_but_never_deleted`). Recorded as
+`COMPLETED_KEPT` instead of `COMPLETED_DELETED`, leaving a 687 MB ZIP on disk. Verified the
+archive's Parquet was complete and correct before manually deleting the orphaned file; no
+code change made for this — it's the known, accepted cost of the safety check.
+
+### The full backfill run
+
+`ukcompany-accounts run --from 2014-01 --to 2026-08 --disposable-store`, resumed once after
+Incident 1. **Result: 152/152 months present and manifest-complete, 0 absent, 0 failed,
+effective covered span `2014-01` through `2026-08`** (`docs/accounts-coverage.md`).
+Re-verified end to end: `ukcompany-accounts verify` → 152/152 archives' manifest observation
+counts matched their archived Parquet row counts (`docs/accounts-verification.md`).
+
+### Out-of-core engine (`src/ukcompany/accounts/ooc.py`, new)
+
+The sample-scale implementations do not scale to full history: the Python-dict restatement
+tally needed 17.8 GB over 24 months, and the sort-based pivot needed ~24.4 GB over 30
+archives — both would exceed this ~30 GB machine well before 152 archives. Added DuckDB-based
+`restatement_rate_duckdb`, `pivot_duckdb`, `member_histogram_duckdb`,
+`total_component_reconciliation_duckdb`, `write_qa_duckdb`, wired in **additively** behind a
+new `--engine {polars/python, duckdb}` flag on `pivot`/`restatement`/`qa` — the Polars/Python
+engines are unchanged and remain the default. Each DuckDB function is validated against its
+Polars/Python counterpart with an exact-equivalence test on synthetic data before being
+trusted at full scale.
+
+**Design decisions that only emerged after getting them wrong first:**
+
+1. **A dedicated, explicitly-bounded connection is required.** DuckDB's implicit default
+   connection's `memory_limit` is a large fraction of system RAM — an unconfigured
+   connection does not meaningfully spill to disk until it has already consumed most of the
+   machine. `_connect()` creates its own `duckdb.connect(":memory:")` and explicitly sets
+   `SET memory_limit` and `SET temp_directory` — without this, the pivot query still OOM'd
+   under a 20 GB cgroup cap despite DuckDB's out-of-core design.
+2. **OR-based joins defeat the hash-join planner.** The first `pivot_duckdb` joined the
+   mapping table to facts via one condition with an `OR` between the totals-shape and the
+   members-shape. This forced a much more expensive join plan that OOM'd even at 20 GB.
+   Fixed by splitting into two CTEs (`totals_cte`, `members_cte`), each a clean equi-join,
+   combined via `UNION ALL` — mirroring how `pivot.py`'s own `_mapped_cells()` already
+   handles the same distinction at sample scale. Empty totals/members lists are handled by a
+   never-matching sentinel VALUES row rather than conditional branching, so both CTEs always
+   have the same shape.
+3. **`memory_limit` bounds DuckDB's own operators, not the Python-side result handoff.**
+   Even after fixes 1–2, materialising `pivot_duckdb`'s ~47M-row provenance table via `.pl()`
+   still OOM'd (safely contained in a cgroup, no collateral damage this time) — DuckDB's
+   memory accounting covers joins/sorts/window functions internally, but converting a query
+   *result* to Arrow/Polars happens after that accounting and needs memory proportional to
+   the result size regardless of the PRAGMA. Fixed by writing directly via `COPY (query) TO
+   'path.parquet' (FORMAT PARQUET, COMPRESSION ZSTD)`, which streams through DuckDB's own
+   writer instead of ever fully materialising the result in Python memory. `member_histogram_
+   duckdb` and `restatement_rate_duckdb` return small (≤9-row / few-hundred-row) results, so
+   `.pl()`/`.fetchall()` stays safe there; `total_component_reconciliation_duckdb`
+   deliberately aggregates the summary *inside* the same SQL statement so the large row-level
+   comparisons table (as big as the mapped-cell corpus) never crosses into Python at all —
+   `write_qa`'s own caller already discards that table unused, so nothing is lost.
+
+**Two further correctness bugs found from a suspicious real-corpus result, not from a
+crash** — caught before being reported as fact, both now covered by regression tests that
+fail without the fix:
+
+4. **Reconciliation silently summed across parallel dimensional axes.** The first full-scale
+   QA run reported an exact 0.0% agreement rate for five of nine concepts — implausible on
+   its face. Root cause: `total_component_reconciliation_duckdb`'s `components` CTE grouped
+   by `SOURCE_KEYS` only, omitting `dimension`, so a concept reported against *two*
+   independent dimensional splits (e.g. Creditors' maturity split *and* its
+   financial-instrument-type split) had both splits' members summed together into one
+   inflated `component_sum` instead of being compared to the total separately — exactly the
+   behaviour `qa.total_component_reconciliation`'s own
+   `test_component_reconciliation_keeps_parallel_dimensions_separate` test exists to prevent,
+   which the DuckDB equivalence test hadn't yet exercised. Fixed by adding `dimension` to the
+   `components` CTE's `SELECT`/`GROUP BY` (matching the Polars original exactly; the join
+   itself correctly stays `SOURCE_KEYS`-only, so one total can still independently match each
+   parallel dimension's component sum). `test_qa_duckdb_matches_polars_qa` extended with a
+   second parallel-axis case; confirmed it fails on the pre-fix code
+   (`{'comparisons': 1, 'agreements': 0}` vs expected `{'comparisons': 2, 'agreements': 2}`).
+5. **`agreement_rate` silently rounded to 0% or 100%.** Even after fix 4, the *rate* column
+   was still wrong in a way the row-level counts weren't: Debtors showed "100.0%" despite
+   1,230,885/1,363,539 ≈ 90.3% actual agreement; CashBankOnHand showed "0.0%" despite
+   8,696/22,649 ≈ 38.4%. Root cause: DuckDB's `SUM(CASE WHEN agrees THEN 1 ELSE 0 END)`
+   returns a HUGEINT, which round-trips through Arrow into a Polars Decimal(scale=0) column;
+   dividing that by an Int64 `comparisons` column in Polars performed decimal arithmetic at
+   scale 0, rounding every fractional rate to the nearest whole number (0 or 1) before it was
+   ever formatted as a percentage. Every affected concept's displayed rate matched this
+   rounding exactly (verified by hand for all nine). Fixed by explicitly casting both operands
+   to `Float64` before dividing. Neither the original nor the parallel-axis-extended test
+   caught this, because every synthetic scenario's true rate happened to be exactly 0 or 1;
+   added a third, deliberately *disagreeing* comparison to the test fixture so the true rate
+   is a genuine fraction (2/3) — confirmed this catches the bug
+   (`Decimal('1')` vs expected `0.6666666666666666` without the cast).
+
+Neither bug affected `restatement_rate_duckdb` (its rate is computed in pure Python from
+`.fetchall()` ints, never routed through a Polars Decimal column) or `pivot_duckdb` (no
+division/rate computation at all).
+
+### Full-scale outputs, all run against the real, complete 152-archive corpus
+
+Each run in its own `systemd-run --user --scope -p MemoryMax=<N>G -p MemorySwapMax=0` cgroup,
+per the standing practice from the prior chapter and Incident 1 above.
+
+- **Inventory** (`docs/accounts-concept-inventory.md`): 4,455 concepts, 1,968,393,998
+  observations — numeric 903,014,823 (45.9%) / non-numeric 1,065,379,175 (54.1%). Employee
+  GBP-unit anomaly: 7,751,582 facts (median 1.0, only 281 ≥100,000). Read-correctness: 0
+  non-numeric facts with a coerced numeric value; **36,119 numeric facts with a
+  missing/unresolved unit — a new finding not present at 30-archive scale** (see
+  `docs/accounts-limitations.md` for the per-concept breakdown and why it's flagged rather
+  than fixed here). Peak memory: retried from a 15 GB cap to 25 GB, actual peak 17.5 GB.
+- **QA** (`docs/accounts-qa.md`, `docs/accounts-member-frequency.csv`,
+  `docs/accounts-component-reconciliation.csv`), via `--engine duckdb`, after both bug fixes
+  above: peak 13.4 GB. Real reconciliation rates: `AverageNumberEmployeesDuringPeriod` 50.3%,
+  `CashBankOnHand` 38.4%, `Creditors` 22.1%, `CurrentAssets` 49.9%, `Debtors` 90.3%, `Equity`
+  94.0%, `NetCurrentAssetsLiabilities` 40.2%, `PropertyPlantEquipment` 93.6%,
+  `TotalAssetsLessCurrentLiabilities` 38.1%.
+- **Restatement** (`docs/accounts-restatement-2014-2026.md`), via `--engine duckdb`, scoped
+  to the whole continuous 2014–2026 span (no longer fragmented into sub-ranges, since the
+  full run closed every gap): 178,916,771 distinct keys, 115,847,972 repeated, 10,740,756
+  disagree — **9.27%**, close to but somewhat above the 2022–2023-only cross-check (7.93%,
+  itself matching the independent panel check's 7.94%). Peak memory: 13.7 GB.
+- **Pivot** (`data/accounts/accounts-wide-{as_first_reported,latest}.parquet` +
+  `accounts-wide-provenance-{as_first_reported,latest}.parquet`), via `--engine duckdb`, both
+  modes: `as_first_reported` 33,512,909 WIDE rows / 180,386,377 provenance rows (13.8 GB
+  peak); `latest` 36,709,276 WIDE rows / 206,062,454 provenance rows (14.5 GB peak). The
+  mode-to-mode cell-count gap observed at 30-archive/2022-H1 scale (~1.8–1.9×) narrows to
+  ~1.10–1.14× at full scale — noted in `docs/accounts-limitations.md` as a scale-dependent
+  characteristic, not investigated further.
+
+### Verification
+
+`ruff check .` clean; full `pytest` 145 passed, 1 live deselected (new: two Gate-1 tests, one
+Gate-2 manifest-export test, `test_restatement_rate_duckdb_matches_python_tally`,
+`test_pivot_duckdb_matches_polars_pivot`, `test_qa_duckdb_matches_polars_qa` — the last
+extended twice in response to the two reconciliation bugs above, each extension confirmed to
+fail on the pre-fix code before being confirmed to pass on the fix).
+
+**Staged test gate (a), closed out live (2026-09-23, post-hoc).** The full run itself
+live-exercised the "recent" half (2026-07/2026-08 downloaded and verified for real), but
+every requested month in `2014-01..2026-08` came back present, so the "genuinely absent
+month → `ABSENT`, not silently skipped" path had only been covered by a synthetic-server
+unit test. Closed by probing `fetch_archive` live against two months from before Companies
+House's earliest bulk archives (January 2005, June 2003): both correctly returned `ABSENT`
+after 404s at *both* the root and `/archive/` locations (confirmed by the reported error
+naming the second-tried, historic URL), and left nothing on disk. No code change; this was
+a verification-only gap.
+
+### Flag, don't decide
+
+Per the build prompt's own framing: the 2010–2013 iXBRL-adoption gap is presented as
+evidence, not resolved — 2014 was the human's choice, not an inferred one. The nested-
+same-tag-name regex limitation and the 36,119 numeric-unit-gap finding are documented, not
+fixed (both are outside this chapter's stated scope and neither touches the nine validated
+target concepts meaningfully). numeric-only vs all-fact remains unchanged (all-fact was
+already decided previously). No publishing/Kaggle step was touched.
