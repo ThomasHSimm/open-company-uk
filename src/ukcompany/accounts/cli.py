@@ -14,14 +14,17 @@ from .extract import (
     discover_archives,
     export_archive_parquet,
     export_completed_archives,
+    export_manifest,
     export_parquet,
     parse_archive,
     process_archive,
     render_extraction_report,
+    render_verification_report,
+    verify_all_monthly_parquets,
 )
-from .inventory import write_concept_inventory
-from .pivot import load_column_map, pivot_parquet
-from .qa import write_qa
+from .inventory import write_concept_inventory, write_concept_inventory_from_parts
+from .pivot import load_column_map, pivot_parquet, track_peak_rss
+from .qa import render_restatement_rate_report, restatement_rate_over_parts, write_qa
 
 DEFAULTS = {
     "downloads_dir": "~/Downloads",
@@ -60,6 +63,15 @@ def load_accounts_settings(path: str | Path) -> dict[str, object]:
 
 def setting_path(value: object) -> Path:
     return Path(str(value)).expanduser()
+
+
+def format_bytes(value: int) -> str:
+    size = float(value)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if size < 1024 or unit == "TB":
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
 
 
 def month_argument(value: str) -> tuple[int, int]:
@@ -125,28 +137,118 @@ def cmd_extract(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_verify(args: argparse.Namespace) -> int:
+    settings = load_accounts_settings(args.settings)
+    store = setting_path(args.store or settings["store_path"])
+    output_dir = setting_path(args.output_dir or settings["monthly_output_dir"])
+    report = setting_path(args.report or "docs/accounts-verification.md")
+    connection = connect_store(store)
+    try:
+        results = verify_all_monthly_parquets(connection, output_dir)
+    finally:
+        connection.close()
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(render_verification_report(results), encoding="utf-8")
+    print(f"Archives checked: {len(results):,}")
+    print(f"Passed: {sum(result.ok for result in results):,}")
+    print(f"Report: {report}")
+    return int(any(not result.ok for result in results))
+
+
+def cmd_export_manifest(args: argparse.Namespace) -> int:
+    """Split the small `processed_archives` manifest out of a store, e.g. before deleting
+    it or before switching the remaining run to --disposable-store."""
+    settings = load_accounts_settings(args.settings)
+    source_path = setting_path(args.source or settings["store_path"])
+    destination_path = setting_path(args.destination)
+    source = connect_store(source_path)
+    destination = connect_store(destination_path)
+    try:
+        copied = export_manifest(source, destination)
+    finally:
+        source.close()
+        destination.close()
+    print(f"Manifest rows copied: {copied:,}")
+    print(f"Destination: {destination_path}")
+    return 0
+
+
 def cmd_pivot(args: argparse.Namespace) -> int:
     settings = load_accounts_settings(args.settings)
     mapping = load_column_map(str(args.column_map or settings["column_map"]))
     long_path = setting_path(args.long or settings["long_input"])
     wide = setting_path(args.output or settings["wide_output"])
     provenance = setting_path(args.provenance_output or settings["wide_provenance_output"])
-    pivot_parquet(long_path, mapping, args.mode, wide, provenance)
+    if args.engine == "duckdb":
+        from .ooc import pivot_duckdb
+
+        with track_peak_rss() as peak_fn:
+            pivot_duckdb(
+                long_path,
+                mapping,
+                args.mode,
+                wide,
+                provenance,
+                memory_limit_gb=args.duckdb_memory_gb,
+            )
+        peak = peak_fn()
+    else:
+        peak = pivot_parquet(long_path, mapping, args.mode, wide, provenance)
     print(f"WIDE: {wide}")
     print(f"Provenance: {provenance}")
+    print(f"Peak memory: {format_bytes(peak)}")
     return 0
 
 
 def cmd_qa(args: argparse.Namespace) -> int:
+    """Member histogram and total/component reconciliation, via the per-file Polars pass
+    (--engine polars) or an out-of-core DuckDB group-by (--engine duckdb, required at
+    full-history scale — the Polars pass OOM'd at a 25 GB cgroup cap over 152 archives)."""
     settings = load_accounts_settings(args.settings)
     long_path = setting_path(args.long or settings["long_input"])
     histogram = setting_path(args.histogram or settings["member_histogram"])
     reconciliation = setting_path(args.reconciliation or settings["reconciliation_output"])
     report = setting_path(args.report or settings["qa_report"])
-    write_qa(long_path, histogram, reconciliation, report)
+    if args.engine == "duckdb":
+        from .ooc import write_qa_duckdb
+
+        with track_peak_rss() as peak_fn:
+            write_qa_duckdb(
+                long_path, histogram, reconciliation, report,
+                memory_limit_gb=args.duckdb_memory_gb,
+            )
+        peak = peak_fn()
+    else:
+        peak = write_qa(long_path, histogram, reconciliation, report)
     print(f"Member histogram: {histogram}")
     print(f"Reconciliation: {reconciliation}")
     print(f"QA report: {report}")
+    print(f"Peak memory: {format_bytes(peak)}")
+    return 0
+
+
+def cmd_restatement(args: argparse.Namespace) -> int:
+    """Decision 6: restatement rate over a CONTINUOUS month range, via a running tally
+    (--engine python) or an out-of-core DuckDB window function (--engine duckdb, required
+    at full-history scale — the Python dict tally needed 17.8 GB over 24 months alone)."""
+    report_output = setting_path(args.report)
+    with track_peak_rss() as peak:
+        if args.engine == "duckdb":
+            from .ooc import restatement_rate_duckdb
+
+            result = restatement_rate_duckdb(
+                args.long, scope_label=args.scope_label, memory_limit_gb=args.duckdb_memory_gb
+            )
+        else:
+            result = restatement_rate_over_parts(args.long, scope_label=args.scope_label)
+        report_output.parent.mkdir(parents=True, exist_ok=True)
+        report_output.write_text(render_restatement_rate_report(result), encoding="utf-8")
+    print(f"Restatement report: {report_output}")
+    print(
+        f"Disagreement rate: {result.disagreement_rate:.2%} of "
+        f"{result.keys_repeated:,} repeated keys"
+    )
+    print(f"Peak memory: {format_bytes(peak())}")
     return 0
 
 
@@ -178,6 +280,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             report_output=coverage,
             scope=scope,
             kinds=kinds,
+            disposable_store=args.disposable_store,
         )
         if args.monolithic_output:
             print("Exporting opt-in monolithic LONG Parquet...", flush=True)
@@ -190,6 +293,12 @@ def cmd_run(args: argparse.Namespace) -> int:
     if args.monolithic_output:
         print(f"Monolithic LONG: {setting_path(args.monolithic_output)}")
     print(f"Extraction report: {extraction_report}")
+    if args.disposable_store:
+        print(
+            "Note: --disposable-store means the store holds manifest rows only; "
+            "the extraction report's observation-level stats are not populated. "
+            "Use `ukcompany-accounts inventory` (reads --long) for full-scale stats."
+        )
     print(f"Coverage report: {coverage}")
     return int(summary.has_gaps)
 
@@ -223,21 +332,27 @@ def cmd_export(args: argparse.Namespace) -> int:
 
 def cmd_inventory(args: argparse.Namespace) -> int:
     settings = load_accounts_settings(args.settings)
-    store = setting_path(args.store or settings["store_path"])
     csv_output = setting_path(args.csv or settings["concept_inventory_csv"])
     report_output = setting_path(args.report or settings["concept_inventory_report"])
-    connection = connect_store(store)
-    try:
-        inventory = write_concept_inventory(
-            connection,
-            csv_output,
-            report_output,
-        )
-    finally:
-        connection.close()
+    if args.store:
+        # Opt-in path for anyone who kept a monolithic store (see Decision 2); this never
+        # requires touching Parquets and is unchanged from the pre-streaming behaviour.
+        connection = connect_store(setting_path(args.store))
+        try:
+            inventory = write_concept_inventory(connection, csv_output, report_output)
+        finally:
+            connection.close()
+        peak = None
+    else:
+        # Default: read the archived Parquets directly, so inventory works even after a
+        # disposable-store run has discarded the scratch database (see pivot/pivot_long_over_parts).
+        long_path = setting_path(args.long or settings["long_input"])
+        inventory, peak = write_concept_inventory_from_parts(long_path, csv_output, report_output)
     print(f"Concepts inventoried: {len(inventory.rows):,}")
     print(f"Concept inventory CSV: {csv_output}")
     print(f"Concept inventory report: {report_output}")
+    if peak is not None:
+        print(f"Peak memory: {format_bytes(peak)}")
     return int(
         bool(
             inventory.audit.non_numeric_coercions
@@ -287,6 +402,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--report")
     run.add_argument("--scope", help="all or a comma-separated local-name list")
     run.add_argument("--kinds", choices=("all", "numeric-only"))
+    run.add_argument(
+        "--disposable-store",
+        action="store_true",
+        help="extract each month into a throwaway working store instead of one monolith "
+        "(recommended for full-history runs; see Decision 2 in accounts-backfill.md)",
+    )
     run.set_defaults(func=cmd_run)
     export = commands.add_parser("export", help="rewrite completed per-month Parquets")
     export.add_argument("--store")
@@ -297,10 +418,28 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("--scope", help="all or a comma-separated local-name list")
     export.add_argument("--kinds", choices=("all", "numeric-only"))
     export.set_defaults(func=cmd_export)
+    verify = commands.add_parser(
+        "verify", help="check manifest observation counts against archived Parquet row counts"
+    )
+    verify.add_argument("--store")
+    verify.add_argument("--output-dir")
+    verify.add_argument("--report")
+    verify.set_defaults(func=cmd_verify)
+    export_manifest_parser = commands.add_parser(
+        "export-manifest",
+        help="copy the small processed_archives manifest out of a store (e.g. before "
+        "deleting it, or before switching the rest of a run to --disposable-store)",
+    )
+    export_manifest_parser.add_argument("--source", help="store to read from; default store_path")
+    export_manifest_parser.add_argument("--destination", required=True)
+    export_manifest_parser.set_defaults(func=cmd_export_manifest)
     inventory = commands.add_parser(
         "inventory", help="write the Stage 1 concept dictionary and read-correctness audit"
     )
-    inventory.add_argument("--store")
+    inventory.add_argument("--long", help="archived Parquet glob; default source")
+    inventory.add_argument(
+        "--store", help="opt-in: read a monolithic SQLite store instead of --long"
+    )
     inventory.add_argument("--csv")
     inventory.add_argument("--report")
     inventory.set_defaults(func=cmd_inventory)
@@ -313,13 +452,49 @@ def build_parser() -> argparse.ArgumentParser:
     pivot.add_argument("--mode", choices=("latest", "as_first_reported"), required=True)
     pivot.add_argument("--output")
     pivot.add_argument("--provenance-output")
+    pivot.add_argument(
+        "--engine",
+        choices=("polars", "duckdb"),
+        default="polars",
+        help="'duckdb' is out-of-core and required at full-history scale; "
+        "'polars' (default) matches prior tested behaviour at sample scale",
+    )
+    pivot.add_argument("--duckdb-memory-gb", type=int, default=8)
     pivot.set_defaults(func=cmd_pivot)
     qa = commands.add_parser("qa", help="write member histogram and reconciliation QA")
     qa.add_argument("--long")
     qa.add_argument("--histogram")
     qa.add_argument("--reconciliation")
     qa.add_argument("--report")
+    qa.add_argument(
+        "--engine",
+        choices=("polars", "duckdb"),
+        default="polars",
+        help="'duckdb' is out-of-core and required at full-history scale; "
+        "'polars' (default) matches prior tested behaviour at sample scale",
+    )
+    qa.add_argument("--duckdb-memory-gb", type=int, default=8)
     qa.set_defaults(func=cmd_qa)
+    restatement = commands.add_parser(
+        "restatement",
+        help="restatement rate via a month-ordered running tally, over a CONTINUOUS "
+        "month-range glob only (Decision 6) — never the full archive with gaps",
+    )
+    restatement.add_argument(
+        "--long", required=True, help="glob over a continuous month range, e.g. "
+        "'data/accounts/long/accounts-long-202[23]-*.parquet' for 2022-2023"
+    )
+    restatement.add_argument("--scope-label", required=True)
+    restatement.add_argument("--report", required=True)
+    restatement.add_argument(
+        "--engine",
+        choices=("python", "duckdb"),
+        default="python",
+        help="'duckdb' is out-of-core and required at full-history scale; "
+        "'python' (default) matches prior tested behaviour at sample scale",
+    )
+    restatement.add_argument("--duckdb-memory-gb", type=int, default=8)
+    restatement.set_defaults(func=cmd_restatement)
     return parser
 
 
