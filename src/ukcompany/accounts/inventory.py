@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import csv
+import glob as glob_module
 import json
 import re
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
+
+from .core import EMPLOYEE_CONCEPT
+from .pivot import require_polars, track_peak_rss
 
 INVENTORY_COLUMNS = (
     "concept",
@@ -79,10 +83,46 @@ class ConceptInventoryAudit:
 
 
 @dataclass(frozen=True)
+class FactKindSplit:
+    """Corpus-wide numeric-vs-non-numeric split (Decision 4: the input to the numeric-only
+    dial, not a decision made here)."""
+
+    numeric_observations: int
+    non_numeric_observations: int
+
+    @property
+    def total(self) -> int:
+        return self.numeric_observations + self.non_numeric_observations
+
+
+@dataclass(frozen=True)
+class EmployeeGbpAnomaly:
+    """Value distribution of GBP-tagged `AverageNumberEmployeesDuringPeriod` facts.
+
+    Employee counts should carry a `pure`/count unit, not a currency; GBP-tagged rows are
+    a unit-resolution anomaly. Small integers are very likely genuine headcounts, whereas
+    money-sized values are very likely a mis-tagged monetary fact. `small_count`/
+    `large_count` split at `threshold`; the pivot never filters employees by currency
+    regardless of this finding (see Decision 5).
+    """
+
+    threshold: float
+    count: int
+    small_count: int
+    large_count: int
+    min_value: float | None
+    median_value: float | None
+    max_value: float | None
+
+
+@dataclass(frozen=True)
 class ConceptInventory:
     rows: tuple[ConceptInventoryRow, ...]
     audit: ConceptInventoryAudit
     archive_names: tuple[str, ...]
+    fact_kind_split: FactKindSplit | None = None
+    employee_gbp_anomaly: EmployeeGbpAnomaly | None = None
+    companies_are_approximate: bool = False
 
 
 def _unit_family(unit: str) -> str:
@@ -227,6 +267,224 @@ def build_concept_inventory(connection: sqlite3.Connection) -> ConceptInventory:
     return ConceptInventory(tuple(rows), audit, archive_names)
 
 
+def _employee_gbp_anomaly(parts: str | Path, threshold: float = 100_000.0) -> EmployeeGbpAnomaly:
+    """Value distribution of GBP-tagged employee-count facts; see `EmployeeGbpAnomaly`."""
+    pl = require_polars()
+    lazy = (
+        pl.scan_parquet(parts)
+        .filter((pl.col("concept") == EMPLOYEE_CONCEPT) & (pl.col("currency") == "GBP"))
+        .with_columns(pl.col("numeric_value").cast(pl.Float64, strict=False).alias("value"))
+    )
+    stats = lazy.select(
+        pl.len().alias("count"),
+        pl.col("value").min().alias("min_value"),
+        pl.col("value").median().alias("median_value"),
+        pl.col("value").max().alias("max_value"),
+        (pl.col("value") < threshold).sum().alias("small_count"),
+        (pl.col("value") >= threshold).sum().alias("large_count"),
+    ).collect(engine="streaming")
+    row = stats.row(0, named=True)
+    return EmployeeGbpAnomaly(
+        threshold=threshold,
+        count=int(row["count"]),
+        small_count=int(row["small_count"] or 0),
+        large_count=int(row["large_count"] or 0),
+        min_value=row["min_value"],
+        median_value=row["median_value"],
+        max_value=row["max_value"],
+    )
+
+
+def build_concept_inventory_from_parts(parts: str | Path) -> ConceptInventory:
+    """Streaming concept inventory built directly from the archived monthly Parquets.
+
+    Unlike the SQLite-backed `build_concept_inventory`, this never requires the scratch
+    store to exist — it is the contract for disposable-store runs (Decision 2), which
+    discard observations after each month. Validated at the full 2,592-concept corpus
+    scale: a plain `group_by("concept")` is cheap (a few thousand groups, ~2 GB peak
+    measured), and `approx_n_unique` (HyperLogLog, ~2% error, fixed sketch size per group
+    regardless of cardinality) computes `companies` in the same cheap pass — measured
+    ~2 GB / 2 s for the whole corpus, replacing an earlier exact-count attempt that could
+    not fit in memory at this scale. Per-group *distinct-value* work over the full fact
+    rows (units, contexts, examples) is still far more expensive at this row count, so
+    those go through a per-file reduce-then-combine pass, mirroring `pivot`/`qa`'s
+    `_over_parts` functions.
+    """
+    pl = require_polars()
+    paths = sorted(glob_module.glob(str(parts)))
+    if not paths:
+        raise ValueError(f"no Parquet files match: {parts}")
+
+    lazy_all = pl.scan_parquet(parts)
+    aggregate_df, non_numeric_df, numeric_gap_df, contexts_all_df, archive_names_df = (
+        pl.collect_all(
+            [
+                lazy_all.group_by("concept").agg(
+                    pl.len().alias("observations"),
+                    pl.col("company").approx_n_unique().alias("companies"),
+                    (pl.col("fact_kind") == "numeric").sum().alias("numeric"),
+                    (pl.col("fact_kind") == "non-numeric").sum().alias("non_numeric"),
+                    pl.col("numeric_value").is_null().sum().alias("numeric_null"),
+                ),
+                lazy_all.filter(
+                    (pl.col("fact_kind") == "non-numeric") & pl.col("numeric_value").is_not_null()
+                )
+                .group_by("concept")
+                .agg(pl.len().alias("n")),
+                lazy_all.filter(
+                    (pl.col("fact_kind") == "numeric")
+                    & (pl.col("unit").is_null() | (pl.col("unit").str.strip_chars() == ""))
+                )
+                .group_by("concept")
+                .agg(pl.len().alias("n")),
+                lazy_all.select("context_kind").unique(),
+                lazy_all.select("source_archive", "source_year", "source_month")
+                .unique()
+                .sort(["source_year", "source_month", "source_archive"]),
+            ],
+            engine="streaming",
+        )
+    )
+
+    units_parts, contexts_parts, examples_parts = [], [], []
+    for path in paths:
+        file_lazy = pl.scan_parquet(path)
+        units_parts.append(
+            file_lazy.filter(
+                pl.col("unit").is_not_null() & (pl.col("unit").str.strip_chars() != "")
+            )
+            .select("concept", "unit")
+            .unique()
+            .collect(engine="streaming")
+        )
+        contexts_parts.append(
+            file_lazy.select("concept", "context_kind").unique().collect(engine="streaming")
+        )
+        examples_parts.append(
+            file_lazy.select("concept", "raw_value")
+            .group_by("concept")
+            .agg(pl.col("raw_value").drop_nulls().unique().sort().head(3).alias("examples"))
+            .collect(engine="streaming")
+        )
+
+    units_df = (
+        pl.concat(units_parts, how="vertical")
+        .unique()
+        .group_by("concept")
+        .agg(pl.col("unit").sort().alias("units"))
+    )
+    contexts_df = (
+        pl.concat(contexts_parts, how="vertical")
+        .unique()
+        .group_by("concept")
+        .agg(pl.col("context_kind").sort().alias("context_kinds"))
+    )
+    examples_df = (
+        pl.concat(examples_parts, how="vertical")
+        .explode("examples")
+        .group_by("concept")
+        .agg(pl.col("examples").drop_nulls().unique().sort().head(3).alias("examples"))
+    )
+
+    unknown_contexts = set(contexts_all_df["context_kind"].to_list()) - {"instant", "duration"}
+    if unknown_contexts:
+        kinds = ", ".join(sorted(unknown_contexts))
+        raise RuntimeError(
+            f"inventory requires instant/duration context metadata; re-extract rows with: {kinds}"
+        )
+
+    units_map = dict(zip(units_df["concept"], units_df["units"], strict=True))
+    contexts_map = dict(zip(contexts_df["concept"], contexts_df["context_kinds"], strict=True))
+    examples_map = dict(zip(examples_df["concept"], examples_df["examples"], strict=True))
+    non_numeric_map = dict(zip(non_numeric_df["concept"], non_numeric_df["n"], strict=True))
+    numeric_gap_map = dict(zip(numeric_gap_df["concept"], numeric_gap_df["n"], strict=True))
+
+    rows: list[ConceptInventoryRow] = []
+    numeric_counts: dict[str, int] = {}
+    non_numeric_counts: dict[str, int] = {}
+    total_numeric = 0
+    total_non_numeric = 0
+    for record in aggregate_df.iter_rows(named=True):
+        concept = str(record["concept"])
+        observations = int(record["observations"])
+        numeric = int(record["numeric"])
+        non_numeric = int(record["non_numeric"])
+        numeric_counts[concept] = numeric
+        non_numeric_counts[concept] = non_numeric
+        total_numeric += numeric
+        total_non_numeric += non_numeric
+        kind = "mixed" if numeric and non_numeric else "numeric" if numeric else "non_numeric"
+        context_values = set(contexts_map.get(concept, []))
+        context_kind = (
+            "mixed" if len(context_values) > 1 else next(iter(context_values), "unknown")
+        )
+        rows.append(
+            ConceptInventoryRow(
+                concept=concept,
+                observations=observations,
+                companies=int(record["companies"]),
+                kind=kind,
+                units=tuple(units_map.get(concept, [])),
+                context_kind=context_kind,
+                pct_numeric_null=100 * int(record["numeric_null"]) / observations,
+                example_values=tuple(_example(str(v)) for v in examples_map.get(concept, [])),
+            )
+        )
+    rows.sort(key=lambda row: (-row.observations, row.concept))
+
+    mixed_kinds = tuple(row.concept for row in rows if row.kind == "mixed")
+    incompatible_units = tuple(
+        (row.concept, row.units)
+        for row in rows
+        if len({_unit_family(unit) for unit in row.units}) > 1
+    )
+    mixed_contexts = tuple(row.concept for row in rows if row.context_kind == "mixed")
+    name_kind_mismatches = []
+    for row in rows:
+        if TEXT_NAME_RE.search(row.concept) and numeric_counts[row.concept]:
+            name_kind_mismatches.append((row.concept, "text-like name has numeric facts"))
+        numeric_like = (
+            NUMERIC_NAME_RE.search(row.concept)
+            and not TEXT_PREFIX_RE.match(row.concept)
+            and not IDENTIFIER_NAME_RE.search(row.concept)
+        )
+        if numeric_like and non_numeric_counts[row.concept]:
+            name_kind_mismatches.append((row.concept, "numeric-like name has non-numeric facts"))
+
+    non_numeric_coercions = tuple(
+        sorted(
+            ((str(c), int(n)) for c, n in non_numeric_map.items()),
+            key=lambda item: (-item[1], item[0]),
+        )
+    )
+    numeric_unit_gaps = tuple(
+        sorted(
+            ((str(c), int(n)) for c, n in numeric_gap_map.items()),
+            key=lambda item: (-item[1], item[0]),
+        )
+    )
+
+    audit = ConceptInventoryAudit(
+        non_numeric_coercions=non_numeric_coercions,
+        numeric_unit_gaps=numeric_unit_gaps,
+        mixed_kinds=mixed_kinds,
+        incompatible_units=incompatible_units,
+        mixed_contexts=mixed_contexts,
+        name_kind_mismatches=tuple(name_kind_mismatches),
+    )
+    archive_names = tuple(str(value) for value in archive_names_df["source_archive"].to_list())
+    fact_kind_split = FactKindSplit(total_numeric, total_non_numeric)
+    employee_gbp_anomaly = _employee_gbp_anomaly(parts)
+    return ConceptInventory(
+        tuple(rows),
+        audit,
+        archive_names,
+        fact_kind_split,
+        employee_gbp_anomaly,
+        companies_are_approximate=True,
+    )
+
+
 def write_inventory_csv(inventory: ConceptInventory, output: str | Path) -> Path:
     destination = Path(output)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -258,8 +516,9 @@ def render_inventory_report(inventory: ConceptInventory) -> str:
     lines = [
         "# Accounts concept inventory",
         "",
-        "This is the Stage 1 data dictionary generated from the configured SQLite store. "
-        "It reports source facts as read and does not correct or curate stored values.",
+        "This is the Stage 1 data dictionary generated from the extracted accounts data "
+        "(SQLite store or archived monthly Parquets). It reports source facts as read and "
+        "does not correct or curate stored values.",
         "",
         f"- Archives represented: {len(inventory.archive_names):,}",
         f"- Source manifests: "
@@ -271,32 +530,86 @@ def render_inventory_report(inventory: ConceptInventory) -> str:
         "other concepts are captured but unvalidated; rare concepts should not be trusted "
         "without checking this inventory and the source filing.",
         "",
-        "## Read-correctness audit",
-        "",
-        f"- Non-numeric facts with non-null `numeric_value`: "
-        f"**{audit.non_numeric_coercion_rows:,}**",
-        f"- Numeric facts with a missing or unresolved `unit`: "
-        f"**{audit.numeric_unit_gap_rows:,}**",
-        "",
-        "### Non-numeric coercions by concept",
-        "",
-        *_count_table(audit.non_numeric_coercions),
-        "",
-        "### Numeric unit gaps by concept",
-        "",
-        *_count_table(audit.numeric_unit_gaps),
-        "",
-        "## Anomaly flags",
-        "",
-        "These flags are review cues, not corrections.",
-        "",
-        f"### Mixed numeric/non-numeric kind ({len(audit.mixed_kinds):,})",
-        "",
-        *_concept_list(audit.mixed_kinds),
-        "",
-        f"### Multiple incompatible unit families ({len(audit.incompatible_units):,})",
-        "",
     ]
+    if inventory.companies_are_approximate:
+        lines.extend(
+            [
+                "**`companies` is approximate.** Computed with `approx_n_unique` "
+                "(HyperLogLog, ~2% typical error) rather than an exact distinct count, "
+                "which does not fit in memory across all 2,592 concepts (the full "
+                "(concept, company) pair set measured 338M+ rows for this corpus).",
+                "",
+            ]
+        )
+    if inventory.fact_kind_split is not None:
+        split = inventory.fact_kind_split
+        lines.extend(
+            [
+                "## Numeric versus non-numeric split",
+                "",
+                "The input to the `numeric-only` scope dial (config `accounts.kinds`), not a "
+                "decision made here. Free-text disclosures are the main size driver of the "
+                "all-fact archive relative to a numeric-only one.",
+                "",
+                f"- Numeric observations: {split.numeric_observations:,} "
+                f"({100 * split.numeric_observations / split.total:.1f}%)",
+                f"- Non-numeric observations: {split.non_numeric_observations:,} "
+                f"({100 * split.non_numeric_observations / split.total:.1f}%)",
+                "",
+            ]
+        )
+    if inventory.employee_gbp_anomaly is not None:
+        anomaly = inventory.employee_gbp_anomaly
+        lines.extend(
+            [
+                "## Employee-count GBP-unit anomaly",
+                "",
+                f"`{EMPLOYEE_CONCEPT}` facts whose unit resolved to GBP instead of a plain "
+                "count — headcount should never carry a currency. Small values are very "
+                "likely genuine headcounts with a mis-tagged unit (kept, unit ignored); "
+                "large values are very likely a different, mis-tagged monetary fact. The "
+                "pivot does not filter employee facts by currency regardless of this split "
+                "(see accounts-qa report limitations).",
+                "",
+                f"- GBP-tagged employee facts: {anomaly.count:,}",
+                f"- Value range: {anomaly.min_value} – {anomaly.max_value} "
+                f"(median {anomaly.median_value})",
+                f"- Below {anomaly.threshold:,.0f} (plausible headcount): "
+                f"{anomaly.small_count:,}",
+                f"- At or above {anomaly.threshold:,.0f} (likely mis-tagged): "
+                f"{anomaly.large_count:,}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Read-correctness audit",
+            "",
+            f"- Non-numeric facts with non-null `numeric_value`: "
+            f"**{audit.non_numeric_coercion_rows:,}**",
+            f"- Numeric facts with a missing or unresolved `unit`: "
+            f"**{audit.numeric_unit_gap_rows:,}**",
+            "",
+            "### Non-numeric coercions by concept",
+            "",
+            *_count_table(audit.non_numeric_coercions),
+            "",
+            "### Numeric unit gaps by concept",
+            "",
+            *_count_table(audit.numeric_unit_gaps),
+            "",
+            "## Anomaly flags",
+            "",
+            "These flags are review cues, not corrections.",
+            "",
+            f"### Mixed numeric/non-numeric kind ({len(audit.mixed_kinds):,})",
+            "",
+            *_concept_list(audit.mixed_kinds),
+            "",
+            f"### Multiple incompatible unit families ({len(audit.incompatible_units):,})",
+            "",
+        ]
+    )
     if audit.incompatible_units:
         lines.extend(["| Concept | Units |", "|---|---|"])
         lines.extend(
@@ -350,3 +663,18 @@ def write_concept_inventory(
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(render_inventory_report(inventory), encoding="utf-8")
     return inventory
+
+
+def write_concept_inventory_from_parts(
+    parts: str | Path,
+    csv_output: str | Path,
+    report_output: str | Path,
+) -> tuple[ConceptInventory, int]:
+    """Write the inventory from the archived Parquets; returns `(inventory, peak_rss_bytes)`."""
+    with track_peak_rss() as peak:
+        inventory = build_concept_inventory_from_parts(parts)
+        write_inventory_csv(inventory, csv_output)
+        report = Path(report_output)
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text(render_inventory_report(inventory), encoding="utf-8")
+    return inventory, peak()
