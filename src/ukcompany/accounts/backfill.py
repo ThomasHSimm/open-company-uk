@@ -19,9 +19,11 @@ from .extract import (
     export_archive_parquet,
     parse_archive,
     process_archive,
+    process_archive_disposable,
 )
 
-DEFAULT_BASE_URL = "https://download.companieshouse.gov.uk/archive"
+DEFAULT_BASE_URL = "https://download.companieshouse.gov.uk"
+HISTORIC_BASE_URL = "https://download.companieshouse.gov.uk/archive"
 TRANSIENT_HTTP_STATUSES = frozenset({408, 425, 429, 500, 502, 503, 504})
 
 
@@ -117,12 +119,56 @@ def _verified_zip(path: Path) -> None:
         archive.infolist()
 
 
+def _fetch_from_url(
+    url: str,
+    *,
+    partial: Path,
+    chunk_size: int,
+    retries: int,
+    backoff: float,
+    timeout: float,
+    sleep: Callable[[float], None],
+    client: requests.Session,
+) -> FetchResult:
+    """Try one candidate URL with retries; the caller decides how to react to ABSENT."""
+    last_error: str | None = None
+    received = 0
+    for attempt in range(retries + 1):
+        retryable = True
+        received = 0
+        try:
+            with client.get(url, stream=True, timeout=timeout) as response:
+                if response.status_code == 404:
+                    return FetchResult(FetchStatus.ABSENT, Path(), error=f"HTTP 404: {url}")
+                if response.status_code >= 400:
+                    retryable = response.status_code in TRANSIENT_HTTP_STATUSES
+                    response.raise_for_status()
+                expected_header = response.headers.get("Content-Length")
+                expected = int(expected_header) if expected_header is not None else None
+                with partial.open("wb") as output:
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            output.write(chunk)
+                            received += len(chunk)
+                if expected is not None and received != expected:
+                    raise OSError(f"short download: received {received:,} of {expected:,} bytes")
+            return FetchResult(FetchStatus.DOWNLOADED, Path(), bytes_received=received)
+        except (OSError, ValueError, zipfile.BadZipFile, requests.RequestException) as exc:
+            last_error = str(exc)
+            partial.unlink(missing_ok=True)
+            if not retryable or attempt >= retries:
+                break
+            sleep(backoff * (2**attempt))
+    return FetchResult(FetchStatus.FAILED, Path(), received, last_error)
+
+
 def fetch_archive(
     month: int,
     year: int,
     *,
     downloads: str | Path,
     base_url: str = DEFAULT_BASE_URL,
+    historic_base_url: str | None = HISTORIC_BASE_URL,
     chunk_size: int = 8 * 1024 * 1024,
     retries: int = 2,
     backoff: float = 5.0,
@@ -130,7 +176,15 @@ def fetch_archive(
     sleep: Callable[[float], None] = time.sleep,
     session: requests.Session | None = None,
 ) -> FetchResult:
-    """Fetch one archive through a verified temporary file without buffering it."""
+    """Fetch one archive through a verified temporary file without buffering it.
+
+    Companies House splits monthly accounts archives across two live locations: a rolling
+    recent window at the root path, and everything older under `/archive/` — confirmed by
+    probing the live server (root 200s for 2022-08..2026-08, 404s for 2016/2010; `/archive/`
+    is the reverse). Neither path alone covers the full history, so a 404 on `base_url`
+    falls back to `historic_base_url` (and vice versa is unnecessary since callers should
+    pass the more-likely-correct URL first) before the month is reported ABSENT.
+    """
     if chunk_size <= 0:
         raise ValueError("chunk_size must be positive")
     if retries < 0:
@@ -156,53 +210,41 @@ def fetch_archive(
 
     client = session or requests.Session()
     owns_session = session is None
-    url = f"{base_url.rstrip('/')}/{name}"
-    last_error: str | None = None
+    candidates = [base_url]
+    if historic_base_url is not None and historic_base_url.rstrip("/") != base_url.rstrip("/"):
+        candidates.append(historic_base_url)
     try:
-        for attempt in range(retries + 1):
-            retryable = True
-            received = 0
-            try:
-                with client.get(url, stream=True, timeout=timeout) as response:
-                    if response.status_code == 404:
-                        return FetchResult(
-                            FetchStatus.ABSENT,
-                            destination,
-                            error=f"HTTP 404: {url}",
-                        )
-                    if response.status_code >= 400:
-                        retryable = response.status_code in TRANSIENT_HTTP_STATUSES
-                        response.raise_for_status()
-                    expected_header = response.headers.get("Content-Length")
-                    expected = int(expected_header) if expected_header is not None else None
-                    with partial.open("wb") as output:
-                        for chunk in response.iter_content(chunk_size=chunk_size):
-                            if chunk:
-                                output.write(chunk)
-                                received += len(chunk)
-                    if expected is not None and received != expected:
-                        raise OSError(
-                            f"short download: received {received:,} of {expected:,} bytes"
-                        )
-                _verified_zip(partial)
-                partial.replace(destination)
-                return FetchResult(
-                    FetchStatus.DOWNLOADED,
-                    destination,
-                    bytes_received=received,
-                    downloaded_this_run=True,
-                )
-            except (OSError, ValueError, zipfile.BadZipFile, requests.RequestException) as exc:
-                last_error = str(exc)
-                partial.unlink(missing_ok=True)
-                if not retryable or attempt >= retries:
-                    break
-                sleep(backoff * (2**attempt))
+        result = FetchResult(FetchStatus.ABSENT, destination)
+        for candidate in candidates:
+            url = f"{candidate.rstrip('/')}/{name}"
+            result = _fetch_from_url(
+                url,
+                partial=partial,
+                chunk_size=chunk_size,
+                retries=retries,
+                backoff=backoff,
+                timeout=timeout,
+                sleep=sleep,
+                client=client,
+            )
+            if result.status != FetchStatus.ABSENT:
+                break
+        if result.status == FetchStatus.DOWNLOADED:
+            _verified_zip(partial)
+            partial.replace(destination)
+            return FetchResult(
+                FetchStatus.DOWNLOADED,
+                destination,
+                bytes_received=result.bytes_received,
+                downloaded_this_run=True,
+            )
+        if result.status == FetchStatus.ABSENT:
+            return FetchResult(FetchStatus.ABSENT, destination, error=result.error)
+        return FetchResult(FetchStatus.FAILED, destination, result.bytes_received, result.error)
     finally:
         partial.unlink(missing_ok=True)
         if owns_session:
             client.close()
-    return FetchResult(FetchStatus.FAILED, destination, received, last_error)
 
 
 def _write_coverage(path: str | Path | None, outcomes: list[MonthOutcome]) -> None:
@@ -224,6 +266,94 @@ def _record(
     _write_coverage(report_output, outcomes)
 
 
+def _run_month_disposable(
+    connection: sqlite3.Connection,
+    year: int,
+    month: int,
+    *,
+    downloads: str | Path,
+    output_dir: str | Path,
+    base_url: str,
+    historic_base_url: str | None,
+    keep_zips: bool,
+    limit_per_zip: int | None,
+    chunk_size: int,
+    retries: int,
+    backoff: float,
+    timeout: float,
+    scope: str | Collection[str],
+    kinds: str,
+    scratch_dir: str | Path | None,
+) -> MonthOutcome:
+    """One month's disposable-store state transition; `connection` holds manifest rows only."""
+    name = archive_name(year, month)
+    if archive_recorded_complete(connection, name, scope=scope, kinds=kinds):
+        return MonthOutcome(year, month, name, MonthStatus.SKIPPED_COMPLETE, True)
+    fetched = fetch_archive(
+        month,
+        year,
+        downloads=downloads,
+        base_url=base_url,
+        historic_base_url=historic_base_url,
+        chunk_size=chunk_size,
+        retries=retries,
+        backoff=backoff,
+        timeout=timeout,
+    )
+    if fetched.status in (FetchStatus.ABSENT, FetchStatus.FAILED):
+        status = MonthStatus.ABSENT if fetched.status == FetchStatus.ABSENT else MonthStatus.FAILED
+        return MonthOutcome(
+            year, month, name, status, bytes_received=fetched.bytes_received, error=fetched.error
+        )
+
+    archive: ArchiveSpec = parse_archive(fetched.path)
+    try:
+        process_archive_disposable(
+            connection,
+            archive,
+            output_dir,
+            scratch_dir=scratch_dir,
+            limit=limit_per_zip,
+            scope=scope,
+            kinds=kinds,
+        )
+    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile, sqlite3.Error) as exc:
+        return MonthOutcome(year, month, name, MonthStatus.FAILED, error=str(exc))
+
+    complete = archive_recorded_complete(connection, name, scope=scope, kinds=kinds)
+    if limit_per_zip is not None:
+        return MonthOutcome(
+            year, month, name, MonthStatus.PARTIAL_KEPT, bytes_received=fetched.bytes_received
+        )
+    if not complete:
+        return MonthOutcome(
+            year,
+            month,
+            name,
+            MonthStatus.FAILED,
+            error="extraction returned without a complete manifest row",
+        )
+    if fetched.downloaded_this_run and not keep_zips:
+        try:
+            fetched.path.unlink()
+        except OSError as exc:
+            return MonthOutcome(
+                year,
+                month,
+                name,
+                MonthStatus.FAILED,
+                manifest_complete=True,
+                bytes_received=fetched.bytes_received,
+                error=f"extracted, but ZIP deletion failed: {exc}",
+            )
+        status = MonthStatus.COMPLETED_DELETED
+    else:
+        status = MonthStatus.COMPLETED_KEPT
+    return MonthOutcome(
+        year, month, name, status, manifest_complete=complete, bytes_received=fetched.bytes_received
+    )
+
+
 def run_backfill(
     connection: sqlite3.Connection,
     start: tuple[int, int],
@@ -232,6 +362,7 @@ def run_backfill(
     downloads: str | Path,
     output_dir: str | Path,
     base_url: str = DEFAULT_BASE_URL,
+    historic_base_url: str | None = HISTORIC_BASE_URL,
     keep_zips: bool = False,
     limit_per_zip: int | None = None,
     chunk_size: int = 8 * 1024 * 1024,
@@ -241,8 +372,18 @@ def run_backfill(
     report_output: str | Path | None = None,
     scope: str | Collection[str] = "all",
     kinds: str = "all",
+    disposable_store: bool = False,
+    scratch_dir: str | Path | None = None,
 ) -> BackfillSummary:
-    """Serially fetch, extract, and conditionally delete an inclusive month range."""
+    """Serially fetch, extract, and conditionally delete an inclusive month range.
+
+    `disposable_store=True` extracts each month into a throwaway per-month working store
+    (see `extract.process_archive_disposable`) instead of accumulating one monolithic
+    database across the whole range; `connection` then only ever holds small manifest rows.
+    This is the recommended mode for a full-history run — see Decision 2 in
+    `docs/accounts-backfill.md` — but is opt-in to keep the pre-existing monolithic-store
+    behaviour and its tests unchanged by default.
+    """
     if limit_per_zip is not None and limit_per_zip <= 0:
         raise ValueError("limit_per_zip must be positive")
     months = tuple(iter_months(start, end))
@@ -250,6 +391,35 @@ def run_backfill(
     outcomes: list[MonthOutcome] = []
     for year, month in months:
         name = archive_name(year, month)
+        if disposable_store:
+            try:
+                outcome = _run_month_disposable(
+                    connection,
+                    year,
+                    month,
+                    downloads=downloads,
+                    output_dir=output_dir,
+                    base_url=base_url,
+                    historic_base_url=historic_base_url,
+                    keep_zips=keep_zips,
+                    limit_per_zip=limit_per_zip,
+                    chunk_size=chunk_size,
+                    retries=retries,
+                    backoff=backoff,
+                    timeout=timeout,
+                    scope=scope,
+                    kinds=kinds,
+                    scratch_dir=scratch_dir,
+                )
+            except AssertionError as exc:
+                _record(
+                    outcomes,
+                    MonthOutcome(year, month, name, MonthStatus.FAILED, error=str(exc)),
+                    report_output,
+                )
+                raise
+            _record(outcomes, outcome, report_output)
+            continue
         if archive_recorded_complete(connection, name, scope=scope, kinds=kinds):
             try:
                 export_archive_parquet(
@@ -285,6 +455,7 @@ def run_backfill(
             year,
             downloads=downloads,
             base_url=base_url,
+            historic_base_url=historic_base_url,
             chunk_size=chunk_size,
             retries=retries,
             backoff=backoff,

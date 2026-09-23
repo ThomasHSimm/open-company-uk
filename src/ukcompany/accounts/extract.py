@@ -680,6 +680,203 @@ def export_archive_parquet(
     return destination
 
 
+@dataclass(frozen=True)
+class ParquetVerification:
+    archive_name: str
+    manifest_count: int | None
+    parquet_count: int | None
+    parquet_path: Path
+
+    @property
+    def ok(self) -> bool:
+        return (
+            self.manifest_count is not None
+            and self.parquet_count is not None
+            and self.manifest_count == self.parquet_count
+        )
+
+
+def verify_monthly_parquet(
+    connection: sqlite3.Connection,
+    archive_name: str,
+    output_dir: str | Path,
+) -> ParquetVerification:
+    """Compare a manifest's recorded observation count with the actual Parquet row count.
+
+    This is the real completeness check after an unclean shutdown: it never touches the
+    (possibly huge or already-discarded) `observations` table, only the small manifest row
+    and the archived Parquet file.
+    """
+    import polars as pl
+
+    row = connection.execute(
+        "SELECT observation_count FROM processed_archives WHERE archive_name = ?",
+        (archive_name,),
+    ).fetchone()
+    manifest_count = int(row[0]) if row is not None else None
+    path = monthly_parquet_path(output_dir, archive_name)
+    if not path.exists():
+        return ParquetVerification(archive_name, manifest_count, None, path)
+    parquet_count = int(pl.scan_parquet(path).select(pl.len()).collect(engine="streaming").item())
+    return ParquetVerification(archive_name, manifest_count, parquet_count, path)
+
+
+def verify_all_monthly_parquets(
+    connection: sqlite3.Connection,
+    output_dir: str | Path,
+) -> list[ParquetVerification]:
+    """Verify every manifest-complete archive's Parquet row count in one pass."""
+    return [
+        verify_monthly_parquet(connection, name, output_dir)
+        for name in completed_archive_names(connection)
+    ]
+
+
+def render_verification_report(results: list[ParquetVerification]) -> str:
+    lines = [
+        "# Accounts monthly Parquet verification",
+        "",
+        "Compares each manifest-complete archive's recorded `observation_count` against the "
+        "actual row count of its archived per-month Parquet. This replaces a full-store "
+        "`PRAGMA integrity_check`, which scans scratch-database bytes that are not the "
+        "deliverable and are not required to trust the Parquet archive.",
+        "",
+        f"- Archives checked: {len(results):,}",
+        f"- Passed: {sum(result.ok for result in results):,}",
+        f"- Failed or missing: {sum(not result.ok for result in results):,}",
+        "",
+        "| Archive | Manifest count | Parquet count | Status |",
+        "|---|---:|---:|:---:|",
+    ]
+    for result in results:
+        manifest = f"{result.manifest_count:,}" if result.manifest_count is not None else "—"
+        parquet = f"{result.parquet_count:,}" if result.parquet_count is not None else "MISSING"
+        status = "ok" if result.ok else "MISMATCH"
+        lines.append(f"| `{result.archive_name}` | {manifest} | {parquet} | {status} |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+_MANIFEST_COLUMNS = (
+    "archive_name",
+    "archive_size",
+    "member_count",
+    "observation_count",
+    "complete",
+    "integrity_json",
+    "scope_json",
+    "kinds",
+    "fact_schema_version",
+    "export_scope_json",
+    "export_kinds",
+    "export_observation_count",
+)
+
+
+def _copy_manifest_row(
+    source: sqlite3.Connection, destination: sqlite3.Connection, archive_name_value: str
+) -> None:
+    row = source.execute(
+        "SELECT " + ", ".join(_MANIFEST_COLUMNS) + " FROM processed_archives "
+        "WHERE archive_name = ?",
+        (archive_name_value,),
+    ).fetchone()
+    if row is None:
+        return
+    columns = ", ".join(_MANIFEST_COLUMNS)
+    placeholders = ", ".join("?" for _ in _MANIFEST_COLUMNS)
+    updates = ", ".join(
+        f"{column}=excluded.{column}" for column in _MANIFEST_COLUMNS if column != "archive_name"
+    )
+    destination.execute(
+        f"INSERT INTO processed_archives ({columns}) VALUES ({placeholders}) "
+        f"ON CONFLICT(archive_name) DO UPDATE SET {updates}",
+        row,
+    )
+    destination.commit()
+
+
+def export_manifest(source: sqlite3.Connection, destination: sqlite3.Connection) -> int:
+    """Copy every `processed_archives` row from `source` into `destination`.
+
+    Lets a persistent manifest be split out from a store before that store is deleted, or
+    before switching an already-populated monolithic run over to `--disposable-store` for
+    the remaining months (the persistent manifest is what `run_backfill`/
+    `process_archive_disposable` check for "already complete" — it never needs the
+    `observations` table). Returns the number of rows copied.
+    """
+    rows = source.execute(
+        "SELECT " + ", ".join(_MANIFEST_COLUMNS) + " FROM processed_archives"
+    ).fetchall()
+    if not rows:
+        return 0
+    columns = ", ".join(_MANIFEST_COLUMNS)
+    placeholders = ", ".join("?" for _ in _MANIFEST_COLUMNS)
+    updates = ", ".join(
+        f"{column}=excluded.{column}" for column in _MANIFEST_COLUMNS if column != "archive_name"
+    )
+    destination.executemany(
+        f"INSERT INTO processed_archives ({columns}) VALUES ({placeholders}) "
+        f"ON CONFLICT(archive_name) DO UPDATE SET {updates}",
+        rows,
+    )
+    destination.commit()
+    return len(rows)
+
+
+def process_archive_disposable(
+    manifest_connection: sqlite3.Connection,
+    archive: ArchiveSpec,
+    output_dir: str | Path,
+    *,
+    scratch_dir: str | Path | None = None,
+    limit: int | None = None,
+    scope: str | Collection[str] = "all",
+    kinds: str = "all",
+) -> ArchiveIntegrity | None:
+    """Extract one archive into a throwaway per-month store, export its Parquet, discard.
+
+    Peak disk then stays at roughly one ZIP plus one month's working store plus the slowly
+    growing Parquet archive — never a monolithic multi-month database. `manifest_connection`
+    is the only state that persists across months (a `processed_archives` row per archive,
+    copied from the scratch store before it is deleted); it never accumulates `observations`
+    rows itself, so `archive_is_complete`'s stored-archive-size/member-count re-verification
+    naturally does not apply here — resumability rests on the copied manifest row alone.
+
+    Trade-off: once the scratch store for a month is discarded, that month cannot be
+    re-exported at a different scope/kinds without re-extracting from the original ZIP.
+    Callers must not fall back to `export_archive_parquet` against `manifest_connection`
+    for an already-complete month in this mode; there is nothing there to export.
+    """
+    if archive_recorded_complete(manifest_connection, archive.name, scope=scope, kinds=kinds):
+        print(f"skip completed (disposable store): {archive.name}", flush=True)
+        return None
+    root = (
+        Path(scratch_dir)
+        if scratch_dir is not None
+        else Path(output_dir).expanduser().parent / ".accounts-scratch"
+    )
+    root.mkdir(parents=True, exist_ok=True)
+    scratch_path = root / f".{archive.name}.scratch.sqlite"
+    for suffix in ("", "-wal", "-shm"):
+        Path(f"{scratch_path}{suffix}").unlink(missing_ok=True)
+    scratch_connection = connect_store(scratch_path)
+    try:
+        integrity = process_archive(scratch_connection, archive, limit=limit, scope=scope, kinds=kinds)
+        if integrity is not None and archive_recorded_complete(
+            scratch_connection, archive.name, scope=scope, kinds=kinds
+        ):
+            export_archive_parquet(
+                scratch_connection, archive.name, output_dir, scope=scope, kinds=kinds
+            )
+            _copy_manifest_row(scratch_connection, manifest_connection, archive.name)
+        return integrity
+    finally:
+        scratch_connection.close()
+        for suffix in ("", "-wal", "-shm"):
+            Path(f"{scratch_path}{suffix}").unlink(missing_ok=True)
+
+
 def completed_archive_names(connection: sqlite3.Connection) -> list[str]:
     names = [
         row[0]

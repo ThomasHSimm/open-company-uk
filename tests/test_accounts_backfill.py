@@ -16,7 +16,7 @@ from ukcompany.accounts.backfill import (
     fetch_archive,
     run_backfill,
 )
-from ukcompany.accounts.extract import archive_recorded_complete, connect_store
+from ukcompany.accounts.extract import archive_recorded_complete, connect_store, export_manifest
 
 
 def minimal_filing(company: str = "00123456") -> bytes:
@@ -77,6 +77,7 @@ def test_full_range_downloads_extracts_deletes_and_reports_coverage(tmp_path: Pa
             downloads=downloads,
             output_dir=tmp_path / "monthly",
             base_url=base_url,
+            historic_base_url=None,
             retries=0,
             report_output=report,
         )
@@ -99,6 +100,121 @@ def test_full_range_downloads_extracts_deletes_and_reports_coverage(tmp_path: Pa
     connection.close()
 
 
+def test_disposable_store_never_accumulates_observations_and_resumes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source"
+    downloads = tmp_path / "downloads"
+    source.mkdir()
+    for month in (1, 2):
+        make_archive(source / archive_name(2022, month))
+    connection = connect_store(tmp_path / "store.sqlite")
+    scratch_dir = tmp_path / "scratch"
+
+    with serve_directory(source) as base_url:
+        summary = run_backfill(
+            connection,
+            (2022, 1),
+            (2022, 2),
+            downloads=downloads,
+            output_dir=tmp_path / "monthly",
+            base_url=base_url,
+            historic_base_url=None,
+            retries=0,
+            disposable_store=True,
+            scratch_dir=scratch_dir,
+        )
+
+    assert [outcome.status for outcome in summary.outcomes] == [
+        MonthStatus.COMPLETED_DELETED,
+        MonthStatus.COMPLETED_DELETED,
+    ]
+    # The manifest connection never accumulates observations under disposable mode.
+    assert connection.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 0
+    assert sorted(path.name for path in (tmp_path / "monthly").glob("*.parquet")) == [
+        "accounts-long-2022-01.parquet",
+        "accounts-long-2022-02.parquet",
+    ]
+    assert archive_recorded_complete(connection, archive_name(2022, 1))
+    assert archive_recorded_complete(connection, archive_name(2022, 2))
+    # Scratch stores are cleaned up after each month.
+    assert not list(scratch_dir.glob("*.sqlite*"))
+
+    def unexpected_fetch(*_args: object, **_kwargs: object):
+        raise AssertionError("completed month was downloaded again")
+
+    monkeypatch.setattr(backfill, "fetch_archive", unexpected_fetch)
+    second = run_backfill(
+        connection,
+        (2022, 1),
+        (2022, 2),
+        downloads=downloads,
+        output_dir=tmp_path / "monthly",
+        base_url="http://127.0.0.1:1",
+        historic_base_url=None,
+        retries=0,
+        disposable_store=True,
+        scratch_dir=scratch_dir,
+    )
+
+    assert all(outcome.status == MonthStatus.SKIPPED_COMPLETE for outcome in second.outcomes)
+    connection.close()
+
+
+def test_exported_manifest_alone_skips_already_complete_months(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Gate 2: a manifest exported out of a store (e.g. before the store is deleted) must,
+    on its own, make `run_backfill` skip already-complete months rather than re-download."""
+    source = tmp_path / "source"
+    downloads = tmp_path / "downloads"
+    source.mkdir()
+    make_archive(source / archive_name(2022, 1))
+    working_connection = connect_store(tmp_path / "working.sqlite")
+    with serve_directory(source) as base_url:
+        run_backfill(
+            working_connection,
+            (2022, 1),
+            (2022, 1),
+            downloads=downloads,
+            output_dir=tmp_path / "monthly",
+            base_url=base_url,
+            historic_base_url=None,
+            retries=0,
+            disposable_store=True,
+            scratch_dir=tmp_path / "scratch",
+        )
+    assert archive_recorded_complete(working_connection, archive_name(2022, 1))
+
+    # Export to an independent manifest file and drop the original connection entirely,
+    # simulating the working store being deleted.
+    manifest_connection = connect_store(tmp_path / "exported-manifest.sqlite")
+    copied = export_manifest(working_connection, manifest_connection)
+    working_connection.close()
+    assert copied == 1
+    assert manifest_connection.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 0
+
+    def unexpected_fetch(*_args: object, **_kwargs: object):
+        raise AssertionError("already-complete month was re-downloaded")
+
+    monkeypatch.setattr(backfill, "fetch_archive", unexpected_fetch)
+    summary = run_backfill(
+        manifest_connection,
+        (2022, 1),
+        (2022, 1),
+        downloads=downloads,
+        output_dir=tmp_path / "monthly",
+        base_url="http://127.0.0.1:1",
+        historic_base_url=None,
+        retries=0,
+        disposable_store=True,
+        scratch_dir=tmp_path / "scratch",
+    )
+
+    assert summary.outcomes[0].status == MonthStatus.SKIPPED_COMPLETE
+    manifest_connection.close()
+
+
 def test_keep_zips_retains_downloaded_archive(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
@@ -114,6 +230,7 @@ def test_keep_zips_retains_downloaded_archive(tmp_path: Path) -> None:
             downloads=tmp_path / "downloads",
             output_dir=tmp_path / "monthly",
             base_url=base_url,
+            historic_base_url=None,
             keep_zips=True,
             retries=0,
         )
@@ -138,6 +255,7 @@ def test_limited_run_is_partial_and_never_deletes(tmp_path: Path) -> None:
             downloads=tmp_path / "downloads",
             output_dir=tmp_path / "monthly",
             base_url=base_url,
+            historic_base_url=None,
             limit_per_zip=1,
             retries=0,
         )
@@ -162,6 +280,7 @@ def test_manually_staged_archive_is_extracted_but_never_deleted(tmp_path: Path) 
         downloads=downloads,
         output_dir=tmp_path / "monthly",
         base_url="http://127.0.0.1:1",
+        historic_base_url=None,
         retries=0,
     )
 
@@ -204,6 +323,7 @@ def test_short_download_is_failed_and_404_is_absent(tmp_path: Path) -> None:
             downloads=downloads,
             output_dir=tmp_path / "monthly",
             base_url=f"http://{host}:{port}",
+            historic_base_url=None,
             retries=0,
             report_output=report,
         )
@@ -223,6 +343,51 @@ def test_short_download_is_failed_and_404_is_absent(tmp_path: Path) -> None:
     connection.close()
 
 
+def test_fetch_archive_falls_back_to_historic_url_on_404(tmp_path: Path) -> None:
+    """Gate 1: a 404 on the root path must try `historic_base_url` before giving up."""
+    root_dir = tmp_path / "root"
+    historic_dir = tmp_path / "historic"
+    root_dir.mkdir()
+    historic_dir.mkdir()
+    name = archive_name(2016, 1)
+    make_archive(historic_dir / name)  # only present at the historic location
+
+    with serve_directory(root_dir) as root_url, serve_directory(historic_dir) as historic_url:
+        result = fetch_archive(
+            1,
+            2016,
+            downloads=tmp_path / "downloads",
+            base_url=root_url,
+            historic_base_url=historic_url,
+            retries=0,
+        )
+
+    assert result.status == FetchStatus.DOWNLOADED
+    assert result.downloaded_this_run
+
+
+def test_fetch_archive_reports_absent_only_after_both_paths_404(tmp_path: Path) -> None:
+    """Gate 1: a month absent from BOTH candidate locations is ABSENT, not FAILED — and a
+    wrong-path 404 must never masquerade as the month being genuinely missing."""
+    root_dir = tmp_path / "root"
+    historic_dir = tmp_path / "historic"
+    root_dir.mkdir()
+    historic_dir.mkdir()  # neither directory has the archive
+
+    with serve_directory(root_dir) as root_url, serve_directory(historic_dir) as historic_url:
+        result = fetch_archive(
+            1,
+            1999,
+            downloads=tmp_path / "downloads",
+            base_url=root_url,
+            historic_base_url=historic_url,
+            retries=0,
+        )
+
+    assert result.status == FetchStatus.ABSENT
+    assert not (tmp_path / "downloads").exists() or not list((tmp_path / "downloads").iterdir())
+
+
 def test_completed_month_skips_fetch_and_startup_removes_stale_part(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -238,6 +403,7 @@ def test_completed_month_skips_fetch_and_startup_removes_stale_part(
         downloads=downloads,
         output_dir=tmp_path / "monthly",
         base_url="http://127.0.0.1:1",
+        historic_base_url=None,
         keep_zips=True,
         retries=0,
     )
@@ -255,6 +421,7 @@ def test_completed_month_skips_fetch_and_startup_removes_stale_part(
         downloads=downloads,
         output_dir=tmp_path / "monthly",
         base_url="http://127.0.0.1:1",
+        historic_base_url=None,
     )
 
     assert summary.outcomes[0].status == MonthStatus.SKIPPED_COMPLETE
@@ -283,6 +450,7 @@ def test_failed_extraction_keeps_downloaded_zip(
             downloads=tmp_path / "downloads",
             output_dir=tmp_path / "monthly",
             base_url=base_url,
+            historic_base_url=None,
             retries=0,
         )
 
@@ -314,6 +482,7 @@ def test_accounting_nonclosure_aborts_and_keeps_zip(
                 downloads=tmp_path / "downloads",
                 output_dir=tmp_path / "monthly",
                 base_url=base_url,
+                historic_base_url=None,
                 retries=0,
                 report_output=report,
             )
@@ -348,6 +517,7 @@ def test_abort_in_second_month_leaves_first_month_parquet(
                 downloads=tmp_path / "downloads",
                 output_dir=tmp_path / "monthly",
                 base_url=base_url,
+                historic_base_url=None,
                 retries=0,
             )
 
@@ -378,6 +548,7 @@ def test_incomplete_manifest_never_allows_deletion(
             downloads=tmp_path / "downloads",
             output_dir=tmp_path / "monthly",
             base_url=base_url,
+            historic_base_url=None,
             retries=0,
         )
 
@@ -408,6 +579,7 @@ def test_failed_monthly_export_keeps_downloaded_zip(
             downloads=tmp_path / "downloads",
             output_dir=tmp_path / "monthly",
             base_url=base_url,
+            historic_base_url=None,
             retries=0,
         )
 

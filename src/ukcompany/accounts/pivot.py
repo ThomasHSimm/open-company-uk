@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import glob as glob_module
 import json
+import resource
+import sys
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -10,6 +14,26 @@ from typing import Literal
 from .core import EMPLOYEE_CONCEPT, TARGET_CONCEPTS
 
 PivotMode = Literal["latest", "as_first_reported"]
+
+
+def _peak_rss_bytes() -> int:
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak if sys.platform == "darwin" else peak * 1024
+
+
+@contextmanager
+def track_peak_rss():
+    """Yield a zero-argument callable returning peak RSS (bytes) since process start.
+
+    Peak RSS is a monotonic high-water mark for the process lifetime, which is exact for a
+    one-shot CLI invocation: no interval sampling is needed to know whether an operation
+    stayed under its memory budget.
+    """
+    state = {"value": 0}
+    try:
+        yield lambda: state["value"]
+    finally:
+        state["value"] = _peak_rss_bytes()
 
 
 @dataclass(frozen=True)
@@ -61,14 +85,26 @@ def require_polars():
     return pl
 
 
+def to_lazy(frame):
+    """Accept a DataFrame or LazyFrame uniformly; converting a DataFrame is free."""
+    pl = require_polars()
+    return frame.lazy() if isinstance(frame, pl.DataFrame) else frame
+
+
 def _mapped_cells(long_frame, mapping: WideColumnMap):
+    """Reduce to only the mapped total/member cells, keeping the plan lazy.
+
+    This filter (plus the caller's status/currency filters) is what must execute as
+    predicate/projection pushdown against the source Parquet before anything is
+    materialised: the mapped cells are a small fraction of the full LONG corpus.
+    """
     pl = require_polars()
     totals = long_frame.filter(
         pl.col("dimension").is_null() & pl.col("concept").is_in(mapping.totals)
     ).with_columns(pl.col("concept").alias("wide_column"))
     if not mapping.members:
         return totals
-    map_frame = pl.DataFrame(
+    map_frame = pl.LazyFrame(
         [
             {
                 "concept": item.concept,
@@ -85,23 +121,49 @@ def _mapped_cells(long_frame, mapping: WideColumnMap):
     return pl.concat([totals, members], how="diagonal_relaxed")
 
 
-def pivot_long(long_frame, mapping: WideColumnMap, mode: PivotMode):
-    """Return `(wide, provenance)` DataFrames without imputing absent values."""
+_CELL_COLUMNS = (
+    "company",
+    "period_end",
+    "wide_column",
+    "source_year",
+    "source_month",
+    "source_archive",
+    "source_member",
+    "made_up_to_date",
+    "numeric_value",
+)
+
+
+def _reduce_to_cells(long_frame, mapping: WideColumnMap, mode: PivotMode):
+    """Lazily reduce one frame to its mapped total/member cells, columns-projected.
+
+    Safe to `.collect()` on a single monthly Parquet: the mapped cells are a small
+    fraction of a month's rows. The explicit final `.select()` is required for real
+    projection pushdown — without it the optimizer cannot prove the unused source columns
+    (notably free-text `raw_value`, present on every row including non-numeric facts) are
+    droppable, since it has no visibility past a `.collect()` into what happens next.
+    """
     pl = require_polars()
-    mapping.validate()
-    if mode not in {"latest", "as_first_reported"}:
-        raise ValueError(f"unknown pivot mode: {mode}")
-    if "status" in long_frame.columns:
-        long_frame = long_frame.filter(pl.col("status") == "selected")
-    usable = long_frame.filter(
+    lazy = to_lazy(long_frame)
+    if "status" in lazy.collect_schema().names():
+        lazy = lazy.filter(pl.col("status") == "selected")
+    usable = lazy.filter(
         (pl.col("concept") == EMPLOYEE_CONCEPT) | (pl.col("currency") == "GBP")
     )
     cells = _mapped_cells(usable, mapping)
     if mode == "as_first_reported":
         cells = cells.filter(pl.col("is_current") == 1)
-        descending = [False, False, False, False, False, False]
-    else:
-        descending = [False, False, False, True, True, True]
+    return cells.select(*_CELL_COLUMNS)
+
+
+def _finalize_pivot(cells, mapping: WideColumnMap, mode: PivotMode):
+    """Sort/dedupe/reshape an already-small, already-collected cells DataFrame."""
+    pl = require_polars()
+    descending = (
+        [False, False, False, False, False, False]
+        if mode == "as_first_reported"
+        else [False, False, False, True, True, True]
+    )
     cells = (
         cells.sort(
             [
@@ -159,17 +221,64 @@ def pivot_long(long_frame, mapping: WideColumnMap, mode: PivotMode):
     return wide.sort("company", "period_end"), provenance
 
 
+def pivot_long(long_frame, mapping: WideColumnMap, mode: PivotMode):
+    """Return `(wide, provenance)` DataFrames without imputing absent values.
+
+    `long_frame` may be an eager DataFrame or a LazyFrame. For a single small frame (as in
+    tests, or one monthly Parquet), reduction and finalisation both happen here safely. For
+    the full multi-month archive, use `pivot_long_over_parts` instead — a whole-glob lazy
+    plan through this same reduction was measured to still exceed 20 GB RSS despite
+    predicate/projection pushdown (Polars' streaming engine does not keep this operator
+    chain — join, then sort+unique with `maintain_order=True` — bounded across a multi-file
+    scan), so the safe path processes one month at a time.
+    """
+    mapping.validate()
+    if mode not in {"latest", "as_first_reported"}:
+        raise ValueError(f"unknown pivot mode: {mode}")
+    cells = _reduce_to_cells(long_frame, mapping, mode).collect(engine="streaming")
+    return _finalize_pivot(cells, mapping, mode)
+
+
+def pivot_long_over_parts(parts: str | Path, mapping: WideColumnMap, mode: PivotMode):
+    """Memory-bounded pivot over a multi-file glob: reduce each file, then finalise once.
+
+    Peak memory scales with the largest single month's mapped-cell slice (measured at a
+    few hundred MB), not with the full corpus, because each file is collected and reduced
+    to `_CELL_COLUMNS` before the next file is even scanned.
+    """
+    pl = require_polars()
+    mapping.validate()
+    if mode not in {"latest", "as_first_reported"}:
+        raise ValueError(f"unknown pivot mode: {mode}")
+    paths = sorted(glob_module.glob(str(parts)))
+    if not paths:
+        raise ValueError(f"no Parquet files match: {parts}")
+    reduced = [
+        _reduce_to_cells(pl.scan_parquet(path), mapping, mode).collect(engine="streaming")
+        for path in paths
+    ]
+    # Every file went through the identical `_CELL_COLUMNS` projection, so schemas match
+    # exactly; "vertical" avoids diagonal_relaxed's schema-reconciliation cost.
+    cells = pl.concat(reduced, how="vertical")
+    return _finalize_pivot(cells, mapping, mode)
+
+
 def pivot_parquet(
     long_path: str | Path,
     mapping: WideColumnMap,
     mode: PivotMode,
     wide_output: str | Path,
     provenance_output: str | Path,
-) -> None:
-    pl = require_polars()
-    frame = pl.read_parquet(long_path)
-    wide, provenance = pivot_long(frame, mapping, mode)
-    Path(wide_output).parent.mkdir(parents=True, exist_ok=True)
-    Path(provenance_output).parent.mkdir(parents=True, exist_ok=True)
-    wide.write_parquet(wide_output, compression="zstd")
-    provenance.write_parquet(provenance_output, compression="zstd")
+) -> int:
+    """Pivot the archived monthly Parquets to WIDE; returns peak RSS in bytes for this run.
+
+    Processes one monthly Parquet at a time (see `pivot_long_over_parts`) so peak memory
+    scales with the largest single month, not the full multi-month corpus.
+    """
+    with track_peak_rss() as peak:
+        wide, provenance = pivot_long_over_parts(long_path, mapping, mode)
+        Path(wide_output).parent.mkdir(parents=True, exist_ok=True)
+        Path(provenance_output).parent.mkdir(parents=True, exist_ok=True)
+        wide.write_parquet(wide_output, compression="zstd")
+        provenance.write_parquet(provenance_output, compression="zstd")
+    return peak()

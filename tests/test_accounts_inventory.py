@@ -3,10 +3,13 @@ import json
 import zipfile
 from pathlib import Path
 
+import polars as pl
+
 from ukcompany.accounts.extract import connect_store, parse_archive, process_archive
 from ukcompany.accounts.inventory import (
     INVENTORY_COLUMNS,
     build_concept_inventory,
+    build_concept_inventory_from_parts,
     write_concept_inventory,
 )
 
@@ -164,3 +167,62 @@ def test_inventory_counts_csv_and_anomaly_flags(tmp_path: Path) -> None:
     assert "`MissingUnit`" in report
     assert "Only the nine core concepts are validated" in report
     connection.close()
+
+
+def test_inventory_from_parts_uses_approx_companies(tmp_path: Path) -> None:
+    common = {
+        "period_end": "2023-12-31",
+        "dimension": None,
+        "member": None,
+        "unit": "pure",
+        "currency": None,
+        "source_year": 2023,
+        "source_month": 1,
+        "source_archive": "a.zip",
+        "made_up_to_date": "20231231",
+        "scale": 0,
+        "sign": None,
+        "is_current": 1,
+    }
+    rows = [
+        {
+            **common,
+            "company": company,
+            "concept": "Equity",
+            "fact_kind": "numeric",
+            "fact_sequence": 0,
+            "status": "selected",
+            "context_kind": "instant",
+            "source_member": f"{company}.html",
+            "raw_value": "1",
+            "numeric_value": "1",
+        }
+        for company in ("00000001", "00000002")
+    ] + [
+        {
+            **common,
+            "company": "00000001",
+            "concept": "AccountingPolicyDescription",
+            "fact_kind": "non-numeric",
+            "fact_sequence": 1,
+            "status": "selected",
+            "context_kind": "duration",
+            "source_member": "00000001.html",
+            "raw_value": "Revenue is recognised on delivery.",
+            "numeric_value": None,
+        }
+    ]
+    pl.DataFrame(rows).write_parquet(tmp_path / "accounts-long-2023-01.parquet")
+
+    inventory = build_concept_inventory_from_parts(str(tmp_path / "*.parquet"))
+
+    assert inventory.companies_are_approximate is True
+    by_concept = {row.concept: row for row in inventory.rows}
+    assert by_concept["Equity"].companies == 2
+    assert by_concept["Equity"].observations == 2
+    assert by_concept["Equity"].kind == "numeric"
+    assert by_concept["AccountingPolicyDescription"].companies == 1
+    assert by_concept["AccountingPolicyDescription"].kind == "non_numeric"
+    assert inventory.fact_kind_split.numeric_observations == 2
+    assert inventory.fact_kind_split.non_numeric_observations == 1
+    assert inventory.employee_gbp_anomaly.count == 0
