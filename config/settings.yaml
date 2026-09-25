@@ -28,3 +28,10 @@ accounts:
   member_histogram: docs/accounts-member-frequency.csv
   reconciliation_output: docs/accounts-component-reconciliation.csv
   qa_report: docs/accounts-qa.md
+psc:
+  downloads_dir: ~/Downloads/psc
+  manifest_path: "data/psc/{date}/manifest.json"
+  parts_glob: "data/psc/{date}/psc-snapshot-{date}_*of*.txt"
+  output_dir: "data/psc/{date}/{mode}"
+  data_governance: true
+  duckdb_memory_gb: 8

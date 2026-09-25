@@ -22,6 +22,7 @@ snapshot = ["polars>=1.0"]
 [project.scripts]
 ukcompany = "ukcompany.cli:main"
 ukcompany-accounts = "ukcompany.accounts.cli:main"
+ukcompany-psc = "ukcompany.psc.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

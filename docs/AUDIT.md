@@ -1419,3 +1419,178 @@ should remain valid after merging, unless a future merge uses squash or rebase i
 would need the reference updated). If a v2 upload is ever made after further fixes, update
 both README lines and this entry to the new commit — a stale commit reference here would be
 actively misleading, not just outdated.
+
+## PSC loader — Tasks A + B only (2026-09-25), branch `feature/psc-loader`
+
+Per `docs/brief/psc-loader-and-page.md`, Tasks A (download/archive) and B (loader to
+Parquet) only. C (`scripts/psc_checks.py`) and D (`docs/site/psc.qmd`) explicitly not
+started. New package `src/ukcompany/psc/` (`download.py`, `manifest.py`, `loader.py`,
+`cli.py`), entry point `ukcompany-psc`, `config/settings.yaml`'s new `psc:` section,
+`tests/test_psc_download.py`, `tests/test_psc_loader.py`. ruff + full pytest suite green
+(174 passed) throughout.
+
+**Bugs found and fixed before any real-scale run:**
+1. A SQL CTE-scoping bug (`_records_select_sql` assumed an "open" WITH-prefix from
+   `_parsed_sql` that didn't exist) — fixed by giving `_parsed_sql` a proper closing
+   `enriched AS (...) SELECT * FROM enriched` and having callers wrap it as
+   `WITH src AS ({parsed}) SELECT ... FROM src`.
+2. Report/reconciliation stats were originally going to be read back from the just-written
+   Parquet, which is incomplete in `--data-governance` mode (drops `middle_name`, `raw`,
+   etc.). Fixed by computing every report statistic from a fresh, always-full
+   `_parsed_sql()` scan, independent of which mode is being persisted — `load_report.json`
+   is aggregates-only either way, same standard as `docs/recon-psc-results.json`.
+3. **Privacy bug**: `GOVERNANCE_DROPPED_COLUMNS` listed `postal_code_raw` but not
+   `postcode_norm`, so the full normalised postcode (not just the outward code) survived
+   into the "privacy-safe" governed output. Caught by manual schema inspection on a smoke
+   test, not by an automated test (none existed yet). Fixed by adding `postcode_norm` to
+   the drop list.
+4. **Correctness bug**, found while writing `tests/test_psc_loader.py`'s governance test:
+   `postcode_district` was extracted via a regex anchored on the *front* of the
+   space-stripped `postcode_norm` (`^[A-Z]{1,2}[0-9][A-Z0-9]?`). Since UK inward codes are
+   always exactly 3 characters, this greedily ate the inward code's leading digit too —
+   e.g. `"SA1 1AA"` → `"SA11AA"` → wrongly extracted `"SA11"` instead of `"SA1"`. Fixed to
+   `left(postcode_norm, length(postcode_norm) - 3)`, which is correct for every UK postcode
+   length variant. Verified against real governed output (outward codes like `WN6`, `SS12`,
+   `EH47`, `CV5` are all now correct).
+
+**Memory cap.** The brief mandates every full-scale job run under
+`systemd-run --user --scope -p MemoryMax=<N>G -p MemorySwapMax=0`, no exceptions. The
+loader's own shipped default (`DEFAULT_MEMORY_LIMIT_GB = 8`, matching the accounts
+pipeline's `ooc.py` convention) **OOM-killed within ~9 seconds** at a matching 8G cgroup
+cap — this job's 13 GB of raw NDJSON text across 32 parts, read via `read_ndjson_objects`
+with a `row_number() OVER (PARTITION BY filename)` window function, needs materially more
+headroom than the accounts pivot job the 8G default was tuned for. Both real full loads
+below were run at a 20G external cap / 16G internal `duckdb-memory-gb` instead, which held.
+**`config/settings.yaml`'s `psc.duckdb_memory_gb: 8` and `loader.py`'s
+`DEFAULT_MEMORY_LIMIT_GB` were left unchanged** — raising the shipped default is a
+production-budget decision for T, not made here; anyone running `ukcompany-psc load` with
+the shipped default on a full snapshot should expect the same OOM.
+
+**Performance note.** Report statistics are computed via ~9 separate full re-parses of the
+raw corpus (one per aggregate: line count, category counts, unknown kinds, company-number
+mismatches, record-id dupes, psc_id cross-company sharing, middle-name fill, date flags,
+plus the totals-line lookup) — a deliberate governance-safety tradeoff (point 2 above), not
+an oversight, but it does make each full load slow (tens of minutes of CPU time at ~600%
+utilisation on an 8-core machine for both runs below). Left as-is since Task B was already
+complete; flagging as a real cost if this loader is scheduled to run daily.
+
+**Real full-scale runs, 2026-09-18 snapshot (32 raw parts, 13 GB text, already extracted
+locally, not downloaded by this agent):**
+- `--no-data-governance` → `data/psc/2026-09-18/`
+- `--data-governance` → `data/psc/2026-09-18-gov/` (separate directory, deliberately, since
+  the loader's output filenames are fixed and running "both modes" as instructed would
+  otherwise overwrite one mode's Parquet with the other's — T should decide which becomes
+  the canonical `data/psc/2026-09-18/` output, or whether the `-gov` suffix convention
+  should stick for dual-mode archival going forward)
+
+Both runs produced byte-identical `load_report.json` statistics (expected, per point 2
+above) and reconciled exactly against `docs/recon-psc-results.md` and the snapshot's own
+totals line — see the chat summary delivered to the user for the full reconciliation table
+and FLAG list. Governance-mode output verified clean on the real 15,952,486-row Parquet
+(schema disjoint from `GOVERNANCE_DROPPED_COLUMNS`), not just the earlier smoke test.
+
+**Live Task A run.** `ukcompany-psc fetch` was run live against
+`https://download.companieshouse.gov.uk/en_pscdata.html` to get a real daily-zipped-size
+figure (the brief's Task A FLAG item). Companies House only serves the *current* day's
+snapshot (established previously in `docs/recon-psc.md`), so this necessarily downloaded
+2026-09-25's snapshot (32 parts, 2,219,852,147 bytes total), not 2026-09-18's — there is no
+way to fetch a past day's zips for direct measurement. Zips kept at
+`~/Downloads/psc/2026-09-25/`, manifest at `data/psc/2026-09-25/manifest.json`.
+
+**Assumptions not otherwise flagged inline:** `psc_id` for exemption records is the literal
+string `"exemptions"` (the last path segment of `/company/<company>/exemptions`), not a
+per-record identifier — exemption records are excluded from the
+`psc_id_shared_across_companies` check for this reason. `raw` is fully dropped in
+governance mode rather than rewritten in place (the brief allowed either). `person_key`
+uses forename+surname+dob_year+dob_month only (matching `docs/recon-psc.md`'s base
+definition), no NOC or company info folded in. `n_bad_lines` conflates "malformed JSON"
+and "valid JSON with no `kind` field" into one count (both land in `category='unknown'`,
+`kind IS NULL`) — not split into separate sub-counts.
+
+## PSC loader — follow-up review (2026-09-25)
+
+Eight follow-up items from reviewing the first pass above, all against the real 2026-09-18
+snapshot. Both full loads re-run end to end after the code changes (private and governed);
+both green, `ruff` and the full pytest suite (178 tests) green throughout.
+
+**1. `f_ceased_out_of_range` (272) vs. the "97" figure in `docs/recon-psc.md`.** Re-derived
+`docs/recon-psc-results.json`'s own `overall.ceased_on.years` histogram (the source recon
+already wrote): summing every year outside [2016, 2026] in that histogram gives **272**,
+matching the loader exactly — recon's own persisted output does not contain a 97 anywhere.
+Independently recomputed recon's exact string-prefix definition (`ceased_on_raw[:4]`,
+`isdigit`-filtered, outside [2016, 2026]) directly against `psc_records.parquet` and got
+272 with zero row-level disagreement against the loader's `TRY_CAST`-based definition. The
+"97" in `docs/recon-psc.md`'s prose does not match the JSON it's supposed to summarise and
+is most likely a stale figure from an earlier, non-final recon pass — not a different
+definition. Not corrected here (out of this brief's file scope); flagging for T to fix the
+prose or re-derive it.
+
+**2. Base rights: loader 54 vs. recon 55 — a NULL-handling artifact, not a vocabulary
+difference.** At least one real record (`OE020203`, an overseas entity) has a literal JSON
+`null` inside its `natures_of_control` array. recon's code stringifies every NOC value
+(`str(noc)`), so that `null` becomes the 4-character string `"None"`, which survives
+suffix-stripping as its own "base right" — recon's 55 includes this artifact. The loader's
+`unnest` preserves it as a genuine SQL `NULL`; `COUNT(DISTINCT base_right)` correctly
+excludes NULL per SQL semantics, giving 54. Confirmed exactly 2 raw `null` NOC entries exist
+in the corpus (`psc_noc.parquet` has 2 rows with `base_right IS NULL`). Recomputing recon's
+own vocabulary (`docs/recon-psc-results.json`'s 87-entry list) with the identical
+suffix-stripping logic and removing the `"None"` artifact gives the same 54 real strings the
+loader has — the two scripts agree completely once the artifact is set aside. Not fixed
+(the `null` is genuine source data, not a bug to correct); both counts are legitimate under
+their own counting rules.
+
+**3. Written-output consistency check.** Added to `load_psc()`: after both COPY writes,
+reads back `psc_records.parquet`'s per-category row counts and compares them against
+`category_counts` (from the independent `stats` re-parse), and compares `psc_noc.parquet`'s
+row count against an independently-derived expected count (`SUM(len(...))` over
+`natures_of_control_json`, a different mechanism than the `unnest`-based write). Raises
+`RuntimeError` on any mismatch. New `consistency_check` block in `load_report.json`. Passed
+cleanly on both real re-runs (expected NOC rows = 35,169,887 = actual, both modes).
+
+**4. Memory in the first 9 seconds.** `duckdb==1.5.3`; unconfigured defaults on this machine:
+`threads=8` (= `nproc`), `memory_limit`/`max_memory`=24.7 GiB (~80% of 30 GB RAM),
+**`preserve_insertion_order=True`**. The last one matters most: with it on (the default),
+DuckDB must buffer completed-but-out-of-order result batches so they can be re-emitted in
+original scan order, on top of the `row_number() OVER (PARTITION BY filename)` window
+function's own per-partition materialisation — across 8 threads racing ahead on 32 files of
+~400-490 MB uncompressed text each, both buffering mechanisms peak almost immediately at
+pipeline start, before any hash-aggregate stage exists to spill from. That combination is
+enough to cross an 8 GB buffer-manager cap in ~9 wall-clock seconds despite `SET
+memory_limit='8GB'` being configured correctly. **Not changed**: `preserve_insertion_order`
+is a strong candidate to set to `false` (row order in the output Parquet files is never
+relied on), but per instruction the default memory limit and no other DuckDB settings were
+touched this round — flagging both as tuning candidates for T.
+
+**5. `postcode_district` now requires valid UK format.** Added `UK_POSTCODE_NORM_RE`
+(mirrors `scripts/recon_psc.py`'s `POSTCODE_NORM_RE`, anchored for a full-string match) as a
+gate before the last-3-characters slice; anything not matching (foreign addresses, free
+text, partial data) now yields `NULL` instead of a plausible-looking but meaningless slice.
+Real corpus: 14,861,207 postcodes present, 14,555,841 (97.9%) valid UK format, 305,366
+(2.1%) invalid — new `postcode_format` block in `load_report.json`.
+
+**6. `person_key_strict` (includes middle name).** New governance-mode-only column,
+`person_key_strict_hmac(forename, middle_name, surname, dob_year, dob_month)`, all five
+fields required non-NULL — so it's populated only for the ~53% of individuals with a
+recorded middle name (real corpus: 7,365,820 of 13,887,210). Confirmed by test
+(`test_person_key_strict_requires_middle_name`) and on the real governed output. The
+existing "`data_governance=True` without a secret raises `ValueError`" guard fires before
+either HMAC UDF is registered, so it already covered the new key with no code change needed
+— reconfirmed by `test_data_governance_true_requires_a_secret` (unchanged, still passing).
+
+**7. `n_bad_lines` split.** New `bad_line_reasons: {invalid_json, missing_kind}` in
+`load_report.json` (`invalid_json` = the line never parsed as JSON at all; `missing_kind` =
+parsed fine but no usable `kind`, e.g. no `data` object or `data` with no `kind`). Real
+corpus: both zero (matches recon's "0 bad lines" — the split has nothing to show here, but
+the plumbing is real and tested with synthetic fixtures of each kind).
+
+**8. Canonical output paths.** Adopted `data/psc/<date>/private/` and
+`data/psc/<date>/governed/` as the loader's actual default (`cli.py`'s `DEFAULTS` and
+`config/settings.yaml`'s `psc.output_dir` both now `"data/psc/{date}/{mode}"`, filled in by
+`cmd_load` from the `--data-governance` flag). This supersedes the ad hoc
+`data/psc/2026-09-18-gov/` directory from the first pass — both real outputs were deleted
+and regenerated fresh under the new convention, so there is no longer any output on disk
+using the old naming.
+
+Real numbers were otherwise unchanged from the first pass (all category counts, totals-line
+reconciliation, NOC assertion count, date flags, middle-name fill) — the code changes above
+added new checks and columns without altering any existing figure.
