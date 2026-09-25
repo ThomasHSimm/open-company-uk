@@ -1235,3 +1235,166 @@ same-tag-name regex limitation and the 36,119 numeric-unit-gap finding are docum
 fixed (both are outside this chapter's stated scope and neither touches the nine validated
 target concepts meaningfully). numeric-only vs all-fact remains unchanged (all-fact was
 already decided previously). No publishing/Kaggle step was touched.
+
+## Finish the accounts chapter — publishable Kaggle dataset (2026-09-24)
+
+Turned the completed archive into a `kaggle/` and `kaggle-long/` staging pair ready for the
+human to upload. No re-extraction, no backfill rerun, no out-of-core-engine change beyond
+what the tasks below needed. Diffs: `ooc.py` (four new functions), `pivot.py` (one-line
+correctness fix, see below), `cli.py` (`build-public-long` command,
+`--employee-gbp-cutoff` on `pivot`), new `public_long.py`, new
+`scripts/kaggle_staging_guard.py`, `config/accounts-wide-columns.json`, tests, docs, and the
+`kaggle/`/`kaggle-long/` staging folders themselves (gitignored, not part of the code diff).
+`ruff check .` clean; full `pytest` 159 passed, 1 live deselected throughout (new: Creditors
+bucketing test, employee-distribution test, employee-cutoff pivot test,
+restatement-by-year test, null-shadowing regression test on both engines, `public_long`
+build tests ×2, staging-guard tests ×7).
+
+**Task 1 — Creditors maturity columns, added.** Built
+`ooc.creditors_maturity_reconciliation_duckdb`, run over the full corpus (20 GB cgroup cap):
+of 3,998 filings with both a Creditors total and a maturity-dimension component, `sign_flip`
+was **zero**, `other` was 20.6%, and — investigated further because 20.6% looked too large to
+wave through — 92% of the "complete axis" `other` cases turned out to be explained by the
+total equalling exactly one maturity bucket (mostly `WithinOneYear`, 80.3% of the 833 such
+cases) rather than a genuine sum. Since `sign_flip` is unambiguously negligible and
+disagreements are dominated by `incomplete_axis` (79.1%) with the rest independently
+explained (not implicating the member values), the decision rule's condition is met:
+`creditors_within_one_year`/`creditors_after_one_year` added to
+`config/accounts-wide-columns.json`. Full writeup, including the borderline judgment on
+whether the "other" finding should have blocked publication:
+`docs/accounts-creditors-maturity-reconciliation.md`.
+
+**Task 2 — employee GBP-unit cut-off, human-approved at 250.** Built
+`ooc.employee_unit_distribution_duckdb`; compared GBP-tagged (7,715,981 facts) against
+`pure`-tagged (28,007,617 facts) non-dimensional employee-fact distributions. Presented four
+candidate cut-offs (p99=54, p99.9=250, p99.99=2,342.5, and the prior ad-hoc 100,000) with
+their kept/nulled splits via `AskUserQuestion`, rather than picking one — this is explicitly
+a "flag, don't decide" item in the brief. **Human chose 250** (the brief's own example
+method, p99.9 of `pure`). `pivot_duckdb` gained an `employee_gbp_cutoff` parameter: nulls a
+GBP-tagged employee value above the cutoff and sets a new `employees_unit_anomaly` WIDE
+column (1 = winning fact was GBP-tagged, kept or nulled; 0 = other unit; null = no employee
+fact selected). Stage 1/LONG untouched — WIDE-only. Full derivation:
+`docs/accounts-employee-unit-cutoff.md`.
+
+**Two real bugs found and fixed while building the cutoff feature, before running anything
+at scale:**
+
+1. **`_NEVER_MATCHES` sentinel embedded a NUL byte in a SQL string literal.** Building a test
+   with an empty `mapping.members` list (the first time any test had exercised that path
+   through `pivot_duckdb`) hit `_duckdb.ParserException: unterminated quoted string` — the
+   sentinel `"'\x00never-matches\x00'"` used to keep the totals/members `UNION ALL` shape
+   consistent when a mapping list is empty was never actually exercised end-to-end before
+   (every prior test used a mapping with both totals and members non-empty). Fixed by
+   replacing it with a plain ASCII placeholder string
+   (`'__never-matches-a-real-concept-name__'`) that can never collide with a real XBRL
+   concept/dimension/member name.
+2. **A blank/dash source fact could shadow a real value from a different filing.** Verifying
+   "provenance matches WIDE one-to-one" (a stated Task 3 requirement, not just a bug hunt)
+   found 10,382 provenance rows for `Creditors` alone with no matching non-null WIDE cell,
+   traced to `raw_value='-'`/`numeric_value=NULL` facts (a real, legitimate Stage 1 shape,
+   not corrupted data) winning the source-ranking and blocking a usable value elsewhere —
+   present in **both** `pivot.pivot_long` (the sample-scale reference) and
+   `ooc.pivot_duckdb`, since neither ever excluded `numeric_value IS NULL` from the candidate
+   pool. Fixed in both engines (kept them equivalent, since the existing `pivot_duckdb`-vs-
+   `pivot_long` tests depend on it), covered by a new regression test exercising both. This
+   is a genuine improvement to what gets published, not just a bookkeeping fix — it changes
+   which value wins a cell, not just which one gets reported as its provenance.
+
+**Task 3 — WIDE rebuilt, both modes, full corpus, verified.** `as_first_reported`: 33,461,467
+rows (was 33,512,909 pre-chapter; net effect of the two Creditors columns plus the
+null-shadowing fix, both increasing and decreasing row count for different reasons — see
+`docs/accounts-wide-rebuild-verification.md`); `latest`: 36,623,698 rows. Every mapped column
+now has **zero** provenance-vs-WIDE gap except `AverageNumberEmployeesDuringPeriod` (1,225
+rows in `as_first_reported`), which is exactly the intended cut-off nulling, not a defect.
+Company numbers confirmed `VARCHAR` with leading zeros intact; zero published monetary cells
+trace to a source fact with a missing/unresolved unit. One retry needed: the `latest`-mode
+rebuild first OOM'd inside DuckDB's own 12 GB internal limit (not the 20 GB cgroup cap) —
+resolved by raising `--duckdb-memory-gb` to 16–18 with a 24 GB cgroup cap, succeeding at
+17.6–21.1 GB peak.
+
+**Task 4 — restatement by year.** Added `ooc.restatement_rate_by_year_duckdb`, grouped by
+year of first filing rather than concept. Guarded the divide-by-zero case (a year with zero
+repeated keys) with an explicit `pl.when(...).otherwise(0.0)`, mirroring
+`RestatementRateResult.disagreement_rate`'s existing Python-level guard — without it, a year
+with no repeats yet (e.g. the still-open 2026) would divide 0.0/0.0 to `NaN`. Real result:
+7.9–10% for most years, but 2016–2017 restate distinctly more (13–15%) — see
+`docs/accounts-restatement-by-year.md`. Not investigated further which of "less-settled
+early filer-software conventions" or "longer time-to-restate window" (or both) drives the
+bump.
+
+**Task 5b — public LONG, denylist/allowlist approved before staging.** Built the numeric
+denylist by pattern-matching concept names
+(`director|officer|keymanagement|related.?party|remuneration`, plus `trustee` added by hand
+after a second pass) against the concept inventory: 95 concepts, 8,697,598 observations
+(0.44% of numeric data). Built the non-numeric allowlist strictly from the brief's six named
+categories: 17 structured concepts (dates, registered number, filing software, dormant/
+trading/audited/legal-form/accounts-type flags), 297,568,003 observations; everything else
+non-numeric dropped, including `EntityCurrentLegalOrRegisteredName` explicitly. Presented
+both lists with three flagged borderline cases (bare director/trustee headcounts kept in the
+denylist by conservative default) and a four-concept "plausibly safe but not named in the
+brief" appendix via `AskUserQuestion`; **human approved as written**. Lists live in
+`src/ukcompany/accounts/public_long.py` as the single source of truth, reused by both the
+builder and the staging guard so they cannot silently drift apart. Built via
+`build_public_long_duckdb` (`COPY ... TO ...`, one Parquet per year, cgroup-wrapped, filters
+the existing per-month Parquets only): 1,301,140,617 rows across 2014–2026, spot-checked
+post-build to confirm only the 17 allowlisted non-numeric concepts appear and
+`EntityCurrentLegalOrRegisteredName` has zero rows. Full lists and review:
+`docs/accounts-public-long-concepts.md`.
+
+**Task 5 — Kaggle WIDE packaging.** `kaggle/` contains both WIDE files, both provenance files
+(human chose to include them over the smaller-download alternative), `README.md` (dataset
+card), `column-dictionary.{csv,md}` (one row per column with coverage %, computed from the
+real rebuilt files, not estimated), `dataset-metadata.json`, and `starter.ipynb`.
+`dataset-metadata.json` uses `licenses: [{"name": "other"}]` with the OGL text embedded in
+the description — Kaggle's current license enum wasn't verified live, so this is the safe
+fallback per the brief's own instruction, flagged for the human to check before upload.
+Title and `id` are explicit placeholders (`INSERT_KAGGLE_USERNAME/...`), per "flag, don't
+decide". **The starter notebook was actually executed against the staged files, not just
+written** (`jupyter nbconvert --execute`) — this caught a real, if tiny, pre-existing data
+artifact: 14 of 33.4M rows (0.00004%) have an obviously mistyped `period_end` year (e.g.
+3020, 2924 — filer data-entry errors, kept as-read, not corrected), which dominated the
+notebook's "coverage by year" demo table until the cell was fixed to restrict to a plausible
+year range with a note explaining why.
+
+**Task 6 — safety checks, all passed.** WIDE schema listed and confirmed to contain only the
+company number, two dates, financial values, and summary columns (19 columns total, no
+name/address/free-text field). `scripts/kaggle_staging_guard.py` scans every Parquet in
+`kaggle/` and `kaggle-long/`: for LONG-shaped files, checks every fact's concept against the
+denylist/allowlist; for WIDE-shaped files (no `concept` column — concepts are column names),
+checks column names against the denylist plus an *independently re-derived* person-name
+regex (not just a re-check of the same list the builder used, per the brief's own reasoning
+that the guard should check the lists, not only trust them). Regression-tested with 7 cases
+(one clean pass per file shape, six synthetic violations each confirmed caught) before
+trusting it against the real folders. The stale 2026-09-21 `accounts-wide.parquet`/
+`accounts-wide-provenance.parquet` were moved to `data/accounts/_stale/` before rebuilding,
+so there was no path by which they could have been staged. Full report:
+`docs/accounts-kaggle-safety-checks.md`.
+
+**Task 7 — docs finished.** `docs/accounts-limitations.md` gained a full "Kaggle publication
+chapter" section with all the numbers above. New `docs/site/accounts.qmd` (no prior accounts
+page existed on the site; created, added to `_quarto.yml`'s navbar, rendered successfully via
+`quarto render docs/site` to confirm it doesn't break the build).
+
+### Flag, don't decide (this chapter)
+
+Employee cut-off (250) and the denylist/allowlist were both explicitly approved by the human
+via `AskUserQuestion`, not inferred. Provenance-files inclusion: presented as a size-vs-
+completeness tradeoff; **human chose to include both** provenance files in `kaggle/`. Kaggle
+dataset title and `id` remain literal placeholders in both `dataset-metadata.json` files —
+not decided here. The `dataset-metadata.json` license field defaults to `"other"` with OGL
+text embedded, since Kaggle's current license enum wasn't checked live; flagged for the human
+to verify (and switch to a named OGL entry if Kaggle now lists one) before upload. The four
+"plausibly safe" non-numeric concepts excluded from the allowlist by conservative default
+(`ScopeAccounts`, `CountryFormationOrIncorporation`, `PrincipalCurrencyUsedInBusinessReport`,
+`ReportPeriod`) were not added — the human approved the list as written, without them.
+
+### Upload commands (human runs these; not run here)
+
+```
+kaggle datasets create -p kaggle/
+kaggle datasets create -p kaggle-long/
+```
+
+Both require `dataset-metadata.json`'s `id` (and ideally `title`) to be filled in first — see
+the placeholders above — and the Kaggle CLI to be authenticated
+(`~/.kaggle/kaggle.json`). Neither command was run by this agent.
