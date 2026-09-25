@@ -8,7 +8,7 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
-from .core import EMPLOYEE_CONCEPT, TARGET_CONCEPTS
+from .core import EMPLOYEE_CONCEPT, NIL_RAW_VALUES, TARGET_CONCEPTS
 from .pivot import require_polars, to_lazy, track_peak_rss
 
 SOURCE_KEYS = (
@@ -78,7 +78,8 @@ def restatement_rate_over_parts(parts: str | Path, *, scope_label: str) -> Resta
     Processes one archive at a time in chronological order (the `accounts-long-YYYY-MM`
     filename sort is already chronological), so the only state held across the whole run is
     the dict of distinct keys seen so far — proportional to key cardinality (tens of
-    millions, a few GB), not to the raw fact-row count.
+    millions, a few GB), not to the raw fact-row count. A bare dash (`NIL_RAW_VALUES`) is
+    treated as a genuine value of 0, not excluded.
     """
     pl = require_polars()
     first_value: dict[tuple[str, str, str], str] = {}
@@ -92,7 +93,16 @@ def restatement_rate_over_parts(parts: str | Path, *, scope_label: str) -> Resta
                 pl.col("concept").is_in(TARGET_CONCEPTS)
                 & (pl.col("status") == "selected")
                 & pl.col("dimension").is_null()
-                & pl.col("numeric_value").is_not_null()
+                & (
+                    pl.col("numeric_value").is_not_null()
+                    | pl.col("raw_value").is_in(NIL_RAW_VALUES)
+                )
+            )
+            .with_columns(
+                pl.when(pl.col("numeric_value").is_null())
+                .then(pl.lit("0"))
+                .otherwise(pl.col("numeric_value"))
+                .alias("numeric_value")
             )
             .select("company", "period_end", "concept", "numeric_value")
             .collect(engine="streaming")

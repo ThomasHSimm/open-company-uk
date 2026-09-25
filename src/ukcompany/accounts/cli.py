@@ -361,6 +361,29 @@ def cmd_inventory(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_build_public_long(args: argparse.Namespace) -> int:
+    """Filter the existing per-month Parquets into one privacy-reviewed Parquet per year
+    (see docs/accounts-public-long-concepts.md — maintainer-approved denylist/allowlist).
+    Never re-extracts from source archives."""
+    from .public_long import build_public_long_duckdb
+
+    settings = load_accounts_settings(args.settings)
+    long_path = setting_path(args.long or settings["long_input"])
+    written = build_public_long_duckdb(
+        long_path,
+        args.output_dir,
+        range(args.from_year, args.to_year + 1),
+        memory_limit_gb=args.duckdb_memory_gb,
+    )
+    total = 0
+    for year, count in sorted(written.items()):
+        print(f"{year}: {count:,} rows" if count else f"{year}: no source data, skipped")
+        total += count
+    print(f"Total public LONG rows: {total:,}")
+    print(f"Output directory: {args.output_dir}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--settings", default="config/settings.yaml")
@@ -443,6 +466,17 @@ def build_parser() -> argparse.ArgumentParser:
     inventory.add_argument("--csv")
     inventory.add_argument("--report")
     inventory.set_defaults(func=cmd_inventory)
+    build_public_long = commands.add_parser(
+        "build-public-long",
+        help="filter per-month Parquets into one privacy-reviewed Parquet per year "
+        "(see docs/accounts-public-long-concepts.md); never re-extracts",
+    )
+    build_public_long.add_argument("--long", help="archived Parquet glob; default source")
+    build_public_long.add_argument("--output-dir", required=True)
+    build_public_long.add_argument("--from-year", type=int, required=True)
+    build_public_long.add_argument("--to-year", type=int, required=True)
+    build_public_long.add_argument("--duckdb-memory-gb", type=int, default=8)
+    build_public_long.set_defaults(func=cmd_build_public_long)
     pivot = commands.add_parser("pivot", help="create WIDE and cell provenance Parquets")
     pivot.add_argument("--long")
     pivot.add_argument(

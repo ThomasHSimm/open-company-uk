@@ -10,6 +10,7 @@ website:
       - methodology.qmd
       - validation.qmd
       - limitations.qmd
+      - accounts.qmd
 
 format:
   html:

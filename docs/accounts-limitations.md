@@ -90,6 +90,93 @@ first-reported filing too, whereas the 6-month 2022-H1 sample structurally exclu
 whose *first* filing fell outside the narrow window. Not further investigated; noted as a
 scale-dependent characteristic rather than a discrepancy.
 
+## Kaggle publication chapter (2026-09-24)
+
+Closes the accounts chapter with a publishable Kaggle dataset. Two data flaws in the WIDE
+table were investigated and resolved (one added columns, one added a cut-off + flag); a
+null-shadowing bug found during verification was fixed in both pivot engines; and a
+privacy-reviewed public LONG dataset was built alongside WIDE. Full detail in each linked
+report; `docs/AUDIT.md` has the complete chapter narrative including the bug fixes.
+
+**Creditors maturity columns — added.** A full-corpus reconciliation
+(`docs/accounts-creditors-maturity-reconciliation.md`) found `sign_flip` disagreements
+completely absent (0 of 3,998 comparisons) and disagreements dominated by `incomplete_axis`
+(79.1%) — the decision rule's threshold for safely adding the split. Added
+`creditors_within_one_year` and `creditors_after_one_year` to the WIDE map. A secondary
+finding narrows what the bare `Creditors` total means: even when a non-dimensional total *is*
+filed alongside the maturity split, it frequently equals just one maturity bucket (80.3% of
+such cases equal `WithinOneYear` alone) rather than a genuine sum — the total was already
+documented as sparse (~4%) and is now understood to be unreliable even when present. The
+financial-instrument current/non-current axis remains deliberately out of v1 (a parallel,
+independent split of the same concept — mixing two dimensional axes into one WIDE table would
+produce ambiguous cells).
+
+**Employee GBP-unit cut-off — human-approved at 250.**
+`docs/accounts-employee-unit-cutoff.md`: comparing the GBP-tagged and `pure`-tagged
+non-dimensional employee-fact distributions, the task's example method (99.9th percentile of
+`pure`) gives a cut-off of 250. GBP-tagged values ≤250 are kept as real (mislabelled)
+headcounts; values >250 (2,262 of 7,715,981 GBP-tagged facts, 0.029%) are set to `null` in
+WIDE only — Stage 1/LONG is unaffected. A new `employees_unit_anomaly` WIDE column flags every
+row whose winning employee fact was GBP-tagged (kept or nulled), so both cases are
+identifiable. This supersedes the old 100,000 ad-hoc threshold (which nulled almost nothing —
+275 facts, 0.004%) referenced earlier in this document.
+
+**A null-shadowing bug, found and fixed in both pivot engines.** Verifying "provenance matches
+WIDE one-to-one" (a stated rebuild check) surfaced a real, pre-existing defect: a source fact
+with a blank/unparseable value (`raw_value='-'`, `numeric_value=NULL` — a legitimate Stage 1
+shape) could still win a cell's source ranking and shadow a real value from a different
+filing, producing a `null` WIDE cell where a usable value existed elsewhere. Fixed in both
+`pivot.pivot_long` and `ooc.pivot_duckdb` (excluded from the candidate pool before ranking);
+full detail and the resulting row-count changes in
+`docs/accounts-wide-rebuild-verification.md`. This is a genuine data-quality improvement to
+what's published, not just a bookkeeping fix.
+
+**Superseded before upload: employee cut-off removed, dashes now treated as nil.**
+`docs/accounts-dash-nil-fix.md` records two corrections applied after the two paragraphs
+above and before publication:
+
+- The 250 employee cut-off is **removed**. Every `AverageNumberEmployeesDuringPeriod` value
+  is kept exactly as filed, regardless of unit or size — `employees_unit_anomaly` remains
+  (1 for a GBP-tagged winning fact) but is now purely diagnostic and never alters a value.
+- The null-shadowing fix above was the right instinct for genuinely unparseable text but
+  wrong for one specific shape: **a bare dash (`-`, `–`, `—`) in a UK company account means
+  nil, not "unknown"**. Excluding it from the candidate pool (as the null-shadowing fix did)
+  let a *different* filing's value win instead of treating the dash as the zero it
+  represents. Both pivot engines and both restatement engines now coalesce a dash to `0` and
+  let it compete in ranking/comparison normally — a dash in the winning filing legitimately
+  produces a `0` cell, rather than being skipped.
+- Impact, diffed cell-by-cell against the pre-fix build: 1,936,525 WIDE cells changed under
+  `as_first_reported` (1,936,433 `null`→`0`, 92 real-value→`0`) and 3,444,428 under `latest`
+  (3,310,785 `null`→`0`, 133,643 real-value→`0`) — every changed cell falls into exactly one
+  of those two categories, nothing unexplained. The restatement rate moved from 9.27% to
+  **9.36%** on the same continuous 2014–2026 span, consistent with dash facts now
+  legitimately counting as first-seen values that can later be restated.
+
+**Restatement rate by year.** `docs/accounts-restatement-by-year.md`: the 9.27% all-span rate
+is not flat — most years run 7.9–10%, but keys first reported in 2016–2017 restate distinctly
+more (13–15%), plausibly reflecting less-settled filer-software conventions in the earliest
+near-universal-iXBRL years, the longest possible window to accumulate a restatement, or both
+(not distinguished further here). Computed *before* the dash-nil fix below (all-span rate
+9.27%, not the post-fix 9.36%); the by-year breakdown was not regenerated after that fix, so
+treat its exact percentages as indicative rather than final — the shape of the finding
+(2016–2017 elevated, the rest of the span in a narrower band) is expected to hold.
+
+**Public LONG dataset — personal data removed, published separately.** The private
+`data/accounts/long/` archive (used to build WIDE) contains personal data from the all-fact
+capture — names, the signing director, addresses, director loans and remuneration — and stays
+private, never published; the earlier statement in this document that "financials are not
+personal data" was scoped to the validated nine-concept WIDE output, not to this private
+archive. A maintainer-approved filter (`docs/accounts-public-long-concepts.md`: a 95-concept
+numeric denylist covering director/officer/key-management/related-party/remuneration/trustee
+concepts, 0.44% of numeric observations; a 17-concept non-numeric allowlist of structured
+fields only, everything else non-numeric dropped) produces `kaggle-long/`, one Parquet per
+year, 1,301,140,617 rows total — built as a DuckDB filter over the existing per-month
+Parquets, never re-extracted. The Open Government Licence does not cover personal data, which
+is part of why this split exists. An automated staging guard
+(`scripts/kaggle_staging_guard.py`) independently re-scans every published Parquet in both
+`kaggle/` and `kaggle-long/` against the same lists (plus an independently-derived
+person-name pattern) as the last check before upload.
+
 ## What was kept and what was skipped this chapter
 
 - Kept: all-fact extraction scope (numeric and non-numeric, unchanged), `--disposable-store`
@@ -128,3 +215,13 @@ scale-dependent characteristic rather than a discrepancy.
   `accounts-wide-provenance-{as_first_reported,latest}.parquet`.
 - Manifest-vs-Parquet completeness: `docs/accounts-verification.md` (152/152 passed).
 - Coverage (present/absent/failed months, real span): `docs/accounts-coverage.md`.
+- Creditors maturity reconciliation: `docs/accounts-creditors-maturity-reconciliation.md`.
+- Employee GBP-unit cut-off derivation: `docs/accounts-employee-unit-cutoff.md`.
+- WIDE rebuild verification (row counts, provenance alignment, the null-shadowing fix):
+  `docs/accounts-wide-rebuild-verification.md`.
+- Restatement rate by year of first filing: `docs/accounts-restatement-by-year.md` (pre-dates
+  the dash-nil fix; see below).
+- Public LONG concept lists (maintainer-approved) and Kaggle staging safety checks:
+  `docs/accounts-public-long-concepts.md`, `docs/accounts-kaggle-safety-checks.md`.
+- Employee cut-off removal and dash-means-nil fix (supersedes the cut-off described above):
+  `docs/accounts-dash-nil-fix.md`.

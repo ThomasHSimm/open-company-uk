@@ -4,4 +4,6 @@ __pycache__/
 .ruff_cache/
 data/
 !data/.gitkeep
+kaggle/
+kaggle-long/
 .env

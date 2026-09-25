@@ -26,6 +26,14 @@ TARGET_SET = frozenset(TARGET_CONCEPTS)
 EMPLOYEE_CONCEPT = "AverageNumberEmployeesDuringPeriod"
 COMPANY_CONCEPT = "UKCompaniesHouseRegisteredNumber"
 
+# A numeric fact filed as a bare dash means nil, not "no value" — downstream pivot and
+# restatement computations treat it as 0 rather than excluding it (see
+# docs/accounts-wide-rebuild-verification.md). Covers the plain hyphen and the two dash
+# characters filing software commonly substitutes for it. Extraction (Stage 1) is
+# unaffected: `numeric_value` stays `None` for these facts in the LONG archive exactly as
+# read; this constant is only consumed downstream, at pivot/restatement time.
+NIL_RAW_VALUES = ("-", "–", "—")
+
 CONTEXT_RE = re.compile(
     rb"<\s*(?:[\w.-]+:)?context\b([^>]*)>(.*?)</\s*(?:[\w.-]+:)?context\s*>",
     re.I | re.S,

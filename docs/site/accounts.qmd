@@ -1,0 +1,38 @@
+---
+title: "Accounts"
+---
+
+A company-period-level financial dataset built from Companies House's monthly bulk accounts
+archives (inline XBRL filings): nine core financial concepts, pivoted to one row per company
+per accounting period, published on Kaggle as a companion to this project's compliance
+pipeline.
+
+- **Coverage**: continuous 2014-01 through 2026-08, 152 monthly archives, 0 gaps. Starts in
+  2014 because iXBRL adoption was near zero before then (0% in 2010, ~97% by 2014) — not
+  because Companies House's data stops earlier. Coverage gaps within the span are non-random:
+  they correlate with filing regime, exemption status, and company size.
+- **Two pivot modes**: `as_first_reported` (the flagship file — no look-ahead, use this for
+  any predictive work) and `latest` (includes later comparative restatements, unsuitable for
+  predictive work).
+- **Creditors**: the bare total is only ~4% populated and, even when filed, often duplicates
+  a single maturity bucket rather than a genuine sum. Use the `creditors_within_one_year` /
+  `creditors_after_one_year` columns, added after a full-corpus reconciliation found no
+  sign-flip corruption.
+- **Employee counts**: ~29% of source facts carry a GBP unit instead of a plain count. A
+  human-approved cut-off of 250 (the 99.9th percentile of correctly-tagged headcounts)
+  separates genuine mislabelled headcounts (kept) from monetary values in the wrong field
+  (nulled); an `employees_unit_anomaly` flag marks every affected row. Employee coverage also
+  has a 2020–2021 reporting-regime break.
+- **Restatements**: 9.27% of repeated (company, period, concept) values disagree with the
+  first-reported figure across the full span — not flat by year; keys first reported in
+  2016–2017 restate distinctly more (13–15%) than the rest of the span (roughly 8–10%).
+- **A full-fact LONG dataset** (every XBRL concept, not just the nine core ones) is published
+  separately with person-related and free-text concepts removed by a maintainer-approved
+  allowlist/denylist — the private, unfiltered archive is never published.
+
+Full methodology, every reconciliation and cut-off derivation, and the complete concept lists
+are in the project repository under `docs/accounts-*.md`, linked from each dataset's own card
+on Kaggle.
+
+Not affiliated with or endorsed by Companies House. Contains public sector information
+licensed under the Open Government Licence v3.0.

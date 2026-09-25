@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.5", "polars>=1.0", "lxml>=5.0"]
+dev = ["pytest>=8.0", "ruff>=0.5", "polars>=1.0", "lxml>=5.0", "duckdb>=1.0"]
 snapshot = ["polars>=1.0"]
 
 [project.scripts]

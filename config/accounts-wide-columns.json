@@ -22,6 +22,18 @@
       "dimension": "EquityClassesDimension",
       "member": "RetainedEarningsAccumulatedLosses",
       "column": "equity_retained_earnings"
+    },
+    {
+      "concept": "Creditors",
+      "dimension": "MaturitiesOrExpirationPeriodsDimension",
+      "member": "WithinOneYear",
+      "column": "creditors_within_one_year"
+    },
+    {
+      "concept": "Creditors",
+      "dimension": "MaturitiesOrExpirationPeriodsDimension",
+      "member": "AfterOneYear",
+      "column": "creditors_after_one_year"
     }
   ]
 }

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from .core import EMPLOYEE_CONCEPT, TARGET_CONCEPTS
+from .core import EMPLOYEE_CONCEPT, NIL_RAW_VALUES, TARGET_CONCEPTS
 
 PivotMode = Literal["latest", "as_first_reported"]
 
@@ -142,13 +142,24 @@ def _reduce_to_cells(long_frame, mapping: WideColumnMap, mode: PivotMode):
     projection pushdown — without it the optimizer cannot prove the unused source columns
     (notably free-text `raw_value`, present on every row including non-numeric facts) are
     droppable, since it has no visibility past a `.collect()` into what happens next.
+
+    A numeric fact filed as a bare dash (`NIL_RAW_VALUES`) means nil and is coalesced to
+    `"0"` rather than excluded — it competes in the ranking on equal footing with a real
+    value from another filing, so a dash in the winning filing legitimately produces a `0`
+    cell rather than being skipped in favour of some other filing's number.
     """
     pl = require_polars()
     lazy = to_lazy(long_frame)
     if "status" in lazy.collect_schema().names():
         lazy = lazy.filter(pl.col("status") == "selected")
     usable = lazy.filter(
-        (pl.col("concept") == EMPLOYEE_CONCEPT) | (pl.col("currency") == "GBP")
+        ((pl.col("concept") == EMPLOYEE_CONCEPT) | (pl.col("currency") == "GBP"))
+        & (pl.col("numeric_value").is_not_null() | pl.col("raw_value").is_in(NIL_RAW_VALUES))
+    ).with_columns(
+        pl.when(pl.col("numeric_value").is_null())
+        .then(pl.lit("0"))
+        .otherwise(pl.col("numeric_value"))
+        .alias("numeric_value")
     )
     cells = _mapped_cells(usable, mapping)
     if mode == "as_first_reported":
