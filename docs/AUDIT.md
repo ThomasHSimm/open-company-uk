@@ -1398,3 +1398,24 @@ kaggle datasets create -p kaggle-long/
 Both require `dataset-metadata.json`'s `id` (and ideally `title`) to be filled in first — see
 the placeholders above — and the Kaggle CLI to be authenticated
 (`~/.kaggle/kaggle.json`). Neither command was run by this agent.
+
+### Post-close: real IDs filled in, commit provenance recorded (2026-09-25)
+
+The human filled in both `dataset-metadata.json` placeholders themselves:
+`thomassimm/uk-company-accounts-wide-2014-2026` and
+`thomassimm/uk-company-accounts-long-2014-2026` (license left as `"other"`, per the flag
+above — not resolved either way). `pyproject.toml`'s `dev` extra was also missing `duckdb`
+and `pyarrow` (installed locally outside the declared dependencies, so CI's fresh install
+failed on both in turn); fixed by adding `duckdb>=1.0` and `pyarrow>=14.0` (the latter needed
+because DuckDB's `.pl()` conversion goes through Arrow). Committed as `c768486` ("Kaggle
+accounts upload v1") and `4eb5ec9` ("Fix pytest ci test") on `kaggle_build`.
+
+**Kaggle dataset v1 = commit `4eb5ec9`.** Both `kaggle/README.md` and
+`kaggle-long/README.md` now name this commit as the exact code state that produced their
+Parquet files, so anyone auditing a published number can check out that commit and see the
+pipeline that made it. This repo's prior two PRs (#1, #2) both merged via a regular "Merge
+pull request" commit, which preserves commit SHAs unchanged onto `main` — so this reference
+should remain valid after merging, unless a future merge uses squash or rebase instead (which
+would need the reference updated). If a v2 upload is ever made after further fixes, update
+both README lines and this entry to the new commit — a stale commit reference here would be
+actively misleading, not just outdated.
