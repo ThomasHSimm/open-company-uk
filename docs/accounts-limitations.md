@@ -7,10 +7,42 @@ validated — read this before citing any number from the accounts archive. (Sup
 prior 30-archive-sample chapter; see "Where the numbers come from" for which reports moved
 and which stayed as validation cross-checks.)
 
-The archive keeps every concept, all-fact, exactly as read (verified: no non-numeric fact
-carries a coerced numeric value). Only the nine core financial concepts are validated for
-coverage and internal consistency; the remaining ~4,446 concepts are captured-as-read and
-unvalidated — rare and single-filer concepts especially.
+**Corrected completeness statement** (this document previously said the archive keeps "every
+concept, all-fact, exactly as read" — that was wrong at a materially significant rate, found
+during the accounts-parser check, `docs/accounts-parser-check.md`): the archive keeps every
+*non-dimensional* and *single-member-dimensional* concept, exactly as read. It skips, by
+design, two dimensional context shapes entirely:
+
+- **Multi-member contexts** (a fact tagged against 2+ dimension members at once) —
+  **25.3% of all 35,806,258 filings** in the archive have at least one.
+- **Typed-member contexts** (a dimension whose member is a filer-supplied typed value rather
+  than a fixed taxonomy member) — **20.1% of all filings** have at least one.
+
+These overlap heavily (a filing can have both); the union is **37.9% of the archive (13.58M
+filings)** with at least one context shape this pipeline does not capture. This is a
+materially larger completeness gap than "edge case" framing would suggest, and is stated
+plainly here rather than left implicit in the old "every concept, all-fact" claim.
+
+**Personal-data check on typed members** (`docs/accounts-parser-check.md` Phase A3,
+descriptive only — this did not trigger a decision to start capturing them): every typed
+dimension found in a live scan of the 1% sample is code-shaped, not name-shaped. The two
+"Directors"-named dimensions carry the highest a priori risk
+(`X-SpecificAdvanceOrCreditDirectorsGroupingDimension`,
+`X-SpecificGuaranteeDirectorsGroupingDimension`) — verified with non-identifying aggregate
+statistics rather than trusting a classifier alone: of 3,321 typed values found for these two
+dimensions, 100% are all-digit, maximum length 2 characters, 0% contain a space. These are
+sequence indices (distinguishing, e.g., director 1's loan from director 2's loan), not
+director names.
+
+Non-numeric values are kept as the raw displayed text; the iXBRL Transformation Registry
+(which would, for example, normalise "3 January 2023" to "2023-01-03") is never applied. This
+is a deliberate choice, not a defect — see "Read-correctness against a second parser" below
+for how much this actually matters to published numbers (essentially nothing: it never
+touches a numeric WIDE cell).
+
+Only the nine core financial concepts are validated for coverage and internal consistency; the
+remaining ~4,446 concepts are captured-as-read and unvalidated — rare and single-filer
+concepts especially.
 
 Non-numeric text (54.1% of observations) is retained untriaged: statutory boilerplate,
 structured metadata (filing dates, registered number, names, filing software), and
@@ -35,11 +67,40 @@ against 2019–2025 markup only, so early-year filings from unfamiliar filing so
 open risk. Samples: 2013 (300 filings, real archive) → 98.0% exact fact-set agreement; 2022
 (200–500 filings) → 82.5%. **Zero disagreements in either sample touched any of the nine
 target concepts** — all were either CRLF/LF line-ending normalisation (benign, XML-spec
-mandated) or a confirmed, narrow regex limitation: a non-greedy `ix:nonNumeric` match
-truncates when a same-named element is nested inside it (e.g. a date fact embedded mid-
-sentence in a narrative disclosure), which only affects non-numeric narrative concepts, never
-the nine numeric core concepts this archive validates. Not fixed (out of the scope-discipline
-for this chapter); flagged here for anyone extending non-numeric concept coverage.
+mandated) or the non-greedy nested-element regex limitation described below.
+
+**Read-correctness against a second parser** (`docs/accounts-parser-check.md`, full detail):
+this chapter's own confirmed prefix bug (a hardcoded `ix:` prefix silently zeroing out any
+filing using a different namespace binding — since fixed, ~291,802 filings affected,
+2014-2022) and comma-as-decimal number misreads (also since fixed) are covered in that report,
+not repeated here. Two further defects were found, confirmed independently by Arelle, and a
+reasoned decision made *not* to fix them:
+
+- **Nested facts** — an inner fact lost or merged into an outer fact's text (the same
+  non-greedy `ix:nonNumeric`/`ix:nonFraction` matching limitation the paragraph above
+  originally flagged, now precisely quantified): affects **9.85% of filings archive-wide**
+  (6,169,655 occurrences), but only **0.0015% of numeric facts** (2 of 131,096 in a live
+  sample) and **zero of the nine target WIDE concepts**. Given that rate, the maintainer's
+  explicit decision was to defer a fix rather than build one — documented here as a known
+  limitation, not silently left as "not fixed, out of scope" the way the prior version of this
+  paragraph did.
+- **Continuations** (`ix:continuation` chains — only the first text fragment is kept, the rest
+  silently dropped): non-numeric-only impact, and the public `kaggle-long/` dataset only keeps
+  a 17-concept structured-metadata allowlist (see below) — a continuation-truncated fact would
+  need to be BOTH a narrative concept long enough to need continuation AND on that allowlist to
+  ever reach publication, which none currently are. Deferred for the same reason as nested
+  facts: real, but low-consequence at today's publication scope.
+
+**The accuracy figure that matters for what's actually published**: WIDE only ever holds
+numeric cells (plus the fact-of-a-value for `AverageNumberEmployeesDuringPeriod`). Restricted
+to numeric facts and excluding the dash-as-nil convention above (a design difference, not a
+disagreement — ixbrlparse and Arelle both resolve a dash immediately at extraction time; this
+archive defers that resolution to pivot time, see "dashes now treated as nil" below), ours
+agrees with `ixbrlparse` on **99.999% of numeric facts (dashes excluded; resolved identically
+at pivot)** — 119,812 of 119,813 shared numeric facts across a 5,000-filing, 13-year sample,
+95% CI [99.995%, 100%]. This replaces an earlier 89.5% all-facts figure that mixed in the
+Transformation-Registry text-normalisation difference noted above (70% of that figure's
+disagreements) — not relevant to any numeric WIDE column.
 
 Because the whole 2014–2026 span is now gap-free, longitudinal metrics (restatement,
 `as_first_reported`) are valid across the **entire archive**, not just a sub-range — see
@@ -198,8 +259,34 @@ person-name pattern) as the last check before upload.
   machine (see `docs/AUDIT.md` for the OOM evidence and the engine's internal bugs found and
   fixed during validation). The Polars engines remain the default and are unchanged.
 
+## Accounts-parser v2 fix and rebuild (2026-09-27)
+
+Full detail: `docs/accounts-parser-check.md` (the bug-finding and benchmark chapter) and
+`docs/AUDIT.md` (this chapter's narrative). Summary of what changed in the parser itself,
+kept here since it directly bears on what "the archive" now contains:
+
+- **Fixed**: the prefix bug (a hardcoded `ix:` prefix silently zeroing out any filing using a
+  different namespace binding); comma-as-decimal number formats (`numdotcomma`/`numcomma`/
+  `numspacecomma`/`numcommadecimal`, both `ixt` and `ixt2` registry namespaces); numeric facts
+  with an unrecognised `format` now resolve to `null` and are counted, never guessed.
+- **Added**: plain-XML filings (301,141 archive-wide, 0.84% of the archive) are now extracted
+  via an `ixbrlparse`-based adapter instead of being skipped outright. Every observation now
+  carries a `parser` column (`"ours"` or `"ixbrlparse"`) recording which extractor produced
+  it — provenance, not a quality signal in itself.
+- **Deferred, by reasoned decision, not oversight**: nested facts and `ix:continuation`
+  chains — see "Read-correctness against a second parser" above for the exact rates that
+  justified deferring rather than fixing.
+- **Still not captured, by design, unchanged**: multi-member and typed-member dimensional
+  contexts — see the corrected completeness statement at the top of this document.
+- A second, full 2014–2026 rebuild ("v2") was produced from the fixed parser, kept alongside
+  the original ("v1") rather than overwriting it. The v1→v2 change, cell by cell where
+  applicable, is reported separately — see `docs/accounts-parser-check.md` for the comparison
+  methodology and results once complete.
+
 ## Where the numbers come from
 
+- Prefix-bug footprint, parser benchmark, fact-level comparison, numeric agreement figure,
+  typed-member personal-data check, v1→v2 change: `docs/accounts-parser-check.md`.
 - Per-concept read-correctness audit, numeric/non-numeric split, employee GBP-unit anomaly,
   numeric-unit-gap finding: `docs/accounts-concept-inventory.md` (`companies` is
   approximate — `approx_n_unique`, ~2% typical error — not an exact count; an exact

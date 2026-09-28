@@ -1419,3 +1419,302 @@ should remain valid after merging, unless a future merge uses squash or rebase i
 would need the reference updated). If a v2 upload is ever made after further fixes, update
 both README lines and this entry to the new commit — a stale commit reference here would be
 actively misleading, not just outdated.
+
+## Accounts parser check — prefix bug fix, benchmark, three-way comparison (2026-09-27)
+
+Full report: `docs/accounts-parser-check.md`. Branch `feature/accounts-parser-check`; nothing
+pushed. New scripts (all gitignored-data-producing, not part of the package):
+`scripts/parser_census.py` (Phase 1), `scripts/parser_benchmark.py` +
+`scripts/run_phase3_matrix.sh` (Phase 3), `scripts/parser_compare.py` +
+`scripts/arelle_correctness.py` (Phase 4).
+
+**Real bug fixed in `core.py`/`extract.py`**: `IX_FACT_RE` hardcoded the literal `ix:`
+prefix, silently returning zero facts for any filing binding the inline-XBRL namespace to a
+different prefix or to the default namespace. Fixed to match any prefix (or none), via the
+same `(?:[\w.-]+:)?` idiom already used elsewhere in `core.py`. Added
+`zero_fact_ixbrl_filings` (a filing-level flag, deliberately excluded from the
+`accounted()`/`closes()` invariant) so a filing with inline-XBRL markup but zero matched
+facts is never mistaken for a genuinely clean/empty filing. Six new regression tests in
+`tests/test_accounts_core.py`; verified two of them genuinely fail on the pre-fix code via
+`git stash` (not just written and trusted). Full suite: 167 passed, ruff clean.
+
+**A second, more subtle bug was found in this task's OWN audit tooling, not in `core.py`**:
+the census script's namespace-detection regex (and an early draft of `core.py`'s own
+`IX_NAMESPACE_RE`) matched double-quoted `xmlns:ix="..."` only. A real single-quoted
+`xmlns:ix='...'` filing from 2013 was misclassified as "no namespace binding detected",
+inflating the naive bug-footprint estimate to 612,750 filings. Caught by a LONG cross-check
+(bug-affected filings should have zero corresponding LONG rows; found 311,610 mismatches),
+not by trusting the first number computed. Fixed with the same quote-agnostic backreference
+idiom already used by `core.py`'s pre-existing `ATTR_RE`; corrected estimate: **≈291,802
+filings (95% CI [264,049, 324,455]), concentrated in 2014-2022**, cross-check mismatches
+dropped to zero. The lesson generalises: a regex-based audit tool can carry the same class of
+bug as the code it's auditing, and needs its own independent verification, not just internal
+consistency.
+
+**A real Arelle robustness bug was found and fixed mid-benchmark**: a filing referencing an
+unresolvable extension taxonomy (`dpl-frs`) caused Arelle to hang for 2+ hours against a
+60-second budget, with the in-process `signal.alarm()` timeout never firing because Arelle
+never yielded back to the Python bytecode loop (it was genuinely busy, logging thousands of
+repeated schema errors, not deadlocked). Diagnosed via `/proc/<pid>/fd` and `/proc/<pid>/wchan`
+(showed a running, non-blocked process) and finally the Arelle worker's own 61MB log file, not
+`py-spy` (blocked by ptrace restrictions, no sudo used). Fixed by moving Arelle's timeout
+enforcement to a hard subprocess-level kill (`multiprocessing.Process` + `.join(timeout)` +
+`.kill()`); ours and ixbrlparse, being pure-Python, were left on `SIGALRM`. This fix was
+load-bearing for the rest of Phase 3 and for the later Arelle correctness-set run (7,977
+files, zero failures/timeouts) — a `SIGALRM`-only design would very likely have hung again on
+similar pathological filings at that scale.
+
+**Benchmark headline** (5,000-file fixed subset, e2e/1-worker): ours ~11.8x faster than
+ixbrlparse, ~1,520x faster than Arelle, zero failures (ixbrlparse: 2/5,000, both
+`IXBRLParseError: Filetype not recognised` on early-vintage filings — an independent blind
+spot in ixbrlparse's own type-sniffing for the same 2013/2014 markup era as the quote-style
+bug above). Projected full-archive wall-clock at measured 8-worker throughput: ~2.1h (ours)
+vs ~34.5h (ixbrlparse) vs ~94.6 days (Arelle) — Arelle is not viable at this archive's scale
+under any parallelism this machine can offer.
+
+**Fact-level comparison** (ours vs ixbrlparse, same subset): 89.5% agreement on 271,795
+shared facts. Disagreements decompose cleanly: two are documented design differences (nil-dash
+deferred to pivot time; untransformed text vs Transformation-Registry-normalised text — both
+confirmed as design choices, not defects, by the Arelle three-way cross-check below); two are
+genuine, fixable-in-principle bugs in ours (no `ix:continuation`-chain following; a
+nested-same-name-element defect that silently truncates or entirely swallows facts — both
+confirmed by Arelle agreeing with ixbrlparse 95-100% of the time on these specific
+categories); the rest are ours' by-design scope exclusions (multi-member and typed-member
+dimensional contexts, plain-XML filings).
+
+**Recommendation reported (not implemented), per the brief**: (b) — keep ours as the default
+parser (speed), fall back to ixbrlparse for the 15,484,687 filings (43.3% of the archive,
+computed directly from the existing full-archive census, no new scanning needed) that are
+structurally out of ours' scope by design. The continuation/nested-fact bugs (14.9% of the
+archive, overlapping with the above) are flagged as a separate, scoped follow-on fix
+opportunity rather than folded into the permanent ixbrlparse-fallback population. Full
+evidence and the two rejected alternatives ((a) ship the prefix fix alone; (c) switch to
+ixbrlparse entirely) are in the report.
+
+### Flag, don't decide (this chapter)
+
+The optional WIDE-table cell-by-cell comparison (brief's Phase 4, conditional on ≥2h
+remaining) was assessed against the real cost — a second reconciliation pipeline mapping
+ixbrlparse's facts into the `pivot.py`/`WideColumnMap` schema, not an incremental extension of
+the fact-level comparison already done — and skipped given time already spent; stated
+explicitly in the report rather than silently omitted. The Arelle correctness-set's size
+(7,977 files: all 4,977 disagreeing files plus a 3,000-file random top-up, ~33 minutes at 8
+workers) was a judgement call sized from measured throughput, not a maintainer instruction —
+flagged in the report. Recommendation (b) is reported with full evidence but not implemented,
+per the brief; the maintainer decides whether/when to schedule the prefix-bug re-extraction
+and the ixbrlparse-fallback pass, and whether the continuation/nested-fact bugs are worth
+fixing directly in `core.py` before or instead of relying on ixbrlparse fallback for those
+filings.
+
+### Assumptions needing live verification
+
+The Arelle hang's root cause (accumulated in-process controller state vs something specific
+to the triggering file) is an informed hypothesis from a single isolated re-test (~13s, 126
+facts, vs 2+ hours originally), not a proven mechanism — the original stuck process's state
+could not be recovered once killed. The Arelle correctness-set's fact-key join (§4 of the
+report) is explicitly best-effort, not as rigorously reconciled as the ours-vs-ixbrlparse
+`FactKey` match — Arelle's own date-shifted context model (instant dates surface one day
+later, XBRL's exclusive-end convention) was corrected for empirically after probing one real
+file, but was not exhaustively verified across every context shape in the archive. The
+projected full-archive timings (§3 of the report) scale measured 5,000-file throughput
+linearly to 35.8M filings — a reasonable first-order estimate, but not verified against an
+actual full-archive run of any of the three parsers.
+
+## Accounts parser v2: fix, rerun, and correct the documentation (2026-09-27)
+
+Full report: `docs/accounts-parser-check.md` §6 onward. Branch `feature/accounts-parser-check`
+throughout (same branch as the prior chapter); nothing committed, nothing pushed, nothing
+uploaded to Kaggle. v1 (`data/accounts/long/`, `data/accounts/accounts-wide-*.parquet`,
+`kaggle/`, `kaggle-long/`) untouched; v2 writes exclusively to `data/accounts/v2/`,
+`kaggle-v2/`, `kaggle-long-v2/`.
+
+**Phase A (analysis, no code changes)** restricted the existing Phase 4 comparison to the 13
+WIDE columns: 93.5-99.85% agreement, every disagreement either the nil-dash design choice or
+one of two known ixbrlparse hard-failures. Numeric-only, dash-excluded agreement: **99.999%
+(119,812/119,813, 95% CI [99.995%, 100%])** — the figure now published in place of 89.5%. A
+typed-member personal-data scan (found and fixed a prefix-capture regex bug in the scan
+itself first — a colon-less character class was capturing only the namespace prefix, not the
+local name, the same class of mistake this whole audit exists to catch) found every sampled
+typed dimension code-shaped, substantiated with non-identifying aggregate stats (100%
+all-digit, max 2 characters for the two "Directors"-named dimensions) rather than a
+classifier's say-so alone.
+
+**Phase B**: nested facts and continuations were assessed against the maintainer's explicit
+threshold (fix only if >0.1% of numeric facts or any WIDE concept affected) and found at
+0.0015% / zero WIDE concepts — **deferred, not fixed**, per instruction. Comma-as-decimal
+number formats (`numdotcomma`/`numcomma`/`numspacecomma`/`numcommadecimal`, `ixt`/`ixt2`) were
+fixed in `normalise_number`; an unrecognised format now nulls and counts rather than
+guessing. Six new tests, five verified to fail on pre-fix code via `git stash`. Speed impact
+unmeasurable (within run-to-run noise).
+
+**Phase C**: new `src/ukcompany/accounts/xml_adapter.py` routes plain-XML filings (previously
+`xml_skipped`) through `ixbrlparse` into the same `FactObservation` schema as the iXBRL path,
+via a small `core.py` refactor exposing the existing grouping/dedupe logic to both paths
+rather than duplicating it. Two things confirmed empirically before writing the adapter, not
+assumed: ixbrlparse already applies scale/sign internally (re-applying them would double-
+count); its own `segments` list has a duplicate-entry quirk for typed members (BeautifulSoup's
+`findChildren()` walks all descendants, not just direct children). New `parser` provenance
+column on every observation (`OBSERVATION_SCHEMA_VERSION` 2→3), propagated to Parquet export
+automatically via the existing column-list-driven design. Ten new tests. Checked against
+Arelle on 200 real `.xml` filings: 100% agreement on shared facts (5,845/5,845), zero misses
+across 186 successfully-compared files (14 excluded — a pre-existing, unrelated zero-byte
+sample-extraction artifact from the 2015-12 archive month, found incidentally, confirmed
+isolated and non-overlapping with the earlier HTML-only benchmark subset).
+
+**Phase D**: disk-checked (441 GB free, ~30 GB v1 footprint, nowhere near the 50 GB floor),
+then found that `ukcompany-accounts run` has no built-in parallelism — a live single-threaded
+run measured ~820 filings/sec, projecting ~12.1 hours against the brief's ~4-5 hour estimate
+(which came from Phase 3's benchmark *scripts*, not the production CLI). Flagged to the
+maintainer with three options; the maintainer chose to parallelise. Killed the single-
+threaded run (zero completed months, nothing wasted), smoke-tested a 2-worker/limited-filing
+run, then launched 8 concurrent `ukcompany-accounts run` invocations over disjoint ~19-month
+ranges (`scripts/run_phase_d2_parallel.sh`) — separate `--store` per worker (SQLite doesn't
+tolerate concurrent writers), shared `--output-dir` (disjoint month ranges never collide on
+filename). All 152 months completed, zero errors; manifests merged via the existing
+`export-manifest` command. Rebuilt WIDE (both modes + provenance), public LONG
+(1,312,845,786 rows), concept inventory (4,593 concepts), and restatement (overall + all 13
+years) from v2 LONG via the DuckDB engine, each inside a `systemd-run` cgroup. One transient
+failure: the by-year restatement loop was OOM-killed at a step transition after four earlier
+steps had already succeeded; relaunched in a fresh cgroup with more headroom, completed
+cleanly. Staging guard passed on `kaggle-v2/`/`kaggle-long-v2/` (hard-linked, not copied).
+
+**Phase E, the headline finding of this chapter**: diffing v1's and v2's actual output
+directly (no sampling) found the prefix-bug fix genuinely recovered **61,085 filings** — not
+the ≈291,802 the prior chapter's sample-based, census-regex-proxy methodology had estimated.
+Spot-checking ten real filings from that estimate's source population found all ten already
+had complete, identical row counts in both v1 and v2 — they were never bug-affected. Root
+cause: the census's namespace-*declaration* detector and the actual fact-*extraction* regex
+are two independent regexes matching two different things, and they disagreed on more filings
+than the earlier 2,907-filing LONG cross-check happened to catch. **This is logged as an
+erratum in `docs/accounts-parser-check.md` §1, not a silent rewrite** — the original ≈291,802
+figure and its derivation are left in place so the record shows how understanding evolved.
+Two DuckDB queries needed rework mid-run at this scale: a naive multi-column join across
+facts with duplicate/conflicting status exploded into a disk-filling cartesian product (fixed
+by restricting to `status='selected'` rows, the only shape that comparison makes sense for
+anyway); a 7-column anti-join across ~2 billion rows exceeded a 22 GB cgroup (fixed by
+joining on one hashed key column instead of seven raw text columns). Full results: 273,418
+XML-caused + 61,085 prefix-fix-caused new filings (20,955,250 new observations); 1,108
+facts changed value (comma-decimal fix, confirmed against real examples both directions);
+**zero regressions** (every v1 fact still present in v2); WIDE `as_first_reported` shows
+~61,000 newly-filled cells per column (matching the prefix-fix filing count almost exactly);
+`latest` mode's larger "changed" counts trace to newly-recovered filings sometimes becoming
+the new most-recent-filing winner, not a new defect; restatement rate unchanged (9.36%
+before and after); fill rates unchanged to within 0.3 percentage points on every column.
+
+**Phase F**: `docs/accounts-limitations.md` corrected — the old "every concept, all-fact,
+exactly as read" claim replaced with the exact multi-member/typed-member counts and the
+typed-member personal-data finding; the nested-fact/continuation paragraph updated from the
+prior chapter's vaguer "not fixed, out of scope" framing to the precisely-quantified,
+reasoned-deferral framing above; the 89.5% figure replaced with 99.999%-on-numeric-facts,
+worded exactly as instructed ("99.999% on numeric facts (dashes excluded; resolved
+identically at pivot)"). `docs/accounts-validation-summary.md` and
+`docs/source-material/deck-corrections.md` written (no site-restructure branch exists, so the
+brief's fallback path was used for the former). `kaggle-v2/` and `kaggle-long-v2/` staged
+with full changelog READMEs (not uploaded); their `dataset-metadata.json`/commit references
+are placeholders pending an actual commit, unlike v1's which name a real commit SHA.
+
+### Flag, don't decide (this chapter)
+
+The Phase D2 parallelisation approach (kill-and-relaunch 8-way vs. accept the ~12h
+single-threaded runtime vs. build-and-validate-alongside) was put to the maintainer via
+`AskUserQuestion` rather than decided unilaterally; the maintainer chose parallelisation.
+Nested-fact and continuation fixes were assessed against a maintainer-specified numeric
+threshold and deferred once the measured rate came in under it — an instruction-following
+outcome, not an independent judgement call. The Phase E prefix-bug erratum is reported as a
+correction to prior work, not smoothed over; the maintainer should treat any other figure in
+the prior chapter that rested on the same census-regex classification (rather than a direct
+before/after diff) with the same caution until similarly re-verified. Kaggle v2's commit
+reference is left as an explicit placeholder rather than guessed — the maintainer fills it in
+once this branch's changes are actually committed and reviewed, matching how v1's README was
+finalised (see the "Post-close" entry in the prior Kaggle chapter above).
+
+### Assumptions needing live verification
+
+The 8-way parallel `run_phase_d2_parallel.sh` split was smoke-tested on a 2-worker/limited-
+filing run before the full launch, not on a full month pair — the full 152-month run's
+success is the real validation, but if it's ever rerun on a machine with materially different
+core count or network conditions, the per-worker `MemoryMax=4G` cgroup setting should be
+re-checked (no worker was observed near that ceiling in this run, but it was not stress-
+tested deliberately). The XML adapter's Arelle cross-check excluded 14 of 200 sampled files
+for the zero-byte artifact; that artifact's root cause (a Phase 1 sample-extraction issue
+specific to the 2015-12 archive month) was characterised but not fixed or explained further —
+if the same issue recurs in a future re-extraction, it needs its own investigation. The
+"other_new_coverage" cause label in Phase E's new-filing-coverage breakdown assumes every
+non-XML newly-covered filing is prefix-fix-caused; this was not individually verified file by
+file beyond the ten-filing spot-check reported above (a systematic secondary cause,
+if one exists, would currently be invisible inside that bucket).
+
+## Erratum contradiction resolved; a second real bug found and fixed (2026-09-28)
+
+The maintainer caught a genuine contradiction between this chapter's §1 ("0 of 2,907 mismatches")
+and its own erratum ("10 spot-checked filings had full v1 rows") and asked for it to be
+traced to ground truth before anything was staged or uploaded — not glossed over with a
+plausible-sounding explanation. It wasn't glossed over; the actual root cause was different
+from, and more interesting than, either original claim.
+
+**Root cause of the contradiction**: `find data/accounts/parser-census -name "*.parquet"
+-newer scripts/parser_census.py` returns **0 of 152** — the persisted census Parquet files on
+disk were never regenerated after `IX_NS_RE`'s quote-style fix was applied to the script.
+Every `ix_prefix` classification this whole chapter's earlier work relied on — the ≈291,802
+estimate, the "0 of 2,907" cross-check, and this session's own 10-file spot-check — was
+computed from the *same stale, pre-fix data* the whole time. Confirmed directly: the current,
+correctly-fixed `detect_ix_prefix()` returns `"ix"` for the exact traced example filing
+(`Prod224_0005_03318735_20140331.html`); the stale Parquet says `"none"`.
+
+**A deeper issue found while chasing this**: even with the quote-fix correctly applied,
+re-scanning the *entire* 1% sample fresh (353,562 real files, not from stale Parquets) found
+**zero** files classified `"none"`. Namespace-*declaration* presence was never a reliable
+proxy for "will this filing's facts extract correctly" — a filing can declare `xmlns:ix=...`
+and still tag its actual facts with a different prefix. The census's `ix_prefix` field
+measures the wrong signal, independent of the quote bug. This means the ≈291,802 estimate
+(and this chapter's own erratum, which tried to explain the mismatch via "the LONG cross-check
+happened not to catch it") were both built on a methodology that was never going to reliably
+track the real bug, on top of also using stale data.
+
+**What was NOT wrong**: the direct v1-vs-v2 diff (Phase E) never touched the census's
+`ix_prefix` field — it compares actual LONG output row-for-row. The 61,085 figure was
+correct throughout, now corroborated a second, independent way: a full-archive anti-join
+confirms **zero `.html` filings have zero rows in v2, in any year** (`zero_fact_ixbrl_filings
+= 0` archive-wide) — the prefix fix is complete, no residual gap exists to find.
+
+**A second, real, separate bug was found and fixed** while answering the maintainer's Q5
+("trace WIDE newly-null cells — a published value disappearing needs an explanation"):
+`normalise_number` recognised `numdotdecimal` but not the hyphenated Transformation Registry
+spelling `num-dot-decimal` — the exact same format family, just punctuated differently.
+Confirmed on a real 2024 filing (`format="ixt2:num-dot-decimal"`, raw `"49,386"`), then
+confirmed archive-wide via the existing format census (no re-scan needed): 540 occurrences,
+confined to exactly 3 months (July2024, July2026, August2026). This bug had been silently
+nulling values that parsed *correctly* even before this chapter's comma-decimal fix existed —
+a genuine regression introduced by the comma-decimal fix's own "never guess at an
+unrecognised format" safety net, which is correct in principle but was matching format names
+too literally. Fixed with `normalise_format_name()` (strips hyphens/underscores before
+matching); tested against the real markup, and specifically verified to fail when *only* the
+hyphen-normalisation is reverted (not just against the pre-chapter baseline, which would have
+passed the value assertion by coincidence, since the ancient code doesn't read `format` at
+all and comma-stripping happens to be right for this particular raw value). The 3 affected
+months were re-extracted, WIDE/public-LONG/restatement rebuilt from the corrected LONG, and
+every downstream Phase E number reverified: value-changed count 1,108→1,096 (12 facts that
+were only "changed" because they were wrongly null), **every WIDE "newly null" cell across
+every column and both modes is now exactly 0** (was 11–73 per column), regression check
+re-run and still 0, restatement rate re-confirmed unchanged at 9.36%. `kaggle-v2/`/
+`kaggle-long-v2/`'s hard-linked staged files were stale after the WIDE/public-LONG rebuild
+(different inodes — `pivot`/`build-public-long` write-then-replace) and were refreshed;
+staging guard re-run and passed. Nothing was staged or uploaded before this was fully
+resolved, per the maintainer's explicit instruction.
+
+### Flag, don't decide (this sub-chapter)
+
+None — this was pure verification and bug-fixing in response to a direct maintainer
+instruction, not a judgement call with a choice to flag.
+
+### Assumptions needing live verification
+
+The `numunitdecimal` format (36 occurrences across 8 months) remains correctly left as
+"unrecognised, null" — its semantics were not researched or guessed at, per the "never
+guess" principle, since 36 occurrences didn't warrant the risk of a wrong guess. If this
+format's meaning is ever confirmed, `normalise_number` should be updated accordingly. The
+census's `ix_prefix` field is now known to be an unreliable signal even when correctly
+computed (namespace declaration presence != actual fact-tag prefix usage) — any future work
+that wants a per-filing "was this specific filing bug-affected" answer should use a direct
+before/after extraction diff (as Phase E does), not the census classification, regardless of
+whether the persisted Parquet files are ever regenerated.

@@ -6,4 +6,6 @@ data/
 !data/.gitkeep
 kaggle/
 kaggle-long/
+kaggle-v2/
+kaggle-long-v2/
 .env

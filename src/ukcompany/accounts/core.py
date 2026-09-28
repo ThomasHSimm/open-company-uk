@@ -55,8 +55,28 @@ MEASURE_RE = re.compile(
     rb"<\s*(?:[\w.-]+:)?measure\b[^>]*>(.*?)</",
     re.I | re.S,
 )
+# Matches the inline-XBRL namespace declaration regardless of which prefix a filing binds
+# it to — `xmlns:ix="..."`, `xmlns:xbrli="..."`, or the bare default-namespace form
+# `xmlns="..."` with no prefix at all. This is the namespace URI itself, not a local-name
+# guess, so it can't collide with an unrelated element (e.g. an HTML5 <header> tag) the way
+# a bare "header" wildcard would. Quote-agnostic like ATTR_RE below (`(['"])...\1`) — early
+# CH filing software (2013-14 vintage observed live) wrote `xmlns:ix='...'` with single
+# quotes; a double-quote-only pattern here silently misses it, exactly the kind of blind
+# spot this whole audit exists to catch — found via a real false-negative on a 2014 filing.
+IX_NAMESPACE_RE = re.compile(
+    rb"""xmlns(?::[\w.-]+)?\s*=\s*(['"])http://www\.xbrl\.org/\d{4}/inlineXBRL\1""",
+    re.I,
+)
+# Prior versions of this regex hardcoded the literal `ix:` prefix, so any filing that bound
+# the inline-XBRL namespace to a different prefix — or to the default namespace with no
+# prefix at all — silently extracted zero facts. Fixed the same way CONTEXT_RE/UNIT_RE/etc.
+# below already handle prefixes: an optional, wildcard `(?:[\w.-]+:)?` local-name match,
+# applied independently to the opening and closing tag (a document using mismatched
+# prefixes at open/close is already malformed XML; matching each independently is a
+# reasonable relaxation of the old exact-`ix:`-on-both-ends requirement, not a new gap).
 IX_FACT_RE = re.compile(
-    rb"<\s*ix:(nonFraction|nonNumeric)\b([^>]*?)(?:/\s*>|>(.*?)</\s*ix:\1\s*>)",
+    rb"<\s*(?:[\w.-]+:)?(nonFraction|nonNumeric)\b([^>]*?)"
+    rb"(?:/\s*>|>(.*?)</\s*(?:[\w.-]+:)?\1\s*>)",
     re.I | re.S,
 )
 ATTR_RE = re.compile(rb"([:\w.-]+)\s*=\s*(['\"])(.*?)\2", re.S)
@@ -96,6 +116,11 @@ class FactObservation:
     unit: str | None
     currency: str | None
     is_current: bool
+    # Provenance (Phase C, accounts-parser v2): which extractor produced this row. Defaults
+    # to "ours" so the one existing call site (_observation, for iXBRL filings) needs no
+    # change; xml_adapter.py's plain-XML path is the only caller that ever passes
+    # "ixbrlparse" explicitly.
+    parser: str = "ours"
 
 
 @dataclass(frozen=True)
@@ -124,6 +149,22 @@ class IntegrityCounts:
     bad_period_refs: int = 0
     non_gbp_facts: int = 0
     unresolved_unit_refs: int = 0
+    # A filing that declares the inline-XBRL namespace (any prefix, or the default
+    # namespace) but for which IX_FACT_RE finds zero nonFraction/nonNumeric elements at
+    # all. Deliberately excluded from accounted()/closes(): it is a filing-level flag (0 or
+    # 1), not a fact-level count, and facts_seen is legitimately 0 for it too — including it
+    # in the invariant would just make that case look "accounted for" instead of flagged.
+    # This must never be read as "clean, no relevant facts" — it means extraction found
+    # nothing at all despite genuine ix markup, which is exactly the prefix bug's signature.
+    zero_fact_ixbrl_filings: int = 0
+    # A numeric (nonFraction) fact whose `format` attribute names a Transformation Registry
+    # family this module doesn't implement (nether the dot-decimal nor comma-decimal nor
+    # nil-like families normalise_number recognises). Deliberately excluded from
+    # accounted()/closes() for the same reason as zero_fact_ixbrl_filings above: it is an
+    # ADDITIONAL diagnostic on a fact that is still classified normally (kept_total,
+    # kept_member, etc.) via the usual grouping logic — it just carries numeric_value=None
+    # rather than a guessed value, per the "never guess at an unrecognised format" rule.
+    unrecognised_numeric_format: int = 0
 
     def accounted(self) -> int:
         return (
@@ -265,23 +306,84 @@ def extract_units(data: bytes) -> dict[str, str]:
     return units
 
 
-def normalise_number(raw: str, scale: int, sign: str = "") -> str | None:
-    """Convert common iXBRL numeric presentations to a scaled decimal string."""
+# Transformation Registry format families this module can interpret on a numeric fact.
+# Local names only (namespace prefix stripped, lowercased) — real filings bind these under
+# "ixt:" or "ixt2:" depending on vintage, and this codebase treats prefixes as never
+# load-bearing (see IX_FACT_RE's own history). numdotdecimal/numcommadot/numspacedot are the
+# "dot is the decimal point" family, already handled correctly by unconditionally stripping
+# "," and " " as digit-group separators. numdotcomma/numcomma/numspacecomma/numcommadecimal
+# are the "comma is the decimal point" family — silently misread by a power of ten under the
+# old unconditional-comma-strip logic, confirmed live against real markup
+# (docs/accounts-parser-check.md §2: "1.234,56" / "1 234,56" both misread as ~100x too
+# large). zerodash/numdash/fixedzero/nocontent/fixedempty are nil-like: their raw text is
+# already almost always a literal dash handled by the NIL_RAW_VALUES check above, but
+# recognising the format explicitly means a nil-like fact is never miscounted as
+# "unrecognised" just because some filing renders it with different displayed text.
+_DOT_DECIMAL_FORMATS = frozenset({"numdotdecimal", "numcommadot", "numspacedot"})
+_COMMA_DECIMAL_FORMATS = frozenset(
+    {"numdotcomma", "numcomma", "numspacecomma", "numcommadecimal"}
+)
+_NIL_LIKE_NUMERIC_FORMATS = frozenset(
+    {"zerodash", "numdash", "fixedzero", "nocontent", "fixedempty"}
+)
+_KNOWN_NUMERIC_FORMATS = _DOT_DECIMAL_FORMATS | _COMMA_DECIMAL_FORMATS | _NIL_LIKE_NUMERIC_FORMATS
+
+
+def normalise_format_name(local: str) -> str:
+    """Strip punctuation-only variation between Transformation Registry naming
+    conventions. Confirmed live in the real archive: `ixt2:num-dot-decimal` (hyphenated,
+    528+12 occurrences) is the exact same format as `numdotdecimal` (357M+73M occurrences,
+    the same registry family, no hyphens) — the original format-recognition code matched
+    local names literally and treated the hyphenated spelling as unrecognised, silently
+    nulling out numeric facts that had parsed correctly before the comma-decimal fix was
+    even written. Only hyphens and underscores are stripped (not spaces — a real space
+    inside a format name isn't a known convention and would be worth investigating, not
+    silently swallowing)."""
+    return local.replace("-", "").replace("_", "")
+
+
+def normalise_number(
+    raw: str, scale: int, sign: str = "", format_name: str | None = None
+) -> tuple[str | None, bool]:
+    """Convert common iXBRL numeric presentations to a scaled decimal string.
+
+    Returns (numeric_value, format_recognised). format_recognised is False only when
+    format_name is given and matches none of the families above — the value is still
+    None in that case ("never guess" at an unknown format's semantics), but the caller
+    must count it separately rather than let it look like an ordinary parse failure.
+    format_name, if given, must already be the local name (prefix stripped, lowercased).
+    """
     value = raw.strip()
-    if not value or value in {"-", "—", "–"}:
-        return None
+    if not value or value in NIL_RAW_VALUES:
+        return None, True
+    if format_name is not None and format_name not in _KNOWN_NUMERIC_FORMATS:
+        return None, False
+    if format_name in _NIL_LIKE_NUMERIC_FORMATS:
+        return None, True
     negative = value.startswith("(") and value.endswith(")")
-    cleaned = value.strip("()").replace(",", "").replace(" ", "")
+    cleaned = value.strip("()")
+    if format_name in _COMMA_DECIMAL_FORMATS:
+        if format_name == "numdotcomma":
+            cleaned = cleaned.replace(".", "")
+        elif format_name == "numspacecomma":
+            cleaned = cleaned.replace(" ", "")
+        # numcomma / numcommadecimal define no digit-group separator at all — only the
+        # decimal comma itself needs converting.
+        cleaned = cleaned.replace(",", ".")
+    else:
+        # No format attribute, or the dot-decimal family: "," and " " are both digit-group
+        # separators here, exactly the original unconditional-stripping behaviour.
+        cleaned = cleaned.replace(",", "").replace(" ", "")
     try:
         number = Decimal(cleaned)
     except InvalidOperation:
-        return None
+        return None, True
     if negative:
         number = -number
     if sign.strip() == "-":
         number = -abs(number)
     number *= Decimal(10) ** scale
-    return format(number, "f")
+    return format(number, "f"), True
 
 
 def normalise_scope(scope: str | Collection[str]) -> frozenset[str] | None:
@@ -306,6 +408,7 @@ def _observation(
     candidate: _CandidateFact,
     status: str,
     current_period: str,
+    parser: str = "ours",
 ) -> FactObservation:
     return FactObservation(
         candidate.concept,
@@ -323,6 +426,7 @@ def _observation(
         candidate.unit,
         candidate.currency,
         candidate.context.period_end == current_period,
+        parser,
     )
 
 
@@ -331,6 +435,7 @@ def _emit_group(
     observations: list[FactObservation],
     integrity: IntegrityCounts,
     current_period: str,
+    parser: str = "ours",
 ) -> None:
     first = candidates[0]
     if len({candidate.agreement_key() for candidate in candidates}) != 1:
@@ -341,7 +446,7 @@ def _emit_group(
             integrity.member_value_conflict += len(candidates)
             status = "conflict_member"
         observations.extend(
-            _observation(candidate, status, current_period) for candidate in candidates
+            _observation(candidate, status, current_period, parser) for candidate in candidates
         )
         return
     if first.context.kind == ContextKind.NON_DIMENSIONAL:
@@ -349,7 +454,31 @@ def _emit_group(
     else:
         integrity.kept_member += 1
     integrity.collapsed_duplicate += len(candidates) - 1
-    observations.append(_observation(first, "selected", current_period))
+    observations.append(_observation(first, "selected", current_period, parser))
+
+
+def _resolve_legacy_fallbacks(
+    legacy_groups: dict[
+        tuple[str, str], list[tuple[bool, str, str | None, int, str | None, str | None]]
+    ],
+) -> list[LegacyFallback]:
+    """Shared between the iXBRL path (extract_filing) and the XML path
+    (xml_adapter.extract_filing_xml) — audit-only, dimensional-value fallback for a target
+    concept that never had a genuine non-dimensional total tagged."""
+    legacy_fallbacks = []
+    for (concept, period_end), candidates in legacy_groups.items():
+        if any(item[0] for item in candidates):
+            continue
+        values = {
+            ("NUM", numeric) if numeric is not None else ("RAW", raw)
+            for _non_dimensional, raw, numeric, _scale, _sign, _currency in candidates
+        }
+        if len(values) == 1:
+            _non_dimensional, raw, numeric, scale, sign, currency = candidates[0]
+            legacy_fallbacks.append(
+                LegacyFallback(concept, period_end, numeric, raw, scale, sign, currency)
+            )
+    return legacy_fallbacks
 
 
 def extract_filing(
@@ -376,7 +505,11 @@ def extract_filing(
     ] = defaultdict(list)
     observed_periods: set[str] = set()
 
-    for fact_sequence, (raw_tag, raw_attrs, body) in enumerate(IX_FACT_RE.findall(data)):
+    raw_matches = IX_FACT_RE.findall(data)
+    if not raw_matches and IX_NAMESPACE_RE.search(data):
+        integrity.zero_fact_ixbrl_filings = 1
+
+    for fact_sequence, (raw_tag, raw_attrs, body) in enumerate(raw_matches):
         attrs = parse_attrs(raw_attrs)
         concept = local_name(attrs.get("name", ""))
         raw_value = text_content(body)
@@ -399,11 +532,18 @@ def extract_filing(
         except ValueError:
             scale = 0
         sign = attrs.get("sign") or None
-        numeric_value = (
-            normalise_number(raw_value, scale, sign or "")
-            if fact_kind == "numeric"
-            else None
-        )
+        if fact_kind == "numeric":
+            raw_format = attrs.get("format")
+            format_name = (
+                normalise_format_name(local_name(raw_format).lower()) if raw_format else None
+            )
+            numeric_value, format_recognised = normalise_number(
+                raw_value, scale, sign or "", format_name
+            )
+            if not format_recognised:
+                integrity.unrecognised_numeric_format += 1
+        else:
+            numeric_value = None
         unit_ref = attrs.get("unitref", "")
         measure = units.get(unit_ref)
         currency = measure.upper() if _is_currency_measure(measure) else None
@@ -455,19 +595,7 @@ def extract_filing(
     observations: list[FactObservation] = []
     for candidates in groups.values():
         _emit_group(candidates, observations, integrity, current_period)
-    legacy_fallbacks = []
-    for (concept, period_end), candidates in legacy_groups.items():
-        if any(item[0] for item in candidates):
-            continue
-        values = {
-            ("NUM", numeric) if numeric is not None else ("RAW", raw)
-            for _non_dimensional, raw, numeric, _scale, _sign, _currency in candidates
-        }
-        if len(values) == 1:
-            _non_dimensional, raw, numeric, scale, sign, currency = candidates[0]
-            legacy_fallbacks.append(
-                LegacyFallback(concept, period_end, numeric, raw, scale, sign, currency)
-            )
+    legacy_fallbacks = _resolve_legacy_fallbacks(legacy_groups)
     integrity.assert_closes()
     return ExtractedFiling(
         company,
