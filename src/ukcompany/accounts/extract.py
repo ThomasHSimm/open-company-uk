@@ -15,12 +15,14 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 
 from .core import (
+    IX_NAMESPACE_RE,
     TARGET_CONCEPTS,
     ExtractedFiling,
     IntegrityCounts,
     extract_filing,
     normalise_scope,
 )
+from .xml_adapter import extract_filing_xml
 
 ARCHIVE_RE = re.compile(
     r"^\s*Accounts_Monthly_Data-([A-Za-z]+)(\d{4})\.zip\s*$",
@@ -53,8 +55,9 @@ OBSERVATION_COLUMNS = (
     "sign",
     "numeric_value",
     "is_current",
+    "parser",
 )
-OBSERVATION_SCHEMA_VERSION = 2
+OBSERVATION_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -86,6 +89,8 @@ class ArchiveIntegrity:
     bad_period_refs: int = 0
     non_gbp_facts: int = 0
     unresolved_unit_refs: int = 0
+    zero_fact_ixbrl_filings: int = 0
+    unrecognised_numeric_format: int = 0
 
     def add_filing(self, filing: ExtractedFiling) -> None:
         self.filings_processed += 1
@@ -187,7 +192,8 @@ def connect_store(path: str | Path) -> sqlite3.Connection:
             scale INTEGER NOT NULL,
             sign TEXT,
             numeric_value TEXT,
-            is_current INTEGER NOT NULL
+            is_current INTEGER NOT NULL,
+            parser TEXT NOT NULL DEFAULT 'ours'
         );
         CREATE TABLE IF NOT EXISTS processed_archives (
             archive_name TEXT PRIMARY KEY,
@@ -239,6 +245,10 @@ def connect_store(path: str | Path) -> sqlite3.Connection:
         )
     if "unit" not in observation_columns:
         connection.execute("ALTER TABLE observations ADD COLUMN unit TEXT")
+    if "parser" not in observation_columns:
+        connection.execute(
+            "ALTER TABLE observations ADD COLUMN parser TEXT NOT NULL DEFAULT 'ours'"
+        )
     manifest_columns = {
         item[1] for item in connection.execute("PRAGMA table_info(processed_archives)")
     }
@@ -391,6 +401,7 @@ def _store_filing(
                 fact.sign,
                 fact.numeric_value,
                 int(fact.is_current),
+                fact.parser,
             )
             for fact in filing.observations
         ),
@@ -512,20 +523,37 @@ def process_archive(
                 integrity.filename_exceptions += 1
                 continue
             company, made_up_to_date, extension = parsed
-            if extension.lower() == "xml":
-                integrity.xml_skipped += 1
-                continue
+            is_xml = extension.lower() == "xml"
             try:
                 data = source.read(info)
-                if not re.search(rb"<\s*(?:html|ix:header)\b", data, re.I):
-                    raise ValueError("no recognisable iXBRL document root")
-                filing = extract_filing(
-                    data,
-                    company,
-                    made_up_to_date,
-                    scope=scope,
-                    kinds=kinds,
-                )
+                if is_xml:
+                    # Plain XBRL instance document — no inline markup for extract_filing's
+                    # regexes to match at all (Phase C, accounts-parser v2 fix). Previously
+                    # skipped outright (xml_skipped); now routed through ixbrlparse instead,
+                    # which produces the same FactObservation schema with parser="ixbrlparse".
+                    filing = extract_filing_xml(
+                        data,
+                        company,
+                        made_up_to_date,
+                        scope=scope,
+                        kinds=kinds,
+                    )
+                else:
+                    # Was `<html|ix:header>`, hardcoding the literal `ix:` prefix — a filing
+                    # bound to a different prefix (or the default namespace) would fail this
+                    # gate before extract_filing ever ran. IX_NAMESPACE_RE matches the
+                    # inline-XBRL namespace URI itself, independent of the declaring prefix.
+                    if not re.search(
+                        rb"<\s*html\b", data, re.I
+                    ) and not IX_NAMESPACE_RE.search(data):
+                        raise ValueError("no recognisable iXBRL document root")
+                    filing = extract_filing(
+                        data,
+                        company,
+                        made_up_to_date,
+                        scope=scope,
+                        kinds=kinds,
+                    )
                 _store_filing(connection, filing, archive, info.filename)
                 integrity.add_filing(filing)
                 if filing.tagged_companies and normalise_company(company) not in {
@@ -1016,6 +1044,10 @@ def render_extraction_report(connection: sqlite3.Connection) -> str:
             f"- XML filings skipped: {integrity.xml_skipped:,}",
             f"- Filename exceptions: {integrity.filename_exceptions:,}",
             f"- Unparseable filings: {integrity.unparseable_filings:,}",
+            f"- Zero-fact iXBRL filings (namespace declared, no facts found — never clean): "
+            f"{integrity.zero_fact_ixbrl_filings:,}",
+            f"- Numeric facts with an unrecognised `format` (value set to null, never "
+            f"guessed): {integrity.unrecognised_numeric_format:,}",
             f"- Company-number mismatches: {integrity.company_mismatches:,}",
             f"- Non-GBP monetary facts: {integrity.non_gbp_facts:,}",
             f"- Missing or unresolved numeric unit references: "

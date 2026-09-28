@@ -55,7 +55,15 @@ def test_archive_discovery_accepts_any_year_and_surrounding_whitespace(tmp_path:
     assert parse_archive(paths[0]).name.startswith(" ")
 
 
-def test_resumable_archive_manifest_xml_skip_and_company_mismatch(tmp_path: Path) -> None:
+def test_resumable_archive_manifest_processes_xml_and_flags_company_mismatch(
+    tmp_path: Path,
+) -> None:
+    """Phase C (accounts-parser v2): a `.xml` member is no longer skipped outright
+    (xml_skipped, previously incremented here, stays 0 now that ixbrlparse processes it) —
+    it is routed through xml_adapter.extract_filing_xml instead. `<xbrl/>` is a
+    minimal-but-valid plain-XBRL root with no facts in it, so it contributes a second
+    processed filing with zero additional observations/facts_seen, not a skip or a
+    failure."""
     archive_path = tmp_path / "Accounts_Monthly_Data-January2023.zip"
     with zipfile.ZipFile(archive_path, "w") as archive:
         archive.writestr(
@@ -69,14 +77,14 @@ def test_resumable_archive_manifest_xml_skip_and_company_mismatch(tmp_path: Path
     first = process_archive(connection, spec, progress_every=0)
     second = process_archive(connection, spec, progress_every=0)
 
-    assert first is not None and first.filings_processed == 1
-    assert first.xml_skipped == 1
+    assert first is not None and first.filings_processed == 2
+    assert first.xml_skipped == 0
     assert first.filename_exceptions == 1
     assert first.company_mismatches == 1
     assert second is None
     assert connection.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 2
-    row = connection.execute("SELECT company, currency FROM observations").fetchone()
-    assert row == ("00123456", "GBP")
+    row = connection.execute("SELECT company, currency, parser FROM observations").fetchone()
+    assert row == ("00123456", "GBP", "ours")
     assert manifest_integrity(connection).closes()
     manifest = manifest_rows(connection)[0]
     assert manifest["complete"] == 1

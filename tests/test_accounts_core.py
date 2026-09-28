@@ -234,3 +234,187 @@ def test_self_closing_nil_fact_is_seen_and_does_not_consume_next_fact() -> None:
     assert result.integrity.facts_seen == 2
     assert result.integrity.kept_total == 2
     assert result.integrity.closes()
+
+
+def _filing_with_binding(prefix: str | None, *body: str) -> bytes:
+    """Same shape as filing(), but with the inline-XBRL namespace bound the way a real
+    filing would declare it: `xmlns:PREFIX="..."` for an explicit prefix, or a bare
+    `xmlns="..."` default-namespace declaration when prefix is None. Facts and contexts in
+    `body` must already use the matching tag prefix (or none)."""
+    contexts = """
+      <xbrli:context id="current"><xbrli:period>
+        <xbrli:instant>2023-12-31</xbrli:instant></xbrli:period></xbrli:context>
+      <xbrli:unit id="gbp"><xbrli:measure>iso4217:GBP</xbrli:measure></xbrli:unit>
+    """
+    ns_decl = (
+        f'xmlns:{prefix}="http://www.xbrl.org/2013/inlineXBRL"'
+        if prefix
+        else 'xmlns="http://www.xbrl.org/2013/inlineXBRL"'
+    )
+    return (
+        f"<html {ns_decl}>" + contexts + "".join(body) + "</html>"
+    ).encode()
+
+
+def test_ix_prefix_filing_extracts_facts() -> None:
+    """Baseline: the conventional `ix:` prefix, confirming no regression."""
+    data = _filing_with_binding(
+        "ix",
+        '<ix:nonFraction name="uk:Equity" contextRef="current" unitRef="gbp">42</ix:nonFraction>',
+    )
+    result = extract_filing(data, "1", "20231231")
+    assert [row.numeric_value for row in result.observations] == ["42"]
+    assert result.integrity.zero_fact_ixbrl_filings == 0
+
+
+def test_other_prefix_filing_extracts_facts() -> None:
+    """A filing binding the inline-XBRL namespace to a prefix other than `ix` — e.g.
+    `xbrl2` — used to extract zero facts under the old literal-`ix:`-only IX_FACT_RE."""
+    data = _filing_with_binding(
+        "xbrl2",
+        '<xbrl2:nonFraction name="uk:Equity" contextRef="current" '
+        'unitRef="gbp">42</xbrl2:nonFraction>',
+    )
+    result = extract_filing(data, "1", "20231231")
+    assert [row.numeric_value for row in result.observations] == ["42"]
+    assert result.integrity.zero_fact_ixbrl_filings == 0
+
+
+def test_default_namespace_filing_extracts_facts() -> None:
+    """A filing binding the inline-XBRL namespace as the *default* namespace (no prefix at
+    all) — `<nonFraction>`, not `<ix:nonFraction>` — used to extract zero facts under the
+    old literal-`ix:`-only IX_FACT_RE."""
+    data = _filing_with_binding(
+        None,
+        '<nonFraction name="uk:Equity" contextRef="current" unitRef="gbp">42</nonFraction>',
+    )
+    result = extract_filing(data, "1", "20231231")
+    assert [row.numeric_value for row in result.observations] == ["42"]
+    assert result.integrity.zero_fact_ixbrl_filings == 0
+
+
+def test_zero_fact_ixbrl_filing_is_flagged_not_treated_as_clean() -> None:
+    """A filing that declares the inline-XBRL namespace but has no nonFraction/nonNumeric
+    elements at all (e.g. a cover-page-only or malformed filing) must be flagged via
+    zero_fact_ixbrl_filings, not silently treated as a clean zero-fact extraction."""
+    data = _filing_with_binding("ix", "<p>No facts tagged in this document.</p>")
+    result = extract_filing(data, "1", "20231231")
+    assert result.observations == ()
+    assert result.integrity.facts_seen == 0
+    assert result.integrity.zero_fact_ixbrl_filings == 1
+    assert result.integrity.closes()  # the flag must not perturb the fact-accounting invariant
+
+
+def test_non_ixbrl_document_is_not_flagged_as_zero_fact() -> None:
+    """A document with no inline-XBRL namespace declared at all (plain XML/HTML) is simply
+    not iXBRL — it must not be flagged by zero_fact_ixbrl_filings, which is specifically for
+    documents that DO declare the namespace but yield no facts."""
+    data = b"<html><body>Not an iXBRL document at all.</body></html>"
+    result = extract_filing(data, "1", "20231231")
+    assert result.integrity.zero_fact_ixbrl_filings == 0
+    assert result.integrity.facts_seen == 0
+
+
+def test_numdotcomma_format_reads_comma_as_decimal_point() -> None:
+    """ixt:numdotcomma: "." is the digit-group separator, "," is the decimal point. The old
+    code stripped "," unconditionally regardless of format, silently misreading this as
+    123456 (1000x too large) instead of 1234.56 — the real misread this whole audit
+    confirmed live against real markup (docs/accounts-parser-check.md §2)."""
+    data = filing(fact("Equity", "1.234,56", extra='format="ixt:numdotcomma"'))
+    result = extract_filing(data, "1", "20231231")
+    assert result.observations[0].numeric_value == "1234.56"
+    assert result.integrity.unrecognised_numeric_format == 0
+
+
+def test_numcomma_format_reads_comma_as_decimal_point() -> None:
+    """ixt:numcomma: no digit-group separator at all, "," is the decimal point. The old code
+    stripped "," unconditionally, misreading "1234,56" as 123456 instead of 1234.56."""
+    data = filing(fact("Equity", "1234,56", extra='format="ixt:numcomma"'))
+    result = extract_filing(data, "1", "20231231")
+    assert result.observations[0].numeric_value == "1234.56"
+
+
+def test_numspacecomma_format_reads_comma_as_decimal_point() -> None:
+    """ixt:numspacecomma: " " is the digit-group separator, "," is the decimal point. The old
+    code stripped both "," and " " unconditionally, misreading "1 234,56" as 123456 instead
+    of 1234.56."""
+    data = filing(fact("Equity", "1 234,56", extra='format="ixt:numspacecomma"'))
+    result = extract_filing(data, "1", "20231231")
+    assert result.observations[0].numeric_value == "1234.56"
+
+
+def test_numcommadecimal_ixt2_prefix_reads_comma_as_decimal_point() -> None:
+    """ixt2:numcommadecimal — the TR3/ixt2-namespace name for the same comma-decimal family,
+    found live in the archive (282 occurrences). Prefix-agnostic by local name only, the same
+    idiom as every other name lookup in this module."""
+    data = filing(fact("Equity", "1234,56", extra='format="ixt2:numcommadecimal"'))
+    result = extract_filing(data, "1", "20231231")
+    assert result.observations[0].numeric_value == "1234.56"
+
+
+def test_unrecognised_numeric_format_is_null_not_guessed() -> None:
+    """A format the Transformation Registry defines but this module doesn't implement (or a
+    typo'd/unknown one) must never be guessed at — "never guess" per the brief. The old code
+    didn't read the format attribute at all, so it would have unconditionally stripped ","
+    and confidently returned "1234" regardless of what the unrecognised format actually
+    means — silently wrong rather than honestly null."""
+    data = filing(fact("Equity", "1,234", extra='format="ixt:madeupformat"'))
+    result = extract_filing(data, "1", "20231231")
+    assert result.observations[0].numeric_value is None
+    assert result.integrity.unrecognised_numeric_format == 1
+    assert result.integrity.closes()  # diagnostic-only counter must not perturb the invariant
+
+
+def test_nil_like_numeric_format_is_recognised_not_flagged_unrecognised() -> None:
+    """zerodash and friends are nil-like, not "unrecognised" — a numeric fact formatted this
+    way must resolve to None (deferred to pivot, same as a bare dash) WITHOUT being counted
+    as an unrecognised format, so that counter stays a meaningful signal for genuinely
+    unhandled formats rather than being inflated by an intentionally-unimplemented-but-known
+    family."""
+    data = filing(fact("Equity", "-", extra='format="ixt:zerodash"'))
+    result = extract_filing(data, "1", "20231231")
+    assert result.observations[0].numeric_value is None
+    assert result.integrity.unrecognised_numeric_format == 0
+
+
+def test_dot_decimal_format_unaffected_by_comma_decimal_fix() -> None:
+    """Regression safety, not a new-behaviour test (this already worked and must keep
+    working): ixt:numdotdecimal is "," as digit-group separator, "." as decimal point —
+    exactly the pre-fix unconditional-stripping behaviour, now reached via the explicit
+    dot-decimal branch instead of by default."""
+    data = filing(fact("Equity", "1,234.56", extra='format="ixt:numdotdecimal"'))
+    result = extract_filing(data, "1", "20231231")
+    assert result.observations[0].numeric_value == "1234.56"
+
+
+def test_hyphenated_format_name_is_recognised_same_as_unhyphenated() -> None:
+    """Found live in the v2 rebuild's own output: `ixt2:num-dot-decimal` (hyphenated) is the
+    exact same Transformation Registry family as `numdotdecimal` (the single most common
+    numeric format in the archive, 430M+ occurrences unhyphenated) but was treated as
+    unrecognised — silently nulling out a numeric fact that had parsed correctly before the
+    comma-decimal fix was written at all. Real markup: a `core:NetAssetsLiabilities` fact,
+    raw text "49,386", `format="ixt2:num-dot-decimal"`, from a real 2024 filing. 540
+    occurrences confirmed archive-wide (528 `ixt:num-dot-decimal` + 12 `ixt2:num-dot-decimal`,
+    from `data/accounts/parser-format-census-total.json`)."""
+    data = filing(fact("Equity", "49,386", extra='format="ixt2:num-dot-decimal"'))
+    result = extract_filing(data, "1", "20231231")
+    assert result.observations[0].numeric_value == "49386"
+    assert result.integrity.unrecognised_numeric_format == 0
+
+
+def test_single_quoted_namespace_declaration_is_recognised() -> None:
+    """Real 2013/2014-vintage CH filing software wrote `xmlns:ix='...'` with single quotes
+    (found live during the parser-check audit, via a LONG cross-check turning up real rows
+    for a filing the census had wrongly called bug-affected). IX_NAMESPACE_RE must match
+    both quote styles, the same way core.py's own ATTR_RE already does."""
+    data = (
+        b"<html xmlns:ix='http://www.xbrl.org/2008/inlineXBRL'>"
+        b"<xbrli:context id='current'><xbrli:period>"
+        b"<xbrli:instant>2023-12-31</xbrli:instant></xbrli:period></xbrli:context>"
+        b"<xbrli:unit id='gbp'><xbrli:measure>iso4217:GBP</xbrli:measure></xbrli:unit>"
+        b'<ix:nonFraction name="uk:Equity" contextRef="current" unitRef="gbp">42</ix:nonFraction>'
+        b"</html>"
+    )
+    result = extract_filing(data, "1", "20231231")
+    assert [row.numeric_value for row in result.observations] == ["42"]
+    assert result.integrity.zero_fact_ixbrl_filings == 0
