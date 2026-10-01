@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>How the UK sources join – open-company-uk</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-5653e9b43fd0c3a923a4665a384c806a.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">open-company-uk</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guide" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guide</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guide">    
+        <li>
+    <a class="dropdown-item" href="../guide/companies-house.html">
+ <span class="dropdown-text">Companies House</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/sources-map.html">
+ <span class="dropdown-text">How the sources join (map)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/accounts-data.html">
+ <span class="dropdown-text">The accounts data</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/pitfalls.html">
+ <span class="dropdown-text">Pitfalls we found</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-datasets" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Datasets</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-datasets">    
+        <li>
+    <a class="dropdown-item" href="../datasets/accounts.html">
+ <span class="dropdown-text">Accounts (WIDE &amp; LONG)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../datasets/accounts-validation.html">
+ <span class="dropdown-text">Accounts validation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../datasets/psc.html">
+ <span class="dropdown-text">PSC / ownership (status)</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-indicators" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Indicators</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-indicators">    
+        <li>
+    <a class="dropdown-item" href="../indicators/methodology.html">
+ <span class="dropdown-text">Methodology</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/validation.html">
+ <span class="dropdown-text">Validation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/limitations.html">
+ <span class="dropdown-text">Limitations</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/non-compliance.html">
+ <span class="dropdown-text">Non-compliance (planned)</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-landscape" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Landscape</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-landscape">    
+        <li>
+    <a class="dropdown-item" href="../landscape/who-uses.html">
+ <span class="dropdown-text">Who uses the data</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../landscape/market.html">
+ <span class="dropdown-text">The market</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-evidence" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Evidence</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-evidence">    
+        <li>
+    <a class="dropdown-item" href="../evidence/prior-work.html">
+ <span class="dropdown-text">Prior work</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../evidence/register.html">
+ <span class="dropdown-text">Evidence register</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference.html"> 
+<span class="menu-text">Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/ThomasHSimm/open-company-uk"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#summary" id="toc-summary" class="nav-link active" data-scroll-target="#summary">Summary</a></li>
+  <li><a href="#details" id="toc-details" class="nav-link" data-scroll-target="#details">Details</a>
+  <ul class="collapse">
+  <li><a href="#companies-house-itself" id="toc-companies-house-itself" class="nav-link" data-scroll-target="#companies-house-itself">Companies House itself</a></li>
+  <li><a href="#the-gazette" id="toc-the-gazette" class="nav-link" data-scroll-target="#the-gazette">The Gazette</a></li>
+  <li><a href="#hm-land-registry-company-property-ownership" id="toc-hm-land-registry-company-property-ownership" class="nav-link" data-scroll-target="#hm-land-registry-company-property-ownership">HM Land Registry — company property ownership</a></li>
+  <li><a href="#payment-practices-reporting" id="toc-payment-practices-reporting" class="nav-link" data-scroll-target="#payment-practices-reporting">Payment-practices reporting</a></li>
+  <li><a href="#contracts-finder-find-a-tender" id="toc-contracts-finder-find-a-tender" class="nav-link" data-scroll-target="#contracts-finder-find-a-tender">Contracts Finder / Find a Tender</a></li>
+  <li><a href="#charity-registers-charity-commission-oscr-ccni" id="toc-charity-registers-charity-commission-oscr-ccni" class="nav-link" data-scroll-target="#charity-registers-charity-commission-oscr-ccni">Charity registers (Charity Commission, OSCR, CCNI)</a></li>
+  <li><a href="#register-of-overseas-entities" id="toc-register-of-overseas-entities" class="nav-link" data-scroll-target="#register-of-overseas-entities">Register of Overseas Entities</a></li>
+  <li><a href="#fca-register" id="toc-fca-register" class="nav-link" data-scroll-target="#fca-register">FCA register</a></li>
+  <li><a href="#data-you-cant-easily-get" id="toc-data-you-cant-easily-get" class="nav-link" data-scroll-target="#data-you-cant-easily-get">Data you can’t easily get</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">How the UK sources join</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<p>Companies House is not the only free UK source of company data — it is the spine that the others attach to. The Gazette, HM Land Registry, payment-practices reports, public-procurement records, charity registers, the overseas-entities register and the FCA register each add a different column to the same picture, and most of them join to a company on its <strong>company number</strong>. The catch is rarely price: most of these are free. The catch is <strong>licences</strong> (some forbid republishing) and <strong>matching</strong> (some sources carry the company number cleanly, others only sometimes). This page lists each source with what it adds, how it joins, how to get it, whether it can be republished, its known problems, who has used it before, and where this project stands on it.</p>
+<p>A second, blunter point sits underneath the map: some of the most predictive data <strong>cannot</strong> be got this way at all. Bank-credit behaviour, trade-payment histories and court judgments are private or paid, and no amount of open-data engineering reconstructs them. That boundary is set out at the end.</p>
+</section>
+<section id="details" class="level2">
+<h2 class="anchored" data-anchor-id="details">Details</h2>
+<p>Each source below joins to Companies House mostly on the company number. “Our status” uses four values: <strong>Done</strong>, <strong>In progress</strong>, <strong>Planned</strong>, <strong>Not planned</strong>. Match-quality and access claims carry a <strong>[Checked]</strong> / <strong>[Estimated]</strong> label; everything traces to deck slides 6–8 and their notes (<code>docs/source-material/companies-house-accounts-deck.md</code> and <code>companies-house-accounts-notes.md</code>), the project plan (<code>docs/plan.md</code>), the README, and the literature queue (<code>literature/open-company-uk-source-queue-2026-08.md</code>).</p>
+<section id="companies-house-itself" class="level3">
+<h3 class="anchored" data-anchor-id="companies-house-itself">Companies House itself</h3>
+<p>Companies House is several sources in one. Treat each product separately.</p>
+<p><strong>Register (Basic Company Data)</strong></p>
+<ul>
+<li><em>What it adds:</em> the spine — name, number, status, registered office, SIC codes, incorporation and accounts-due dates for every live company.</li>
+<li><em>Join key / match:</em> the company number <em>is</em> the key. <strong>[Checked]</strong></li>
+<li><em>Access &amp; licence:</em> free monthly CSV; OGL v3.0, republishable (personal data aside).</li>
+<li><em>Known problems:</em> live companies only, no history — reconstructing past states means keeping your own monthly copies.</li>
+<li><em>Our status:</em> <strong>Done</strong> — used as population context and the stratification spine in the <a href="../indicators/validation.html">indicator validation</a>.</li>
+</ul>
+<p><strong>Accounts bulk data</strong></p>
+<ul>
+<li><em>What it adds:</em> the actual financial figures — balance-sheet items, employee counts — tagged in iXBRL/XML. See <a href="../guide/accounts-data.html">the accounts guide</a>.</li>
+<li><em>Join key / match:</em> company number, inside each filing. <strong>[Checked]</strong></li>
+<li><em>Access &amp; licence:</em> free daily/monthly ZIPs back to 2008; OGL v3.0. The financial facts are not personal data, so a derived financials dataset can be published.</li>
+<li><em>Known problems:</em> electronically filed only; mostly balance sheets; the API returns no parsed numbers, so you must parse the filings yourself.</li>
+<li><em>Our status:</em> <strong>Done</strong> — the published <a href="../datasets/accounts.html">2014–2026 accounts dataset</a>.</li>
+</ul>
+<p><strong>PSC (persons with significant control)</strong></p>
+<ul>
+<li><em>What it adds:</em> ownership and control — who owns or controls each company, and declared statements where no PSC is identified.</li>
+<li><em>Join key / match:</em> company number; person-level linkage is fuzzy (no stable person ID — see <a href="../datasets/psc.html">the PSC page</a>). <strong>[Checked]</strong></li>
+<li><em>Access &amp; licence:</em> free daily JSON snapshot; OGL v3.0, but it contains personal data, so this project publishes <strong>code only</strong>.</li>
+<li><em>Known problems:</em> only today’s snapshot is served; corrections over time are lost unless you archive. One-shot snapshot, not an event log.</li>
+<li><em>Our status:</em> <strong>In progress</strong> — recon complete, extractor in design.</li>
+</ul>
+<p><strong>Officers (directors and secretaries)</strong></p>
+<ul>
+<li><em>What it adds:</em> who runs the company; appointment/resignation history; ECCTA identity verification fields.</li>
+<li><em>Join key / match:</em> company number via the API; person linkage is fuzzy. <strong>[Checked]</strong></li>
+<li><em>Access &amp; licence:</em> the <em>bulk</em> officers product is on request only, not a public download; the per-company API is free. Personal data — code only.</li>
+<li><em>Our status:</em> <strong>Done (via API, in the indicator pipeline)</strong> — officer churn and identity-verification attributes are derived per company; the bulk product is <strong>Not planned</strong>.</li>
+</ul>
+<p><strong>APIs (REST / Streaming / Document)</strong></p>
+<ul>
+<li><em>What it adds:</em> current, per-company state and the filed documents themselves.</li>
+<li><em>Access &amp; licence:</em> free key; rate-limited (~600 req/5min per key, <strong>[Not verified]</strong> — see <a href="../guide/companies-house.html">Companies House guide</a>).</li>
+<li><em>Known problems:</em> no parsed financial figures; no bulk history.</li>
+<li><em>Our status:</em> <strong>Done</strong> — the indicator pipeline is API-first for freshness-sensitive state.</li>
+</ul>
+</section>
+<section id="the-gazette" class="level3">
+<h3 class="anchored" data-anchor-id="the-gazette">The Gazette</h3>
+<ul>
+<li><em>What it adds:</em> official insolvency and strike-off notices with dates — winding-up petitions, liquidations, strike-offs. Good for <strong>outcome labels</strong> and, more usefully, <strong>timing</strong>: how far ahead of a winding-up petition does a register or accounts signal appear?</li>
+<li><em>Join key / match:</em> company number present in notices. <strong>[Checked]</strong></li>
+<li><em>Access &amp; licence:</em> free official API (JSON), paged; free web viewing is OGL. A separate commercial <strong>Data Service</strong> exists — investigate a reproducible open acquisition route before planning ingestion.</li>
+<li><em>Known problems:</em> separate the free OGL route from the paid Data Service.</li>
+<li><em>Prior work:</em> Transparency International UK used incorporation dates and notices as red flags (see <a href="../evidence/prior-work.html">prior work</a>).</li>
+<li><em>Our status:</em> <strong>Planned</strong> — the next specified external integration (<code>docs/plan.md</code>, README).</li>
+</ul>
+</section>
+<section id="hm-land-registry-company-property-ownership" class="level3">
+<h3 class="anchored" data-anchor-id="hm-land-registry-company-property-ownership">HM Land Registry — company property ownership</h3>
+<ul>
+<li><em>What it adds:</em> which UK and overseas companies own property in England &amp; Wales — asset ownership, and a bridge to overseas owners.</li>
+<li><em>Join key / match:</em> company registration number. <strong>[Checked]</strong></li>
+<li><em>Access &amp; licence:</em> free monthly CSV (free since November 2017, account and licence required), historical files via API. <strong>The licence does not allow republishing</strong> — so, as with PSC, publish code only.</li>
+<li><em>Known problems:</em> republishing restriction; coverage is England &amp; Wales.</li>
+<li><em>Prior work:</em> Private Eye (2015) → Who Owns England → TaxPolicy.org.uk (January 2026), which cross-checked Land Registry against the overseas-entities register and published its method.</li>
+<li><em>Our status:</em> <strong>Planned</strong>.</li>
+</ul>
+</section>
+<section id="payment-practices-reporting" class="level3">
+<h3 class="anchored" data-anchor-id="payment-practices-reporting">Payment-practices reporting</h3>
+<ul>
+<li><em>What it adds:</em> the only open signal on <strong>payment behaviour</strong> — large firms’ average days to pay, share of invoices paid late, and standard terms. This is the open stand-in for the trade-payment data credit agencies sell privately.</li>
+<li><em>Join key / match:</em> company number on every report. <strong>[Checked]</strong></li>
+<li><em>Access &amp; licence:</em> all reports downloadable; open.</li>
+<li><em>Known problems:</em> <strong>large companies only</strong> — it does not cover the small/micro majority.</li>
+<li><em>Our status:</em> <strong>Planned</strong>.</li>
+</ul>
+</section>
+<section id="contracts-finder-find-a-tender" class="level3">
+<h3 class="anchored" data-anchor-id="contracts-finder-find-a-tender">Contracts Finder / Find a Tender</h3>
+<ul>
+<li><em>What it adds:</em> public contracts and winning suppliers — public-sector exposure, and very new suppliers winning contracts (a documented red flag).</li>
+<li><em>Join key / match:</em> <strong>sometimes</strong> — supplier identifiers are inconsistent, so matching needs work. <strong>[Estimated]</strong> (contract→company-number match quality is not yet measured here).</li>
+<li><em>Access &amp; licence:</em> bulk, Open Contracting Data Standard; open.</li>
+<li><em>Prior work:</em> Transparency International UK (“Track and Trace”, “Behind the Masks”); Open Ownership has combined PSC with procurement data.</li>
+<li><em>Our status:</em> <strong>Planned</strong>.</li>
+</ul>
+</section>
+<section id="charity-registers-charity-commission-oscr-ccni" class="level3">
+<h3 class="anchored" data-anchor-id="charity-registers-charity-commission-oscr-ccni">Charity registers (Charity Commission, OSCR, CCNI)</h3>
+<ul>
+<li><em>What it adds:</em> the non-profit segment — many charities are also companies and carry a company number; finances and trustees.</li>
+<li><em>Join key / match:</em> <strong>mostly</strong> — most charitable companies carry a company number. <strong>[Estimated]</strong>.</li>
+<li><em>Access &amp; licence:</em> bulk downloads; open.</li>
+<li><em>Prior work:</em> David Kane / 360Giving’s <strong>Find that Charity</strong> already links 16 sources and ~660,000 non-profits (the same author wrote <code>ixbrlparse</code>).</li>
+<li><em>Our status:</em> <strong>Not planned as an own build</strong> — reuse Find that Charity if a charity join is needed.</li>
+</ul>
+</section>
+<section id="register-of-overseas-entities" class="level3">
+<h3 class="anchored" data-anchor-id="register-of-overseas-entities">Register of Overseas Entities</h3>
+<ul>
+<li><em>What it adds:</em> foreign owners of UK property and their beneficial owners — ownership beyond the UK, and the bridge between Land Registry and ownership.</li>
+<li><em>Join key / match:</em> its own overseas-entity ID; links to HMLR. <strong>[Checked]</strong></li>
+<li><em>Access &amp; licence:</em> held at Companies House, free.</li>
+<li><em>Prior work:</em> TaxPolicy.org.uk’s 2026 cross-check (above).</li>
+<li><em>Our status:</em> <strong>Planned</strong>.</li>
+</ul>
+</section>
+<section id="fca-register" class="level3">
+<h3 class="anchored" data-anchor-id="fca-register">FCA register</h3>
+<ul>
+<li><em>What it adds:</em> which firms are FCA-authorised — a flag for regulated financial firms.</li>
+<li><em>Join key / match:</em> <strong>partly</strong> — not a clean company-number key for all records. <strong>[Checked]</strong></li>
+<li><em>Access &amp; licence:</em> API only, ~10 requests per 10 seconds, so no practical bulk copy.</li>
+<li><em>Known problems:</em> rate limit makes bulk reconstruction impractical; use as a lookup flag.</li>
+<li><em>Our status:</em> <strong>Planned</strong>.</li>
+</ul>
+</section>
+<section id="data-you-cant-easily-get" class="level3">
+<h3 class="anchored" data-anchor-id="data-you-cant-easily-get">Data you can’t easily get</h3>
+<p>Some of the most predictive company data is private or paid, and no open-data pipeline reconstructs it. State the gap plainly rather than imply open data covers everything.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Source</th>
+<th>Why it’s hard to get</th>
+<th>Terms / price (indicative, dated)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Bank credit data on small firms</strong></td>
+<td>Shared by designated banks only with four designated credit agencies (Experian, Equifax, Creditsafe, D&amp;B) under the Commercial Credit Data Sharing scheme</td>
+<td>Small Business, Enterprise and Employment Act 2015; D&amp;B added 2019. Not public. <strong>[Checked]</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Trade-payment behaviour</strong></td>
+<td>Days-beyond-terms and payment scores built from agencies’ own supplier networks</td>
+<td>Proprietary, paid. <strong>[Checked]</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>County court judgments (CCJs)</strong></td>
+<td>Register of Judgments via Registry Trust; a strong distress signal missing from open data</td>
+<td>Searches from ~£10 each; bulk licences for agencies. <em>Indicative, Registry Trust / TrustOnline.</em> <strong>[Estimated]</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Full profit &amp; loss for small firms</strong></td>
+<td>Filed with HMRC alongside the corporation-tax return, not with Companies House</td>
+<td>Confidential. <strong>[Checked]</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>Official business microdata</strong></td>
+<td>ONS business-register extracts</td>
+<td>Accredited researchers only, via secure research services. <strong>[Checked]</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Tax records</strong></td>
+<td>HMRC Datalab</td>
+<td>Approved research projects only. <strong>[Checked]</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Source: deck slide 8 and its notes. The analytical consequence — that an open model can match commercial products on <em>describing</em> companies but not on <em>predicting non-payment</em> — is developed on <a href="../landscape/market.html">the market page</a>.</p>
+<blockquote class="blockquote">
+<p><strong>What it means for you.</strong> Plan joins around the company number, budget effort for licences and matching rather than for access fees, and be honest in any model about the private layer you cannot see. Left off deliberately: the HMRC VAT check (one number at a time), the individual insolvency register (personal data), and food-hygiene ratings (no company numbers).</p>
+</blockquote>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Not affiliated with or endorsed by Companies House or the Insolvency Service. Contains public sector information licensed under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/">Open Government Licence v3.0</a>. This is an independent project; a derived dataset is not a complete or official representation of any company.</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

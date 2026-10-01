@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>The accounts data: mostly balance sheets – open-company-uk</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-5653e9b43fd0c3a923a4665a384c806a.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">open-company-uk</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guide" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guide</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guide">    
+        <li>
+    <a class="dropdown-item" href="../guide/companies-house.html">
+ <span class="dropdown-text">Companies House</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/sources-map.html">
+ <span class="dropdown-text">How the sources join (map)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/accounts-data.html">
+ <span class="dropdown-text">The accounts data</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/pitfalls.html">
+ <span class="dropdown-text">Pitfalls we found</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-datasets" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Datasets</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-datasets">    
+        <li>
+    <a class="dropdown-item" href="../datasets/accounts.html">
+ <span class="dropdown-text">Accounts (WIDE &amp; LONG)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../datasets/accounts-validation.html">
+ <span class="dropdown-text">Accounts validation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../datasets/psc.html">
+ <span class="dropdown-text">PSC / ownership (status)</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-indicators" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Indicators</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-indicators">    
+        <li>
+    <a class="dropdown-item" href="../indicators/methodology.html">
+ <span class="dropdown-text">Methodology</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/validation.html">
+ <span class="dropdown-text">Validation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/limitations.html">
+ <span class="dropdown-text">Limitations</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/non-compliance.html">
+ <span class="dropdown-text">Non-compliance (planned)</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-landscape" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Landscape</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-landscape">    
+        <li>
+    <a class="dropdown-item" href="../landscape/who-uses.html">
+ <span class="dropdown-text">Who uses the data</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../landscape/market.html">
+ <span class="dropdown-text">The market</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-evidence" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Evidence</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-evidence">    
+        <li>
+    <a class="dropdown-item" href="../evidence/prior-work.html">
+ <span class="dropdown-text">Prior work</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../evidence/register.html">
+ <span class="dropdown-text">Evidence register</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference.html"> 
+<span class="menu-text">Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/ThomasHSimm/open-company-uk"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#summary" id="toc-summary" class="nav-link active" data-scroll-target="#summary">Summary</a></li>
+  <li><a href="#details" id="toc-details" class="nav-link" data-scroll-target="#details">Details</a>
+  <ul class="collapse">
+  <li><a href="#who-files-what" id="toc-who-files-what" class="nav-link" data-scroll-target="#who-files-what">Who files what</a></li>
+  <li><a href="#how-it-is-tagged-ixbrl" id="toc-how-it-is-tagged-ixbrl" class="nav-link" data-scroll-target="#how-it-is-tagged-ixbrl">How it is tagged: iXBRL</a></li>
+  <li><a href="#whats-changing" id="toc-whats-changing" class="nav-link" data-scroll-target="#whats-changing">What’s changing</a></li>
+  <li><a href="#where-to-go-next" id="toc-where-to-go-next" class="nav-link" data-scroll-target="#where-to-go-next">Where to go next</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">The accounts data: mostly balance sheets</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<p>Almost every UK company must file annual accounts, and Companies House publishes the electronically filed ones as a free bulk archive. But <strong>what</strong> a company files depends on its size, and most UK companies are small or micro. Small and micro companies may file <strong>“filleted” accounts</strong> — the balance sheet and its notes only, with no profit-and-loss account. The practical result is that, for most companies, the public data has <strong>no turnover and no profit figure at all</strong>: it is, in effect, a balance-sheet dataset. Accounts are tagged in <strong>iXBRL</strong>, a format that is both human-readable in a browser and machine-readable, so the figures can be extracted at scale.</p>
+<p>Two changes matter for anyone using this data. Size thresholds rose on <strong>6 April 2025</strong> (their first change since 2013), moving some companies into lighter-disclosure bands. And from <strong>April 2028</strong>, reforms will require small companies to file a profit-and-loss account — but that will not fill in the past, so anyone modelling history still works with balance-sheet-only data.</p>
+</section>
+<section id="details" class="level2">
+<h2 class="anchored" data-anchor-id="details">Details</h2>
+<section id="who-files-what" class="level3">
+<h3 class="anchored" data-anchor-id="who-files-what">Who files what</h3>
+<p>Under the Companies Act 2006, essentially every registered company must file annual accounts (private companies have nine months after the year-end). A company’s <strong>size band</strong> is set by meeting two of three tests — turnover, balance-sheet total, and average employees — over two consecutive years. From <strong>6 April 2025</strong> the monetary thresholds rose by roughly half:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Band</th>
+<th>Turnover</th>
+<th>Balance sheet</th>
+<th>Employees</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Micro-entity</td>
+<td>≤ £1m</td>
+<td>≤ £500k</td>
+<td>≤ 10</td>
+</tr>
+<tr class="even">
+<td>Small</td>
+<td>≤ £15m</td>
+<td>≤ £7.5m</td>
+<td>≤ 50</td>
+</tr>
+<tr class="odd">
+<td>Medium</td>
+<td>≤ £54m</td>
+<td>≤ £27m</td>
+<td>≤ 250</td>
+</tr>
+</tbody>
+</table>
+<p>Source: deck slides 11–12 and the accounts explainer (<code>docs/source-material/accounts-explainer.html</code>); thresholds via Lexology summary of the 6 April 2025 change. <strong>[Checked]</strong> (official change date; figures are the published thresholds).</p>
+<p><strong>Filleted accounts</strong> are the defining feature. Under section 444 of the Act, small companies and micro-entities prepare full accounts for their shareholders and HMRC, but file only the <strong>balance sheet and notes</strong> with Companies House — omitting the profit-and-loss account and directors’ report. Since the overwhelming majority of UK companies are small or micro, the public dataset is, in practice, a <strong>balance-sheet dataset</strong>.</p>
+<blockquote class="blockquote">
+<p><strong>What it means for you.</strong> For most companies there is no turnover and no profit in the public data — not because the extraction missed it, but because it was never filed. One useful quirk: the <em>average-employees</em> note is generally treated as not a profit-and-loss note, so it usually survives filleting, which is why headcount is far better covered than any income-statement item. Credit agencies work around the missing turnover by <strong>estimating</strong> it from balance-sheet items and sector ratios (Creditsafe publicly describes an “Estimated Turnover Indicator”) — these are modelled figures, not filed ones, so treat them with care.</p>
+</blockquote>
+</section>
+<section id="how-it-is-tagged-ixbrl" class="level3">
+<h3 class="anchored" data-anchor-id="how-it-is-tagged-ixbrl">How it is tagged: iXBRL</h3>
+<p><strong>iXBRL</strong> (“inline XBRL”) is an ordinary-looking HTML accounts document in which each figure is tagged with a machine-readable name. Concretely, a line that displays as “Equity 12,968” is tagged in the HTML as something like:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode html code-with-copy"><code class="sourceCode html"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="dt">&lt;</span><span class="kw">ix:nonFraction</span><span class="ot"> name</span><span class="op">=</span><span class="st">"Equity"</span><span class="ot"> unitRef</span><span class="op">=</span><span class="st">"GBP"</span><span class="ot"> decimals</span><span class="op">=</span><span class="st">"0"</span><span class="dt">&gt;</span>12,968<span class="dt">&lt;/</span><span class="kw">ix:nonFraction</span><span class="dt">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>A browser renders “12,968”; a parser reads that the value 12,968 is <code>Equity</code>, in GBP. Each tag also carries a reporting <strong>period</strong>, a <strong>unit</strong> (pounds, a count, a ratio), an optional <strong>scale</strong> (for example, “thousands”), a <strong>sign</strong>, and optional <strong>dimensions</strong> (for example, creditors split into “due within one year” and “after one year”).</p>
+<p>Tags follow <strong>FRC taxonomies</strong> — FRS 105 for micro-entities, FRS 102 (including Section 1A) for small and larger companies — which define the machine-readable name for each figure. The taxonomies are revised often, so this project targets each concept’s stable <em>local</em> name and reads across taxonomy generations without a version map. See <a href="../guide/pitfalls.html">the accounts guide to pitfalls</a> for what goes wrong at the tag level.</p>
+<blockquote class="blockquote">
+<p><strong>Why the data starts in 2014.</strong> iXBRL adoption in the bulk product was gradual, not a hard cutover: roughly <strong>0% of filings were iXBRL in 2010, rising through 2011–2013 and reaching ~97% by 2014</strong>. Earlier accounts exist on the server but are barely machine-tagged, so the dataset starts in 2014 — a coverage decision, not a limit of Companies House’s archive. Source: <code>docs/accounts-limitations.md</code> and deck slide 11 notes. <strong>[Checked]</strong> (project measurement).</p>
+</blockquote>
+</section>
+<section id="whats-changing" class="level3">
+<h3 class="anchored" data-anchor-id="whats-changing">What’s changing</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>When</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>2008</td>
+<td>Bulk accounts product begins (e-filed only)</td>
+</tr>
+<tr class="even">
+<td>~2014</td>
+<td>iXBRL nearly universal in the bulk data</td>
+</tr>
+<tr class="odd">
+<td>6 April 2025</td>
+<td>Size thresholds raised ~50%</td>
+</tr>
+<tr class="even">
+<td>2025–26</td>
+<td>Identity checks for directors and PSCs (ECCTA)</td>
+</tr>
+<tr class="odd">
+<td>April 2028</td>
+<td>Software-only iXBRL filing; small &amp; micro firms must file a P&amp;L</td>
+</tr>
+</tbody>
+</table>
+<p>The <strong>2028 reforms</strong> (Economic Crime and Corporate Transparency Act 2023) will require small companies and micro-entities to file a profit-and-loss account, move all filing to commercial software in iXBRL, and remove the filleted/abridged options. After a pause, this was confirmed on <strong>9 June 2026 for April 2028</strong> (delayed from 2027), and the government has indicated small-company P&amp;L data <strong>may be kept private</strong> rather than published. Source: ICAEW, June 2026 (deck slide 11 notes; accounts explainer). <strong>[Checked]</strong> as of June 2026 — the date has already moved once, so re-confirm before relying on it.</p>
+<blockquote class="blockquote">
+<p><strong>What it means for you.</strong> Future data will be richer, but <strong>2028 does not fill in history</strong>: past filings stay balance-sheet-only, and any newly required small-company P&amp;L may stay private. Anyone modelling on the historical archive must work with balance-sheet-only data for the foreseeable future.</p>
+</blockquote>
+</section>
+<section id="where-to-go-next" class="level3">
+<h3 class="anchored" data-anchor-id="where-to-go-next">Where to go next</h3>
+<ul>
+<li><a href="../guide/pitfalls.html">Pitfalls we found</a> — the tag-level and reconciliation problems that change analysis if missed.</li>
+<li><a href="../datasets/accounts.html">The accounts dataset</a> — the tested WIDE and LONG tables built from this data, with a quickstart.</li>
+<li><a href="../datasets/accounts-validation.html">How we know it is right</a> — the parser comparison and cross-checks.</li>
+</ul>
+<div class="callout callout-style-simple callout-note no-icon">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-body-container">
+<p>Sources for this page: deck slides 11–12 and notes (<code>docs/source-material/companies-house-accounts-deck.md</code>), the original accounts explainer (<code>docs/source-material/accounts-explainer.html</code>), and <code>docs/accounts-limitations.md</code> for the iXBRL-adoption figure.</p>
+</div>
+</div>
+</div>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Not affiliated with or endorsed by Companies House or the Insolvency Service. Contains public sector information licensed under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/">Open Government Licence v3.0</a>. This is an independent project; a derived dataset is not a complete or official representation of any company.</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Accounts dataset (WIDE &amp; LONG, 2014–2026) – open-company-uk</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-5653e9b43fd0c3a923a4665a384c806a.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">open-company-uk</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guide" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guide</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guide">    
+        <li>
+    <a class="dropdown-item" href="../guide/companies-house.html">
+ <span class="dropdown-text">Companies House</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/sources-map.html">
+ <span class="dropdown-text">How the sources join (map)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/accounts-data.html">
+ <span class="dropdown-text">The accounts data</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/pitfalls.html">
+ <span class="dropdown-text">Pitfalls we found</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-datasets" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Datasets</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-datasets">    
+        <li>
+    <a class="dropdown-item" href="../datasets/accounts.html">
+ <span class="dropdown-text">Accounts (WIDE &amp; LONG)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../datasets/accounts-validation.html">
+ <span class="dropdown-text">Accounts validation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../datasets/psc.html">
+ <span class="dropdown-text">PSC / ownership (status)</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-indicators" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Indicators</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-indicators">    
+        <li>
+    <a class="dropdown-item" href="../indicators/methodology.html">
+ <span class="dropdown-text">Methodology</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/validation.html">
+ <span class="dropdown-text">Validation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/limitations.html">
+ <span class="dropdown-text">Limitations</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/non-compliance.html">
+ <span class="dropdown-text">Non-compliance (planned)</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-landscape" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Landscape</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-landscape">    
+        <li>
+    <a class="dropdown-item" href="../landscape/who-uses.html">
+ <span class="dropdown-text">Who uses the data</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../landscape/market.html">
+ <span class="dropdown-text">The market</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-evidence" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Evidence</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-evidence">    
+        <li>
+    <a class="dropdown-item" href="../evidence/prior-work.html">
+ <span class="dropdown-text">Prior work</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../evidence/register.html">
+ <span class="dropdown-text">Evidence register</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference.html"> 
+<span class="menu-text">Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/ThomasHSimm/open-company-uk"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#summary" id="toc-summary" class="nav-link active" data-scroll-target="#summary">Summary</a></li>
+  <li><a href="#details" id="toc-details" class="nav-link" data-scroll-target="#details">Details</a>
+  <ul class="collapse">
+  <li><a href="#the-two-tables" id="toc-the-two-tables" class="nav-link" data-scroll-target="#the-two-tables">The two tables</a></li>
+  <li><a href="#the-wide-columns" id="toc-the-wide-columns" class="nav-link" data-scroll-target="#the-wide-columns">The WIDE columns</a></li>
+  <li><a href="#as_first_reported-vs-latest" id="toc-as_first_reported-vs-latest" class="nav-link" data-scroll-target="#as_first_reported-vs-latest"><code>as_first_reported</code> vs <code>latest</code></a></li>
+  <li><a href="#quickstart" id="toc-quickstart" class="nav-link" data-scroll-target="#quickstart">Quickstart</a></li>
+  <li><a href="#limitations-to-know-before-modelling" id="toc-limitations-to-know-before-modelling" class="nav-link" data-scroll-target="#limitations-to-know-before-modelling">Limitations to know before modelling</a></li>
+  <li><a href="#licence-and-personal-data-policy" id="toc-licence-and-personal-data-policy" class="nav-link" data-scroll-target="#licence-and-personal-data-policy">Licence and personal-data policy</a></li>
+  <li><a href="#get-the-data" id="toc-get-the-data" class="nav-link" data-scroll-target="#get-the-data">Get the data</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Accounts dataset (WIDE &amp; LONG, 2014–2026)</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<p>This is an open, analysis-ready version of twelve years of UK company accounts, built from Companies House’s free monthly bulk archives. It comes in two tables. <strong>WIDE</strong> is one row per company per accounting period, with the core balance-sheet figures as columns — the table most people want for modelling. <strong>LONG</strong> is a fuller, <strong>personal-data-removed</strong> table — one row per fact, reaching the concepts the curated columns leave out — for anyone who needs more than WIDE. Coverage is continuous from January 2014 to August 2026 (152 monthly archives, no gaps), and both published tables contain <strong>financial facts and company numbers only</strong> — no names, addresses or other personal data. The complete as-filed archive (which <em>does</em> contain director names, addresses and loans) is kept private and <strong>never published</strong>; what you can download is the filtered subset described under <em>Licence</em> below.</p>
+<p>The one decision you must make before using WIDE is <strong>which pivot</strong> to read: <code>as_first_reported</code> (what was known at the time — use this for anything predictive) or <code>latest</code> (includes later restatements — do not use it for prediction). Everything else on this page is about using the tables correctly: the columns, the known limitations, and the licence.</p>
+</section>
+<section id="details" class="level2">
+<h2 class="anchored" data-anchor-id="details">Details</h2>
+<section id="the-two-tables" class="level3">
+<h3 class="anchored" data-anchor-id="the-two-tables">The two tables</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Table</th>
+<th>Grain</th>
+<th>Contents</th>
+<th>Size</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>WIDE</strong></td>
+<td>one row per (company, period-end)</td>
+<td>nine core balance-sheet concepts + equity and creditors splits + helper columns</td>
+<td>~2.6 GB Parquet</td>
+</tr>
+<tr class="even">
+<td><strong>LONG</strong> (public subset)</td>
+<td>one row per fact</td>
+<td>the full concept set (~4,593 concepts) <strong>with person-related and free-text concepts removed</strong> — <em>not</em> the raw as-filed archive</td>
+<td>~9.2 GB Parquet, one file per year</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-simple callout-important">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>“LONG” here means the published, personal-data-removed subset.</strong> The full LONG archive used <em>internally</em> to build these tables contains personal data — director names, addresses, the signing director, director loans and remuneration — and is <strong>never published</strong>. Only the filtered subset (numeric person-concept denylist + structured-field allowlist, described under <em>Licence</em>) is downloadable. The Kaggle “LONG” dataset is that subset, not the raw archive.</p>
+</div>
+</div>
+</div>
+<p>Coverage: <strong>152 monthly archives, continuous 2014-01 → 2026-08, 0 gaps.</strong> WIDE has <strong>33,513,017</strong> rows in <code>as_first_reported</code> mode and <strong>36,710,673</strong> in <code>latest</code> mode. Source: <code>docs/accounts-wide-rebuild-verification.md</code>, <code>docs/accounts-limitations.md</code>. <strong>[Checked]</strong> (project measurement).</p>
+<blockquote class="blockquote">
+<p><strong>Why it starts in 2014, not 2008.</strong> The format WIDE reads (iXBRL) was adopted gradually — ~0% of filings in 2010, ~97% by 2014 — so 2014 is where tagged coverage becomes near-universal, not where Companies House’s data stops. Pre-2014 would be a separate, much lower-fill-rate extraction. <strong>Coverage gaps within the span are non-random</strong> — they correlate with filing regime, exemption status and company size, so do not treat non-appearance as a random exclusion. Source: <code>docs/accounts-limitations.md</code>.</p>
+</blockquote>
+</section>
+<section id="the-wide-columns" class="level3">
+<h3 class="anchored" data-anchor-id="the-wide-columns">The WIDE columns</h3>
+<p>The nine core concepts, the dimensional splits, and the helper columns, with coverage measured on the flagship <code>as_first_reported</code> file (33,513,017 rows):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 23%">
+<col style="width: 23%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>Meaning</th>
+<th>Unit</th>
+<th style="text-align: right;">Coverage</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>company</code></td>
+<td>Companies House number (leading zeros preserved)</td>
+<td>string</td>
+<td style="text-align: right;">100%</td>
+</tr>
+<tr class="even">
+<td><code>period_end</code></td>
+<td>Accounting period end date</td>
+<td>date</td>
+<td style="text-align: right;">100%</td>
+</tr>
+<tr class="odd">
+<td><code>Equity</code></td>
+<td>Total equity (shareholders’ funds)</td>
+<td>GBP</td>
+<td style="text-align: right;">75.68%</td>
+</tr>
+<tr class="even">
+<td><code>NetCurrentAssetsLiabilities</code></td>
+<td>Net current assets/liabilities</td>
+<td>GBP</td>
+<td style="text-align: right;">85.08%</td>
+</tr>
+<tr class="odd">
+<td><code>CurrentAssets</code></td>
+<td>Total current assets</td>
+<td>GBP</td>
+<td style="text-align: right;">78.95%</td>
+</tr>
+<tr class="even">
+<td><code>Creditors</code></td>
+<td>Total creditors (all maturities) — <strong>sparse; use the splits</strong></td>
+<td>GBP</td>
+<td style="text-align: right;">3.82%</td>
+</tr>
+<tr class="odd">
+<td><code>CashBankOnHand</code></td>
+<td>Cash and bank balances</td>
+<td>GBP</td>
+<td style="text-align: right;">35.41%</td>
+</tr>
+<tr class="even">
+<td><code>Debtors</code></td>
+<td>Total debtors</td>
+<td>GBP</td>
+<td style="text-align: right;">35.31%</td>
+</tr>
+<tr class="odd">
+<td><code>PropertyPlantEquipment</code></td>
+<td>Property, plant &amp; equipment (NBV)</td>
+<td>GBP</td>
+<td style="text-align: right;">22.48%</td>
+</tr>
+<tr class="even">
+<td><code>TotalAssetsLessCurrentLiabilities</code></td>
+<td>Total assets less current liabilities</td>
+<td>GBP</td>
+<td style="text-align: right;">80.63%</td>
+</tr>
+<tr class="odd">
+<td><code>AverageNumberEmployeesDuringPeriod</code></td>
+<td>Average employees during the period</td>
+<td>headcount</td>
+<td style="text-align: right;">60.69%</td>
+</tr>
+<tr class="even">
+<td><code>equity_share_capital</code> / <code>equity_retained_earnings</code></td>
+<td>Equity split</td>
+<td>GBP</td>
+<td style="text-align: right;">30.80% / 29.42%</td>
+</tr>
+<tr class="odd">
+<td><code>creditors_within_one_year</code> / <code>creditors_after_one_year</code></td>
+<td>Creditors by maturity</td>
+<td>GBP</td>
+<td style="text-align: right;">32.69% / 13.72%</td>
+</tr>
+<tr class="even">
+<td><code>employees_unit_anomaly</code></td>
+<td>Was the employee value GBP-tagged? (diagnostic)</td>
+<td>0/1</td>
+<td style="text-align: right;">60.69%</td>
+</tr>
+<tr class="odd">
+<td><code>n_concepts_present</code> / <code>n_source_filings</code></td>
+<td>Completeness helpers</td>
+<td>count</td>
+<td style="text-align: right;">100%</td>
+</tr>
+<tr class="even">
+<td><code>row_available_yyyymm</code></td>
+<td>Month by which the whole row was known</td>
+<td>YYYYMM</td>
+<td style="text-align: right;">100%</td>
+</tr>
+</tbody>
+</table>
+<p>The coverage percentages come from the dataset’s own <strong><code>column-dictionary.md</code></strong>, which the pipeline generates and ships <em>with</em> the Kaggle dataset — it is <strong>not</strong> tracked in the git repo (the <code>kaggle*/</code> staging directories are gitignored), so it travels with the download rather than the source tree. Column <em>meanings</em> are also recorded in the tracked <a href="https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/accounts-wide-columns.md"><code>docs/accounts-wide-columns.md</code></a>. A matching <code>accounts-wide-provenance-{mode}.parquet</code> records which source filing each cell came from. <strong>[Checked]</strong> (pipeline-generated).</p>
+<blockquote class="blockquote">
+<p><strong>Most rows are sparse, and that is expected.</strong> A company reporting only <code>Equity</code> and <code>CurrentAssets</code> for a year genuinely filed filleted accounts without the rest — it is not a gap in the extraction. See <a href="../guide/accounts-data.html">the accounts guide</a>.</p>
+</blockquote>
+</section>
+<section id="as_first_reported-vs-latest" class="level3">
+<h3 class="anchored" data-anchor-id="as_first_reported-vs-latest"><code>as_first_reported</code> vs <code>latest</code></h3>
+<p>Both files share the same schema; they differ only in which filing wins each cell.</p>
+<ul>
+<li><strong><code>accounts-wide-as_first_reported.parquet</code> (flagship, default).</strong> Each cell holds the value from the <strong>earliest</strong> filing that reported it — only information available at the time, no look-ahead. <strong>Use this for any predictive or point-in-time work.</strong></li>
+<li><strong><code>accounts-wide-latest.parquet</code> (secondary).</strong> Each cell holds the value from the <strong>most recent</strong> filing, which can include later comparative restatements of an earlier period. <strong>Do not use this for predictive work</strong> — a value can reflect information that postdates the period.</li>
+</ul>
+<p>Across the full span, <strong>9.36%</strong> of repeated (company, period, concept) values disagree between first-reported and a later filing, which is exactly why the two files are kept separate rather than collapsed into one ambiguous “current” column. Source: <code>docs/accounts-validation-summary.md</code>, <code>docs/accounts-restatement-2014-2026.md</code>.</p>
+</section>
+<section id="quickstart" class="level3">
+<h3 class="anchored" data-anchor-id="quickstart">Quickstart</h3>
+<p>The files are Parquet, so polars, pandas, DuckDB or Spark all work. <code>row_available_yyyymm</code> is the month by which every value in a row had been filed, which makes point-in-time filtering a single comparison. The company number below (<code>00012345</code>) is a placeholder — substitute a real one.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>wide <span class="op">=</span> pl.read_parquet(<span class="st">"accounts-wide-as_first_reported.parquet"</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># one company's history (company numbers are TEXT — keep the leading zeros)</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>(wide</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>   .<span class="bu">filter</span>(pl.col(<span class="st">"company"</span>) <span class="op">==</span> <span class="st">"00012345"</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>   .sort(<span class="st">"period_end"</span>))</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># only what was known as of a date: no look-ahead</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>wide.<span class="bu">filter</span>(pl.col(<span class="st">"row_available_yyyymm"</span>) <span class="op">&lt;=</span> <span class="dv">202312</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Rules of thumb, each because it changes how the data should be used:</p>
+<ol type="1">
+<li><strong>Pivot mode</strong> — <code>as_first_reported</code> for prediction; <code>latest</code> leaks the future (~9% of repeated figures differ).</li>
+<li><strong>Creditors</strong> — use <code>creditors_within_one_year</code> / <code>creditors_after_one_year</code>; the bare total is ~4% populated and unreliable even when present.</li>
+<li><strong>Employees</strong> — ~29% are GBP-tagged (median value 1.0, mostly real headcounts). The flag marks them; no value is removed. Don’t filter employees by unit.</li>
+<li><strong>Dashes</strong> — a dash in the accounts means nil and is stored as <code>0</code>, not null.</li>
+<li><strong>Missing is not zero</strong> — values are never imputed, and some missingness is non-random, so decide explicitly how to handle gaps.</li>
+</ol>
+<p>Source: deck slides 15–16 and notes (<code>docs/source-material/companies-house-accounts-deck.md</code>); see also <a href="../guide/pitfalls.html">pitfalls</a>.</p>
+</section>
+<section id="limitations-to-know-before-modelling" class="level3">
+<h3 class="anchored" data-anchor-id="limitations-to-know-before-modelling">Limitations to know before modelling</h3>
+<ul>
+<li><strong>Balance-sheet only</strong> for most companies (filleted filing): no turnover or profit.</li>
+<li><strong>Starts in 2014</strong> — earlier bulk data is barely machine-tagged.</li>
+<li><strong>Some breakdowns skipped</strong> — facts in multi-member or custom (typed-member) dimensional contexts are not captured; ~38% of filings contain at least one such context (these are mostly detailed notes, not the balance-sheet totals WIDE uses).</li>
+<li><strong>Nine core concepts validated</strong> — the other ~4,580 concepts in LONG are captured as filed but <strong>not</strong> validated; check the source filing before relying on a rare one.</li>
+<li><strong>Restatements (~9%)</strong> and an <strong>employee reporting break around 2020–2021</strong>.</li>
+<li><strong>Non-random gaps</strong> — e.g.&nbsp;equity fill-rate varies by more than 10 percentage points across months.</li>
+<li><strong>GBP only in WIDE</strong> — non-sterling filers are excluded (kept in LONG), not converted.</li>
+</ul>
+<p>Full detail and every reconciliation: <code>docs/accounts-limitations.md</code>. Source: deck slide 17.</p>
+</section>
+<section id="licence-and-personal-data-policy" class="level3">
+<h3 class="anchored" data-anchor-id="licence-and-personal-data-policy">Licence and personal-data policy</h3>
+<p>Contains public sector information from Companies House, licensed under the <strong>Open Government Licence v3.0</strong>, free to reuse with attribution. Companies House and the UK Government do not endorse this dataset, and a derived dataset is not a complete or official representation of any company.</p>
+<p>Both published tables are <strong>financial facts and company numbers only</strong>. WIDE carries no names, addresses or director figures. LONG applies a maintainer-approved filter: a 95-concept numeric <strong>denylist</strong> (director/officer/key-management/related-party remuneration, loans and advances) and a 17-concept non-numeric <strong>allowlist</strong> of structured fields only (dates, the registered number, filing-software name, and categorical flags) — every other non-numeric concept, including all free text, is dropped. The private, unfiltered archive that includes personal data is <strong>never published</strong>. The OGL does not cover personal data, which is part of why this split exists. Source: <code>docs/accounts-public-long-concepts.md</code>, <code>docs/accounts-limitations.md</code>.</p>
+</section>
+<section id="get-the-data" class="level3">
+<h3 class="anchored" data-anchor-id="get-the-data">Get the data</h3>
+<div class="callout callout-style-default callout-important callout-titled" title="Kaggle links — publication pending">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Kaggle links — publication pending
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The datasets are prepared for Kaggle under these slugs. <strong>Confirm the dataset is public before relying on a link</strong> — at the time of writing these are placeholders pending publication (deck notes: “add the Kaggle links once the datasets are published”). <strong>[Not verified]</strong></p>
+<p>Both slugs below are the <strong>published, personal-data-removed</strong> datasets — neither is the private full archive.</p>
+<ul>
+<li>WIDE: <code>thomassimm/uk-company-accounts-wide-2014-2026</code> → <code>https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026</code></li>
+<li>LONG (personal-data-removed public subset): <code>thomassimm/uk-company-accounts-long-2014-2026</code> → <code>https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026</code></li>
+</ul>
+<p>Slugs are from each dataset’s <code>dataset-metadata.json</code>, generated in the gitignored <code>kaggle*/</code> staging directories and shipped with the dataset — not tracked in the git repo.</p>
+</div>
+</div>
+<p>The pipeline that builds these tables is on <a href="https://github.com/ThomasHSimm/open-company-uk">GitHub</a>. See <a href="../datasets/accounts-validation.html">how we know the data is right</a> for the parser comparison and cross-checks.</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Not affiliated with or endorsed by Companies House or the Insolvency Service. Contains public sector information licensed under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/">Open Government Licence v3.0</a>. This is an independent project; a derived dataset is not a complete or official representation of any company.</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

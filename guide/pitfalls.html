@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Pitfalls we found, with examples – open-company-uk</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-5653e9b43fd0c3a923a4665a384c806a.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">open-company-uk</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guide" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guide</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guide">    
+        <li>
+    <a class="dropdown-item" href="../guide/companies-house.html">
+ <span class="dropdown-text">Companies House</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/sources-map.html">
+ <span class="dropdown-text">How the sources join (map)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/accounts-data.html">
+ <span class="dropdown-text">The accounts data</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../guide/pitfalls.html">
+ <span class="dropdown-text">Pitfalls we found</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-datasets" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Datasets</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-datasets">    
+        <li>
+    <a class="dropdown-item" href="../datasets/accounts.html">
+ <span class="dropdown-text">Accounts (WIDE &amp; LONG)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../datasets/accounts-validation.html">
+ <span class="dropdown-text">Accounts validation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../datasets/psc.html">
+ <span class="dropdown-text">PSC / ownership (status)</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-indicators" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Indicators</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-indicators">    
+        <li>
+    <a class="dropdown-item" href="../indicators/methodology.html">
+ <span class="dropdown-text">Methodology</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/validation.html">
+ <span class="dropdown-text">Validation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/limitations.html">
+ <span class="dropdown-text">Limitations</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../indicators/non-compliance.html">
+ <span class="dropdown-text">Non-compliance (planned)</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-landscape" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Landscape</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-landscape">    
+        <li>
+    <a class="dropdown-item" href="../landscape/who-uses.html">
+ <span class="dropdown-text">Who uses the data</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../landscape/market.html">
+ <span class="dropdown-text">The market</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-evidence" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Evidence</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-evidence">    
+        <li>
+    <a class="dropdown-item" href="../evidence/prior-work.html">
+ <span class="dropdown-text">Prior work</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../evidence/register.html">
+ <span class="dropdown-text">Evidence register</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference.html"> 
+<span class="menu-text">Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/ThomasHSimm/open-company-uk"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#summary" id="toc-summary" class="nav-link active" data-scroll-target="#summary">Summary</a></li>
+  <li><a href="#details" id="toc-details" class="nav-link" data-scroll-target="#details">Details</a>
+  <ul class="collapse">
+  <li><a href="#a-dash-means-nil-not-missing" id="toc-a-dash-means-nil-not-missing" class="nav-link" data-scroll-target="#a-dash-means-nil-not-missing">1. A dash means nil, not missing</a></li>
+  <li><a href="#comparatives-and-restatements" id="toc-comparatives-and-restatements" class="nav-link" data-scroll-target="#comparatives-and-restatements">2. Comparatives and restatements</a></li>
+  <li><a href="#creditors-is-given-only-as-parts" id="toc-creditors-is-given-only-as-parts" class="nav-link" data-scroll-target="#creditors-is-given-only-as-parts">3. Creditors is given only as parts</a></li>
+  <li><a href="#employee-counts-tagged-in-pounds" id="toc-employee-counts-tagged-in-pounds" class="nav-link" data-scroll-target="#employee-counts-tagged-in-pounds">4. Employee counts tagged in pounds</a></li>
+  <li><a href="#scale-and-sign-and-european-number-formats" id="toc-scale-and-sign-and-european-number-formats" class="nav-link" data-scroll-target="#scale-and-sign-and-european-number-formats">5. Scale and sign (and European number formats)</a></li>
+  <li><a href="#namespace-prefixes" id="toc-namespace-prefixes" class="nav-link" data-scroll-target="#namespace-prefixes">6. Namespace prefixes</a></li>
+  <li><a href="#plain-xml-filings" id="toc-plain-xml-filings" class="nav-link" data-scroll-target="#plain-xml-filings">7. Plain-XML filings</a></li>
+  <li><a href="#one-shot-psc-snapshots" id="toc-one-shot-psc-snapshots" class="nav-link" data-scroll-target="#one-shot-psc-snapshots">8. One-shot PSC snapshots</a></li>
+  <li><a href="#person-matching-with-no-stable-id" id="toc-person-matching-with-no-stable-id" class="nav-link" data-scroll-target="#person-matching-with-no-stable-id">9. Person matching with no stable ID</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Pitfalls we found, with examples</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<p>Reading a single filing is a solved problem; turning millions of them into a trustworthy table is where the work is. Along the way this project hit a set of traps that are easy to miss and that change results quietly — a dash that means “nil” read as “missing”, a figure that appears twice because the prior year is restated, employee counts tagged in pounds, a mis-detected tag prefix that silently drops a whole filing. None of these crash anything; they just give you wrong numbers that look fine. This page lists each one with a concrete example and its effect on analysis, so you can check for them in your own work.</p>
+<p>The failure mode this project treats as the enemy is <strong>wrong-but-not-crashed</strong>, not crashed. Each pitfall below is handled in the published datasets; they are documented here because the same traps apply to anyone building on this data from scratch.</p>
+</section>
+<section id="details" class="level2">
+<h2 class="anchored" data-anchor-id="details">Details</h2>
+<p>Each pitfall: what it is, a concrete example, and the effect on analysis. Sources are named inline; the fullest treatment of each is in the <code>docs/accounts-*.md</code> files and <code>docs/AUDIT.md</code>.</p>
+<section id="a-dash-means-nil-not-missing" class="level3">
+<h3 class="anchored" data-anchor-id="a-dash-means-nil-not-missing">1. A dash means nil, not missing</h3>
+<p>UK accounts print “–” for a nil value. If a parser reads that dash as <em>missing</em>, a later filing’s comparative can quietly fill the gap — a look-ahead leak.</p>
+<ul>
+<li><strong>Example:</strong> a 2020 filing reports <code>Debtors —</code> (genuinely nil). Read as missing, a 2021 filing that restates 2020 debtors as £4,000 can back-fill the 2020 cell with a value that was not known at the time.</li>
+<li><strong>Effect:</strong> both pivot engines now coalesce a dash to <code>0</code> so it competes normally. Diffed cell-by-cell, this changed <strong>1,936,525</strong> WIDE cells under <code>as_first_reported</code> (1,936,433 null→0, 92 real-value→0). Source: <code>docs/accounts-dash-nil-fix.md</code>, <code>docs/accounts-limitations.md</code>.</li>
+</ul>
+</section>
+<section id="comparatives-and-restatements" class="level3">
+<h3 class="anchored" data-anchor-id="comparatives-and-restatements">2. Comparatives and restatements</h3>
+<p>Every filing contains the current year <strong>and</strong> a prior-year comparative, so the same (company, period, concept) appears in more than one filing — and the two values do not always agree.</p>
+<ul>
+<li><strong>Example:</strong> a company’s 2020 accounts report equity of £50,000 for 2020; its 2021 accounts, which restate 2020 as a comparative, show £48,000. Same period, two values.</li>
+<li><strong>Effect:</strong> <strong>9.36%</strong> of repeated (company, period, concept) keys disagree with the first-reported value across 2014–2026 — and it is not flat by year (keys first reported in 2016–2017 restate 13–15%, the rest of the span 8–10%). For any predictive work use the <strong>as-first-reported</strong> values; the <strong>latest</strong> values incorporate figures that postdate the period and leak the future. Source: <code>docs/accounts-restatement-2014-2026.md</code>, <code>docs/accounts-restatement-by-year.md</code>, <code>docs/accounts-limitations.md</code>.</li>
+</ul>
+</section>
+<section id="creditors-is-given-only-as-parts" class="level3">
+<h3 class="anchored" data-anchor-id="creditors-is-given-only-as-parts">3. Creditors is given only as parts</h3>
+<p>Most filers report creditors <strong>by maturity</strong>, not as a single total — and even when a bare total is filed, it is often not a genuine sum.</p>
+<ul>
+<li><strong>Example:</strong> a filing reports <code>creditors due within one year = £30,000</code> and <code>after one year = £10,000</code> but no combined <code>Creditors</code> line; another files a <code>Creditors</code> total that turns out to equal just the within-one-year bucket.</li>
+<li><strong>Effect:</strong> the bare <code>Creditors</code> total is only about <strong>4%</strong> populated (3.82% in the published file), and where a total <em>is</em> filed alongside the split, <strong>80.3%</strong> of such cases equal just the <code>WithinOneYear</code> bucket rather than a real total. Use <code>creditors_within_one_year</code> and <code>creditors_after_one_year</code>, not <code>Creditors</code>. Source: <code>docs/accounts-limitations.md</code>, <code>docs/accounts-creditors-maturity-reconciliation.md</code>.</li>
+</ul>
+</section>
+<section id="employee-counts-tagged-in-pounds" class="level3">
+<h3 class="anchored" data-anchor-id="employee-counts-tagged-in-pounds">4. Employee counts tagged in pounds</h3>
+<p>The average-employees figure is sometimes tagged with a currency unit instead of a plain count.</p>
+<ul>
+<li><strong>Example:</strong> <code>&lt;ix:nonFraction name="AverageNumberEmployeesDuringPeriod" unitRef="GBP"&gt;3</code> — a headcount of 3, mis-labelled as £3.</li>
+<li><strong>Effect:</strong> about <strong>29%</strong> of employee facts carry a GBP unit; the median such value is 1.0, so almost all are real headcounts with the wrong label, with a small tail of genuine monetary values (e.g.&nbsp;staff costs). <strong>Do not filter employees by unit</strong> or you silently lose ~29% of coverage. The dataset keeps every value as filed and sets <code>employees_unit_anomaly = 1</code> on affected rows. Employee coverage <em>also</em> has a 2020–2021 reporting-regime break — an apparent jump or gap across that boundary may be an artefact. Source: <code>docs/accounts-employee-unit-cutoff.md</code>, <code>docs/accounts-limitations.md</code>.</li>
+</ul>
+</section>
+<section id="scale-and-sign-and-european-number-formats" class="level3">
+<h3 class="anchored" data-anchor-id="scale-and-sign-and-european-number-formats">5. Scale and sign (and European number formats)</h3>
+<p>An iXBRL numeric tag carries a sign and, via its <code>format</code>, a number convention. Ignore them and the magnitude or direction is wrong.</p>
+<ul>
+<li><strong>Example:</strong> a fact with <code>format="ixt2:numdotcomma"</code> and text <code>4.506</code> means <strong>4,506</strong>, not 4.506 — the dot is a thousands separator. A <code>sign="-"</code> attribute makes the value negative even though the printed digits look positive.</li>
+<li><strong>Effect:</strong> comma-as-decimal formats (<code>numdotcomma</code>/<code>numcomma</code>/<code>numspacecomma</code>/ <code>numcommadecimal</code>) were misread by roughly 100–1,000× until fixed — <strong>1,096</strong> facts changed value archive-wide (e.g.&nbsp;a real <code>CashBankOnHand</code> fact read as <code>3.349</code> instead of <code>3349</code>). In the independent ONS tool check, all 363 <code>sign="-"</code> figures were handled correctly by <code>ixbrlparse</code>. Source: <code>docs/accounts-validation-summary.md</code>, <code>docs/source-material/deck-corrections.md</code>, <code>docs/source-material/tool-comparison-check.py</code>.</li>
+</ul>
+</section>
+<section id="namespace-prefixes" class="level3">
+<h3 class="anchored" data-anchor-id="namespace-prefixes">6. Namespace prefixes</h3>
+<p>iXBRL tags live in a namespace that a filing can bind to any prefix. Hardcode one prefix and you silently drop every filing that uses another.</p>
+<ul>
+<li><strong>Example:</strong> the extractor matched <code>ix:nonFraction</code>, but a filing binding inline-XBRL to a different prefix (or the default namespace) — e.g.&nbsp;<code>&lt;ixbrli:nonFraction&gt;</code> — matched nothing, so that filing extracted <strong>zero facts</strong> and simply vanished from the data without error.</li>
+<li><strong>Effect:</strong> fixing the prefix detection recovered <strong>61,085</strong> filings (measured directly; concentrated 2014–2022). An earlier sample-based estimate of ~291,802 was wrong because it was computed from stale scan files — corrected to the measured figure. Source: <code>docs/accounts-validation-summary.md</code>, <code>docs/source-material/deck-corrections.md</code>.</li>
+</ul>
+</section>
+<section id="plain-xml-filings" class="level3">
+<h3 class="anchored" data-anchor-id="plain-xml-filings">7. Plain-XML filings</h3>
+<p>A small tail of filings are plain XBRL (<code>.xml</code>), not iXBRL (<code>.html</code>). An extractor built only for the HTML form skips them entirely.</p>
+<ul>
+<li><strong>Example:</strong> a monthly archive contains mostly <code>.html</code> iXBRL plus a minority of <code>.xml</code> filings; the XML ones were previously dropped, so early-year coverage looked thinner than it was.</li>
+<li><strong>Effect:</strong> plain-XML filings are <strong>301,141</strong> archive-wide (0.84%); they are now read through an <code>ixbrlparse</code>-based adapter (<strong>273,418</strong> gained real facts), verified against Arelle on 186 filings (100% agreement on shared facts). The share is larger in early years, so check it before trusting 2014–2018 coverage. Source: <code>docs/accounts-validation-summary.md</code>, <code>docs/accounts-limitations.md</code>.</li>
+</ul>
+</section>
+<section id="one-shot-psc-snapshots" class="level3">
+<h3 class="anchored" data-anchor-id="one-shot-psc-snapshots">8. One-shot PSC snapshots</h3>
+<p>The PSC product is a <strong>daily snapshot</strong>, not an event stream — only today’s file is served.</p>
+<ul>
+<li><strong>Example:</strong> a PSC’s details are corrected between two days; unless you archived yesterday’s snapshot, the pre-correction state is gone.</li>
+<li><strong>Effect:</strong> to reconstruct history you must archive snapshots yourself. The good news: <strong>ceased PSC records are retained</strong>, so control history is reconstructable from 2016-04-06 (the product spans 10,917,257 distinct companies — nearly double the live register). The bad news: the ~32 parts are <strong>not</strong> random samples or company-number ranges (statements are segregated into parts 31–32; recent years cluster in parts 25–30), so <strong>no per-part rate is usable</strong> — stream all parts. Source: <code>docs/recon-psc.md</code>, <code>docs/recon-psc-results.md</code>.</li>
+</ul>
+</section>
+<section id="person-matching-with-no-stable-id" class="level3">
+<h3 class="anchored" data-anchor-id="person-matching-with-no-stable-id">9. Person matching with no stable ID</h3>
+<p>PSC and officer records have <strong>no stable person identifier</strong>, so linking the same person across companies is a fuzzy join.</p>
+<ul>
+<li><strong>Example:</strong> the same individual appears as a PSC of several companies with slightly different name spellings and addresses; matching on (forename, surname, birth year, birth month) collides real people and splits one person across variants.</li>
+<li><strong>Effect:</strong> on a conservative key, <strong>28.8%</strong> of person-keys appear on two or more records and <strong>28.0%</strong> on two or more distinct companies — so cross-company linkage is common, but the method’s confidence must be stated, not assumed. Global Witness/DataKind matched on name + birth month/year + address; this project will benchmark its matching against theirs. Source: <code>docs/recon-psc-results.md</code>, <a href="../evidence/prior-work.html">prior work</a>.</li>
+</ul>
+<blockquote class="blockquote">
+<p><strong>What it means for you.</strong> If you build on this data directly, test for each of these before trusting a result: a nil read as missing, a restated comparative, a creditors total that is really one bucket, employees filtered by unit, an ignored scale/sign, a dropped filing from a prefix mismatch, skipped XML, an un-archived PSC snapshot, and an over-confident person join. The published <a href="../datasets/accounts.html">accounts dataset</a> handles the accounts ones for you; the <a href="../datasets/accounts-validation.html">validation page</a> shows how each fix was checked.</p>
+</blockquote>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Not affiliated with or endorsed by Companies House or the Insolvency Service. Contains public sector information licensed under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/">Open Government Licence v3.0</a>. This is an independent project; a derived dataset is not a complete or official representation of any company.</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
