@@ -1,0 +1,15 @@
+{
+  "company_number": "07654321",
+  "company_name": "SYNTHETIC FAILED VENTURES LIMITED",
+  "company_status": "liquidation",
+  "type": "ltd",
+  "jurisdiction": "england-wales",
+  "date_of_creation": "2019-01-15",
+  "sic_codes": ["82990"],
+  "accounts": {"overdue": true, "next_due": "2025-10-01", "last_accounts": {"type": "micro-entity", "made_up_to": "2023-12-31"}},
+  "confirmation_statement": {"overdue": true, "next_due": "2025-08-15"},
+  "has_charges": true,
+  "has_insolvency_history": true,
+  "registered_office_address": {"postal_code": "M2 2BB", "locality": "Manchester"},
+  "links": {"self": "/company/07654321", "insolvency": "/company/07654321/insolvency"}
+}

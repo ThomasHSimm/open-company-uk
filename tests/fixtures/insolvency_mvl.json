@@ -1,0 +1,13 @@
+{
+  "cases": [
+    {
+      "type": "members-voluntary-liquidation",
+      "dates": [
+        {
+          "type": "wound-up-on",
+          "date": "2026-03-01"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "company_number": "SC345678",
+  "company_name": "SYNTHETIC DORMANT HOLDINGS LTD",
+  "company_status": "active",
+  "company_status_detail": "active-proposal-to-strike-off",
+  "type": "ltd",
+  "jurisdiction": "scotland",
+  "date_of_creation": "2024-11-01",
+  "sic_codes": ["99999"],
+  "accounts": {"overdue": false},
+  "confirmation_statement": {"overdue": false},
+  "has_charges": false,
+  "registered_office_address": {"postal_code": "EH1 1CC", "locality": "Edinburgh"},
+  "links": {"self": "/company/SC345678"}
+}

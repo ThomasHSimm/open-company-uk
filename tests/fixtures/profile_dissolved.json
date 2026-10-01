@@ -1,0 +1,8 @@
+{
+  "company_number": "02222222",
+  "company_name": "SYNTHETIC GONE LIMITED",
+  "company_status": "dissolved",
+  "type": "ltd",
+  "date_of_creation": "2001-02-03",
+  "links": {"self": "/company/02222222"}
+}
