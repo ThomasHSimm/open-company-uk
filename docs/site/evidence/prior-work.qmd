@@ -1,0 +1,96 @@
+---
+title: "Prior work"
+---
+
+## Summary
+
+This project is not the first to build on UK company data, and it deliberately reuses and
+benchmarks against what exists rather than starting from scratch. Investigative teams have used
+the PSC and Land Registry data to trace ownership (Global Witness, Private Eye and its
+successors, Transparency International UK); open-data organisations maintain standard-format
+ownership pipelines (Open Ownership, OpenSanctions); a long-running project links charities to
+companies (Find that Charity); and an academic literature studies small-company default and
+filing behaviour. Most of these are one-off investigations; a few maintain ongoing pipelines.
+The recurring lesson is that the genuine data advantage sits in the private layer none of them
+can rebuild — and that open, reproducible infrastructure is where there is still a real gap to
+fill.
+
+## Details
+
+Each entry below: what it did, the tools it used, links to the organisation, and what it means
+for this project. Source: deck slide 7 and its notes
+(`docs/source-material/companies-house-accounts-deck.md`,
+`companies-house-accounts-notes.md`) and the literature queue
+(`literature/open-company-uk-source-queue-2026-08.md`). **[Checked]** against those files; "most
+projects are one-off investigations" is a judgement, not a measurement.
+
+### [Global Witness](https://www.globalwitness.org/) + DataKind UK — "The Companies We Keep" (2018)
+
+- **What:** an early analysis of the PSC register, with public code and open notebooks. Matched
+  people using a combination of name, birth month/year, and address.
+- **Tools:** graph database, open Jupyter notebooks.
+- **For us:** the natural benchmark for this project's [PSC person
+  matching](../datasets/psc.qmd) — compare approaches and match confidence directly rather than
+  re-deriving a method.
+
+### Private Eye → Who Owns England → [TaxPolicy.org.uk](https://taxpolicy.org.uk/) (2015–2026)
+
+- **What:** a line of work mapping offshore ownership of UK property from Land Registry data. The
+  2026 map cross-checks the **overseas-entities register** against Land Registry records and
+  **publishes its method**.
+- **For us:** reuse the Land-Registry-to-overseas-entity method when the [Land Registry
+  source](../guide/sources-map.qmd#hm-land-registry-company-property-ownership) is integrated,
+  rather than reinventing the join.
+
+### Transparency International UK — "Track and Trace", "Behind the Masks"
+
+- **What:** analysis of Covid-era public contracts; found **£15.3bn** of high-risk contracts, with
+  red flags including suppliers that were only **weeks old** (using incorporation dates).
+- **For us:** company age is a usable register signal. The repository already has a
+  **`YOUNG_COMPANY`** flag (age < 24 months) — but it is deliberately **`info`** severity, context
+  only, and never counts toward any total, consistent with this project's no-composite-score
+  line. Source: the generated [rule
+  reference](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/rules.md). (The deck
+  slide suggested adding a company-age flag; this corrects it — one already exists, as context.)
+
+### [Open Ownership](https://www.openownership.org/) + [OpenSanctions](https://www.opensanctions.org/)
+
+- **What:** open pipelines that convert UK PSC data into standard formats — Open Ownership's
+  `bods-uk-psc-pipeline` (Beneficial Ownership Data Standard) and OpenSanctions' `gb-coh-psc`
+  (now part of `opensanctions/graph`, FollowTheMoney format). Open Ownership has combined its
+  output with procurement (Open Contracting) and sanctions data. A closely related applied study
+  is Jofre & Knobel (2025), [*Insights from the United Kingdom's People with Significant Control
+  register*](https://www.openownership.org/en/publications/insights-from-the-united-kingdoms-people-with-significant-control-register/).
+- **For us:** reuse these PSC pipelines and the standard formats; add sanctions links. These are
+  maintained pipelines, not one-off investigations — the model to follow for the [PSC
+  work](../datasets/psc.qmd).
+
+### David Kane / 360Giving — [Find that Charity](https://findthatcharity.uk/)
+
+- **What:** links **16 sources and ~660,000 non-profits**; many charities are also companies and
+  carry a company number. The same author wrote **`ixbrlparse`**, the library this project
+  benchmarks its [accounts parser](../datasets/accounts-validation.qmd) against.
+- **For us:** charity lookup is already solved — reuse Find that Charity rather than building a
+  [charity join](../guide/sources-map.qmd#charity-registers-charity-commission-oscr-ccni).
+
+### Academic research
+
+- **What:** a systematic review of **145 studies** on predicting small-company default found
+  nearly half used commercial data services. A 2024 study of **8,490 UK charitable companies**
+  found they file later when in financial difficulty (see also Clatworthy & Peel 2016 on
+  private-company filing timeliness, in the [evidence register](register.qmd)).
+- **For us:** that so much of the default literature leans on *paid* data is exactly the gap an
+  open, reproducible dataset can help fill — while being honest that filing behaviour is not, by
+  itself, a validated predictor of fraud or insolvency.
+
+### Common tools, and the gap
+
+Across these projects the recurring toolset is Jupyter and pandas, graph databases (Neo4j),
+Elasticsearch, linked data (RDF/SPARQL), and DuckDB. **Most projects are one-off investigations**;
+Open Ownership and OpenSanctions are the exceptions that maintain pipelines.
+
+> **What it means for this project.** None of this prior work can be rebuilt from Companies House
+> alone where it depends on the private data layer (bank data, trade payments, judgments). The gap
+> it *can* fill is open, documented, reproducible infrastructure over the free sources — which is
+> the positioning of this whole project: explain and connect what exists, publish usable data, and
+> add code only where it adds something.

@@ -1,6 +1,19 @@
 ---
-title: "Validation"
+title: "Indicators: validation"
 ---
+
+## Summary
+
+Validation asks a narrow, honest question: when a company is independently known to have had an
+adverse insolvency event, does the pipeline's corresponding flag fire? It compares cached
+pipeline flags against Insolvency Service adverse-case labels, using a control cohort of active
+companies matched on structural features (industry and age) that exist *before* any distress.
+Because the published labels contain positives but no verified negatives, this is a
+**positive-unlabelled** study: it can measure conditional recall and whether signals separate
+from a similar control, but it **cannot** establish precision, a false-positive rate, or anything
+about "trustworthiness". No representative result is published yet.
+
+## Details
 
 ## Study design
 

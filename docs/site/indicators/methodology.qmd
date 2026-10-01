@@ -1,6 +1,20 @@
 ---
-title: "Methodology"
+title: "Indicators: methodology"
 ---
+
+## Summary
+
+The indicator pipeline turns a supplied list of company numbers into a set of plain, documented
+**flags** — such as "accounts overdue" or "company in liquidation" — each traceable to a specific
+Companies House field and each carrying a severity and an evidence string. It never combines them
+into a score. The pipeline fetches and caches the raw register responses once, then derives
+attributes and applies a rule registry that lives in code, so the published
+[rule reference](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/rules.md) and
+[data dictionary](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/data-dictionary.md)
+cannot drift from what the code actually does. This page explains the pipeline, the evidence
+tiers behind each field, and what severity means.
+
+## Details
 
 ## Pipeline
 
@@ -24,8 +38,9 @@ distinct.
 - Tier 3: contextual or inferred attributes such as SIC classification.
 
 The authoritative field-by-field tiers, definitions, sources, and caveats are in the
-generated [data dictionary](../data-dictionary.md). Rule definitions and their inputs are in
-the generated [rule reference](../rules.md).
+generated [data dictionary](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/data-dictionary.md).
+Rule definitions and their inputs are in the generated
+[rule reference](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/rules.md).
 
 ## Severity
 

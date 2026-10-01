@@ -1,0 +1,119 @@
+---
+title: "The accounts data: mostly balance sheets"
+---
+
+## Summary
+
+Almost every UK company must file annual accounts, and Companies House publishes the
+electronically filed ones as a free bulk archive. But **what** a company files depends on its
+size, and most UK companies are small or micro. Small and micro companies may file **"filleted"
+accounts** — the balance sheet and its notes only, with no profit-and-loss account. The
+practical result is that, for most companies, the public data has **no turnover and no profit
+figure at all**: it is, in effect, a balance-sheet dataset. Accounts are tagged in **iXBRL**, a
+format that is both human-readable in a browser and machine-readable, so the figures can be
+extracted at scale.
+
+Two changes matter for anyone using this data. Size thresholds rose on **6 April 2025** (their
+first change since 2013), moving some companies into lighter-disclosure bands. And from **April
+2028**, reforms will require small companies to file a profit-and-loss account — but that will
+not fill in the past, so anyone modelling history still works with balance-sheet-only data.
+
+## Details
+
+### Who files what
+
+Under the Companies Act 2006, essentially every registered company must file annual accounts
+(private companies have nine months after the year-end). A company's **size band** is set by
+meeting two of three tests — turnover, balance-sheet total, and average employees — over two
+consecutive years. From **6 April 2025** the monetary thresholds rose by roughly half:
+
+| Band | Turnover | Balance sheet | Employees |
+|---|---|---|---|
+| Micro-entity | ≤ £1m | ≤ £500k | ≤ 10 |
+| Small | ≤ £15m | ≤ £7.5m | ≤ 50 |
+| Medium | ≤ £54m | ≤ £27m | ≤ 250 |
+
+Source: deck slides 11–12 and the accounts explainer
+(`docs/source-material/accounts-explainer.html`); thresholds via Lexology summary of the
+6 April 2025 change. **[Checked]** (official change date; figures are the published thresholds).
+
+**Filleted accounts** are the defining feature. Under section 444 of the Act, small companies
+and micro-entities prepare full accounts for their shareholders and HMRC, but file only the
+**balance sheet and notes** with Companies House — omitting the profit-and-loss account and
+directors' report. Since the overwhelming majority of UK companies are small or micro, the
+public dataset is, in practice, a **balance-sheet dataset**.
+
+> **What it means for you.** For most companies there is no turnover and no profit in the public
+> data — not because the extraction missed it, but because it was never filed. One useful quirk:
+> the *average-employees* note is generally treated as not a profit-and-loss note, so it usually
+> survives filleting, which is why headcount is far better covered than any income-statement
+> item. Credit agencies work around the missing turnover by **estimating** it from balance-sheet
+> items and sector ratios (Creditsafe publicly describes an "Estimated Turnover Indicator") —
+> these are modelled figures, not filed ones, so treat them with care.
+
+### How it is tagged: iXBRL
+
+**iXBRL** ("inline XBRL") is an ordinary-looking HTML accounts document in which each figure is
+tagged with a machine-readable name. Concretely, a line that displays as "Equity 12,968" is
+tagged in the HTML as something like:
+
+```html
+<ix:nonFraction name="Equity" unitRef="GBP" decimals="0">12,968</ix:nonFraction>
+```
+
+A browser renders "12,968"; a parser reads that the value 12,968 is `Equity`, in GBP. Each tag
+also carries a reporting **period**, a **unit** (pounds, a count, a ratio), an optional
+**scale** (for example, "thousands"), a **sign**, and optional **dimensions** (for example,
+creditors split into "due within one year" and "after one year").
+
+Tags follow **FRC taxonomies** — FRS 105 for micro-entities, FRS 102 (including Section 1A) for
+small and larger companies — which define the machine-readable name for each figure. The
+taxonomies are revised often, so this project targets each concept's stable *local* name and
+reads across taxonomy generations without a version map. See [the accounts guide to
+pitfalls](pitfalls.qmd) for what goes wrong at the tag level.
+
+> **Why the data starts in 2014.** iXBRL adoption in the bulk product was gradual, not a hard
+> cutover: roughly **0% of filings were iXBRL in 2010, rising through 2011–2013 and reaching
+> ~97% by 2014**. Earlier accounts exist on the server but are barely machine-tagged, so the
+> dataset starts in 2014 — a coverage decision, not a limit of Companies House's archive.
+> Source: `docs/accounts-limitations.md` and deck slide 11 notes. **[Checked]** (project
+> measurement).
+
+### What's changing
+
+| When | Change |
+|---|---|
+| 2008 | Bulk accounts product begins (e-filed only) |
+| ~2014 | iXBRL nearly universal in the bulk data |
+| 6 April 2025 | Size thresholds raised ~50% |
+| 2025–26 | Identity checks for directors and PSCs (ECCTA) |
+| April 2028 | Software-only iXBRL filing; small & micro firms must file a P&L |
+
+The **2028 reforms** (Economic Crime and Corporate Transparency Act 2023) will require small
+companies and micro-entities to file a profit-and-loss account, move all filing to commercial
+software in iXBRL, and remove the filleted/abridged options. After a pause, this was confirmed
+on **9 June 2026 for April 2028** (delayed from 2027), and the government has indicated
+small-company P&L data **may be kept private** rather than published. Source: ICAEW, June 2026
+(deck slide 11 notes; accounts explainer). **[Checked]** as of June 2026 — the date has already
+moved once, so re-confirm before relying on it.
+
+> **What it means for you.** Future data will be richer, but **2028 does not fill in history**:
+> past filings stay balance-sheet-only, and any newly required small-company P&L may stay
+> private. Anyone modelling on the historical archive must work with balance-sheet-only data for
+> the foreseeable future.
+
+### Where to go next
+
+- [Pitfalls we found](pitfalls.qmd) — the tag-level and reconciliation problems that change
+  analysis if missed.
+- [The accounts dataset](../datasets/accounts.qmd) — the tested WIDE and LONG tables built from
+  this data, with a quickstart.
+- [How we know it is right](../datasets/accounts-validation.qmd) — the parser comparison and
+  cross-checks.
+
+::: {.callout-note appearance="minimal"}
+Sources for this page: deck slides 11–12 and notes
+(`docs/source-material/companies-house-accounts-deck.md`), the original accounts explainer
+(`docs/source-material/accounts-explainer.html`), and `docs/accounts-limitations.md` for the
+iXBRL-adoption figure.
+:::

@@ -1,0 +1,66 @@
+---
+title: "Reference"
+---
+
+## Summary
+
+The authoritative, machine-generated and primary documents live in the repository. This page
+links to them rather than reproducing them, because several are **generated from code** and must
+not be hand-edited — the point of generating them is that the documentation cannot drift from the
+implementation. Use this page as the jump-off to the rule registry, the field-level data
+dictionary, the full implementation log, and the code itself.
+
+## Details
+
+### Generated documentation (do not hand-edit)
+
+- **[Rule reference](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/rules.md)** —
+  every indicator rule with its severity, evidence tier, definition and caveats. Generated from
+  `src/ukcompany/rules.py` via `ukcompany rules-doc`.
+- **[Data dictionary](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/data-dictionary.md)**
+  — every derived attribute with its verification tier, source field, definition and caveats.
+  Generated from `src/ukcompany/derive.py` via `ukcompany data-dict`.
+
+### Implementation log
+
+- **[AUDIT.md](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/AUDIT.md)** — the
+  full, chronological implementation log: assumptions, bug fixes, decisions, and items needing
+  live verification. The narrative behind every figure cited on this site.
+
+### Accounts dataset documentation
+
+- **[Scope and limitations](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/accounts-limitations.md)**
+  — what the accounts archive keeps, skips, validates and doesn't.
+- **[Parser validation summary](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/accounts-validation-summary.md)**
+  — the three-parser benchmark, accuracy, and defects found and fixed.
+- **[WIDE column notes](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/accounts-wide-columns.md)**
+  — the tracked notes on the WIDE columns. The full per-column dictionary with coverage figures
+  (`column-dictionary.md`) is pipeline-generated and ships *with* the Kaggle dataset; the
+  `kaggle*/` staging directories are gitignored, so it is not in the git repo.
+
+### PSC / ownership documentation
+
+- **[PSC recon brief](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/recon-psc.md)**
+  and **[recon results](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/recon-psc-results.md)**
+  — what the PSC bulk snapshot contains, measured over all 32 parts.
+
+### Source material for this site
+
+The deck, its presenter notes, the original accounts explainer and the parser-comparison scripts
+that this site is built from are kept in
+[`docs/source-material/`](https://github.com/ThomasHSimm/open-company-uk/tree/main/docs/source-material).
+A log of what content moved where during the site restructure is in
+[`docs/site/_CHANGES.md`](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/site/_CHANGES.md).
+
+### The code
+
+- **[GitHub repository](https://github.com/ThomasHSimm/open-company-uk)** — the full pipeline:
+  fetch, cache, derive, rules, accounts extraction, and the validation harness. The repository
+  publishes code, methodology and synthetic fixtures only; run outputs and any personal data stay
+  private.
+
+::: {.callout-note appearance="minimal"}
+`rules.md` and `data-dictionary.md` are regenerated from code (`ukcompany rules-doc`,
+`ukcompany data-dict`); never edit them by hand. See the [indicators
+methodology](indicators/methodology.qmd) for how they are produced.
+:::

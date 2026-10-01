@@ -1,0 +1,59 @@
+---
+title: "Who uses UK company data"
+---
+
+## Summary
+
+The same free Companies House data flows outward to a wide range of users — and a striking amount
+of it flows straight back to the public sector as a packaged, scored product. Government buyers
+check suppliers' financial health (often by buying credit-agency reports rather than reading raw
+filings); law enforcement, HMRC and the Insolvency Service use it in investigations; and official
+statistics draw on it. On the business side, credit agencies treat it as raw material, lenders
+and suppliers use it to set credit terms, and it underpins anti-money-laundering checks, sales
+prospecting, investment research and journalism. The pattern worth noticing: public data is paid
+for once to produce, given away free, and then bought back repackaged.
+
+## Details
+
+Companies House's own research identifies three user types: **direct users** (companies,
+creditors, investors, researchers), **intermediaries** (credit-reference agencies and other data
+providers that use it as an input), and **providers of public goods** (government departments and
+law enforcement). Source: deck slide 5 and notes
+(`docs/source-material/companies-house-accounts-deck.md`); the GOV.UK 2019 value study.
+
+### Public sector
+
+- **Procurement.** Cabinet Office guidance on assessing suppliers' economic and financial
+  standing expects buyers to check bidders' financial health and monitor it during contracts —
+  in practice, often by buying credit-agency reports rather than reading raw filings.
+- **Law enforcement.** A 2024 study estimated register value at around **£2,600 per
+  law-enforcement user per year** (DBT/Companies House release, June 2025). **[Estimated]** (a
+  study estimate).
+- **Insolvency Service.** Director-conduct and disqualification work draws on company filings —
+  the same adverse records this project validates its [indicators](../indicators/validation.qmd)
+  against.
+- **Official statistics.** The official business register used by ONS draws on administrative
+  sources (presented generally here, not as a specific data-flow claim).
+- **Local authorities** checking suppliers and local businesses.
+
+### Business and others
+
+- **Credit agencies and data providers** — the raw material for their products.
+- **Lenders and suppliers** deciding credit terms.
+- **Anti-money-laundering and know-your-customer** checks: a 2024 study put the register's value
+  to AML-regulated businesses at **£170–460m a year**. **[Estimated]**.
+- **Sales prospecting, investors, researchers and journalists.**
+
+> **The point worth noticing.** The same public data flows out for free, then gets bought back by
+> the public sector as a packaged, scored product. Both Creditsafe and Dun & Bradstreet list
+> services on the government's G-Cloud Digital Marketplace. That mirrors the pattern in the GIS
+> market, where most underlying data is open and much of the spend is on software and convenience
+> — with one important exception (the private data layer) developed on [the market
+> page](market.qmd). Source: deck slide 5 notes; Digital Marketplace G-Cloud listings for
+> Creditsafe and D&B Risk Analytics. **[Checked]** (listings exist).
+
+> **What it means for you.** If large, well-resourced buyers pay for packaging and convenience
+> rather than for data they could get free, then an analyst at a smaller organisation can
+> reproduce much of the *descriptive* layer from open data — which is exactly what this project
+> does for the [accounts](../datasets/accounts.qmd). What you cannot reproduce is the private
+> predictive layer; [the market page](market.qmd) is explicit about that boundary.

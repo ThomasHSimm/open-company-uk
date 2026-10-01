@@ -1,0 +1,133 @@
+---
+title: "Accounts dataset: how we know it is right"
+---
+
+## Summary
+
+A dataset is only as useful as the reasons to trust it. This extractor was checked three ways.
+First, an **accounting invariant**: every fact read from a filing must land in exactly one
+category (kept, duplicate, conflict, skipped…) and the categories must sum to the total, so
+nothing is lost silently. Second, **independent cross-checks**: two separate implementations of
+the restatement calculation produced the same rate, and suspiciously round results flushed out
+two real bugs that are now covered by regression tests. Third, a **parser comparison**: the
+project's own extractor was run head-to-head against two established tools — the `ixbrlparse`
+library and Arelle, a full standards-compliant XBRL processor — on real filings, with Arelle as
+the tie-breaker where the other two disagreed.
+
+The headline is that on the numbers that actually get published, the project's extractor agrees
+with `ixbrlparse` to **99.999%**, while running about twelve times faster — and the comparison
+itself found and fixed three real bugs in the project's own parser along the way.
+
+## Details
+
+::: {.callout-warning title="Results pending — a parser check is currently running"}
+A further parser check is running at the time of writing. **Nothing on this page anticipates its
+outcome.** The figures below are the measured results of the completed parser-check chapter,
+each cited to a committed file (`docs/accounts-parser-check.md`,
+`docs/accounts-validation-summary.md`); any numbers the live run revises will be reconciled here
+once it finishes. **[Checked]** for the committed figures; the live run's results are **not yet
+available**.
+:::
+
+### 1. The accounting invariant
+
+Every tagged fact in a filing is assigned to exactly one disposition — kept, duplicate,
+conflict, skipped, and so on — and the per-category counts must add back up to the total facts
+read. If they don't, the run fails rather than quietly dropping data. This is the project's main
+defence against the failure mode it treats as the enemy: **wrong-but-not-crashed**. Source: deck
+slide 13 notes (`docs/source-material/companies-house-accounts-deck.md`).
+
+### 2. Independent cross-checks
+
+- **Two implementations, one answer.** The restatement rate was computed by two separate engines
+  (a Polars running-tally and an out-of-core DuckDB engine). On the 2022–2023 window they agreed
+  at **7.93% vs 7.94%**, matching an independent panel check — evidence the calculation is not an
+  artefact of one implementation. Source: `docs/accounts-restatement-2022-2023.md`, deck slide 14.
+- **Round numbers as a smoke alarm.** Suspiciously round results (an exact 0% or 100%) exposed
+  two real bugs during development; both are now covered by regression tests. Source: deck slide
+  13 notes.
+- **Reconciliation and privacy guards.** A full-corpus creditors reconciliation found **zero**
+  sign-flip errors, and an automated staging guard re-scans every published Parquet against the
+  personal-data lists before upload. Source: `docs/accounts-creditors-maturity-reconciliation.md`,
+  `docs/accounts-kaggle-safety-checks.md`.
+
+### 3. The parser comparison
+
+Three parsers were run on the same fixed samples of real Companies House filings, under
+controlled timing (identical input, warm-up excluded, 3 repeats, median reported), with Arelle
+as the independent tie-breaker where ours and `ixbrlparse` disagreed. Source:
+`docs/accounts-validation-summary.md`, `docs/accounts-parser-check.md`.
+
+**Speed** (5,000-filing fixed sample, end-to-end, 1 worker):
+
+| Parser | ms/filing | Relative to ours |
+|---|---:|---|
+| Ours | 0.65 | 1× |
+| `ixbrlparse` | 7.7 | ~12× slower |
+| Arelle | ~992 (≈1 s) | ~1,520× slower |
+
+Projected to the full **35,806,258-filing** archive at measured 8-worker throughput: **~2.1 h**
+(ours) vs **~1.4 days** (`ixbrlparse`) vs **~94.6 days** (Arelle — not viable at this scale, so
+it serves as a referee on samples, not a production parser). **[Checked]** (measured; the
+full-archive figures are projections from the sample throughput — see
+`docs/source-material/deck-corrections.md`).
+
+**Accuracy:** **99.999% agreement on numeric facts** between ours and `ixbrlparse` (119,812 of
+119,813 shared numeric facts; 95% CI [99.995%, 100%]; every year 2014–2026 individually at
+99.9–100%). Dashes are excluded from this figure because both other parsers resolve a dash to
+zero immediately while this pipeline defers that to pivot time — the same published value, a
+design difference not a disagreement. An unfiltered, **all-facts** comparison shows **89.5%** —
+most of that gap is a deliberate choice to keep non-numeric text as displayed rather than
+normalising it (e.g. "3 January 2023" vs "2023-01-03"), which never touches a numeric WIDE cell.
+Source: `docs/accounts-validation-summary.md`.
+
+> **What it means for you.** For the numbers WIDE actually publishes, the project's fast
+> extractor and a general-purpose library are effectively interchangeable in accuracy — the speed
+> difference is what makes a full-archive, full-history build practical at all.
+
+### The 205-filing ONS tool check
+
+A separate, reproducible check (the script is
+`docs/source-material/tool-comparison-check.py`) ran open-source tools over an ONS-curated sample
+of **379 real filings — 205 iXBRL and 174 plain XML** (hand-picked, not random). It is the basis
+for the "reading a filing is solved" point:
+
+| Tool | Result on the ONS sample |
+|---|---|
+| `ixbrlparse` 0.11.2 | Parsed 205/205 iXBRL and 174/174 XML; read all 202 dash figures as 0; handled all 363 `sign="-"` figures correctly; exposed 1,679 dimensional facts; ~33 ms per iXBRL file |
+| `ixbrl-parse` 0.11.0 | Parsed only 101/205 — 89 `ValueError`s (unit names without a namespace prefix) and 15 `KeyError`s |
+| Arelle 2.45.3 | Not value-tested here: it needs the FRC taxonomy files, which this sandbox cannot download; offline it returns concept names without values |
+
+(The ~33 ms/file here and the 7.7 ms/file in the speed table above are different samples and
+machines — both are reported with their context, not blended.) Two findings on this sample show
+what a parser *cannot* do for you: **164** concept/context pairs repeat within the filings (none
+disagree), and **99 of the 107** filings that report Creditors give only its parts, not a total.
+Source: `docs/source-material/companies-house-accounts-notes.md`, deck slide 12.
+
+### What the comparison found in our own parser
+
+The exercise was not a victory lap — it found and fixed three real bugs:
+
+- **Prefix bug** — a hardcoded `ix:` namespace prefix silently extracted zero facts from any
+  filing using a different binding. **61,085** filings recovered (measured directly; an earlier
+  ~291,802 estimate was traced to a stale scan and corrected).
+- **Comma-as-decimal formats** — misread by ~100–1,000×; **1,096** facts corrected.
+- **A hyphenated format name** (`num-dot-decimal`) — silently nulled **540** facts across 3
+  months; found by tracing published values that disappeared between v1 and v2.
+- **Plain-XML filings** — **273,418** gained real facts via a new `ixbrlparse` adapter, verified
+  against Arelle on 186 filings (100% agreement on shared facts).
+- **Zero regressions**; restatement rate unchanged at **9.36%**; fill rates unchanged to within
+  0.3 percentage points.
+
+**Deferred by reasoned decision** (documented, not hidden): nested facts (9.85% of filings but
+only 0.0015% of numeric facts and zero published columns) and text continuations (non-numeric
+only). **Out of scope by design:** multi-member and typed-member dimensional contexts (25.3% and
+20.1% of filings, 37.9% combined). Source: `docs/accounts-validation-summary.md`,
+`docs/accounts-limitations.md`.
+
+> **The honest framing.** Good open-source parsers already exist; `ixbrlparse` does single-filing
+> parsing well. What this project adds is the layer around it — full-history bulk orchestration,
+> deduplication, totals-vs-parts rules, cross-filing restatement handling, point-in-time
+> provenance, and a published table. The parsing was never the hard part; deciding which number
+> is true, and when it was known, is. See [the dataset](accounts.qmd) and
+> [pitfalls](../guide/pitfalls.qmd).

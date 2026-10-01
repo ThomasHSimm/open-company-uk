@@ -1,17 +1,71 @@
 project:
   type: website
+  output-dir: _site
 
 website:
-  title: "open-company-uk methodology"
+  title: "open-company-uk"
+  description: "UK company data: explained, connected, usable."
   navbar:
     left:
       - href: index.qmd
         text: Home
-      - methodology.qmd
-      - validation.qmd
-      - limitations.qmd
-      - accounts.qmd
+      - text: Guide
+        menu:
+          - text: "Companies House"
+            href: guide/companies-house.qmd
+          - text: "How the sources join (map)"
+            href: guide/sources-map.qmd
+          - text: "The accounts data"
+            href: guide/accounts-data.qmd
+          - text: "Pitfalls we found"
+            href: guide/pitfalls.qmd
+      - text: Datasets
+        menu:
+          - text: "Accounts (WIDE & LONG)"
+            href: datasets/accounts.qmd
+          - text: "Accounts validation"
+            href: datasets/accounts-validation.qmd
+          - text: "PSC / ownership (status)"
+            href: datasets/psc.qmd
+      - text: Indicators
+        menu:
+          - text: "Methodology"
+            href: indicators/methodology.qmd
+          - text: "Validation"
+            href: indicators/validation.qmd
+          - text: "Limitations"
+            href: indicators/limitations.qmd
+          - text: "Non-compliance (planned)"
+            href: indicators/non-compliance.qmd
+      - text: Landscape
+        menu:
+          - text: "Who uses the data"
+            href: landscape/who-uses.qmd
+          - text: "The market"
+            href: landscape/market.qmd
+      - text: Evidence
+        menu:
+          - text: "Prior work"
+            href: evidence/prior-work.qmd
+          - text: "Evidence register"
+            href: evidence/register.qmd
+      - href: reference.qmd
+        text: Reference
+    right:
+      - icon: github
+        href: https://github.com/ThomasHSimm/open-company-uk
+        aria-label: GitHub repository
+  page-footer:
+    center: |
+      Not affiliated with or endorsed by Companies House or the Insolvency Service.
+      Contains public sector information licensed under the
+      [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+      This is an independent project; a derived dataset is not a complete or official
+      representation of any company.
 
 format:
   html:
+    theme: cosmo
     toc: true
+    toc-depth: 3
+    anchor-sections: true

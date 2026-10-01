@@ -1,0 +1,92 @@
+---
+title: "Evidence register"
+---
+
+::: {.callout-note appearance="simple"}
+**Status: structure in place; the populated register is to come.** A discovery **queue** exists
+(sources identified and prioritised); the append-only **register** (one reviewed row per source)
+is not yet populated. This page sets out the structure and shows the current queue; entries gain a
+register ID only once a source has been read and extracted.
+:::
+
+## Summary
+
+The evidence register is the project's catalogue of sources — official datasets and APIs, tools
+and products, other countries' registers, papers and investigations, and the governing law and
+licences. Its job is to keep three things separate that are easy to blur: what a source *is*,
+what it *claims*, and what has actually been *observed or measured*. Each reviewed source becomes
+one compact, append-only row recording what it establishes, how reliable it is, and where it
+affects this project. Right now a prioritised discovery queue exists; the reviewed register rows
+are still to be written.
+
+## Details
+
+The register schema, update rules and discovery queue live in the repository's `literature/`
+directory and are summarised here. Source files:
+[`open-uk-company-research-pack.md`](https://github.com/ThomasHSimm/open-company-uk/blob/main/literature/open-uk-company-research-pack.md)
+(schema, §4),
+[`open-company-uk-source-queue-2026-08.md`](https://github.com/ThomasHSimm/open-company-uk/blob/main/literature/open-company-uk-source-queue-2026-08.md)
+(the discovery queue), and
+[`companies-house-data-landscape.md`](https://github.com/ThomasHSimm/open-company-uk/blob/main/literature/companies-house-data-landscape.md)
+(the data/attribute landscape).
+
+### What a register row records
+
+One row per finished source, with these fields (abbreviated): `register_id`, `source_type`,
+`title`, `authors_or_operator`, `year_or_version`, `jurisdiction`, `source_artifact`,
+`extraction_file`, `main_question`, `evidence_role`, `operational_proximity`, `access_class`,
+`main_data_or_method`, `outcome_or_purpose`, `validation_type`, `current_repo_relevance`,
+`future_research_relevance`, `actionability_now`, `supports_production_change`, `main_limit`,
+`review_status`, `reviewed_on`, `recheck_by`, `notes`.
+
+**ID prefixes** mark the kind of source: `DATA-` (official dataset/API/register), `TOOL-`
+(tool/product), `REG-` (country-register review), `USE-` (paper/report/investigation/repo),
+`GOV-` (law/licence/governance), `METH-` (method/entity-resolution/validation).
+
+**Review status** is explicit about how much to trust a row: `solid` (checked, reliable for its
+role), `conditional` (usable with a stated caveat), `needs-review` (do not rely on without
+revisiting), `screening-only` (not accessible enough for full extraction), `rejected`,
+`inaccessible`, `superseded` (access/schema/pricing/law changed — the old observation is kept and
+the replacement linked).
+
+### The guardrails the register enforces
+
+The point of the register is disciplined honesty, so its update rules are strict: append-only by
+default; never silently change an earlier judgement (add a dated note or a superseding row); do
+**not** upgrade a `claimed` finding to `observed` or `measured`; an official source *defines* a
+field or access rule but does not thereby *validate* an analytical indicator; a vendor source
+supports what the vendor claims to offer, not independent effectiveness; and keep
+data-existence, capability, observed use and measured validity separate.
+
+> **Why this matters here.** The same discipline runs through the whole site: figures are labelled
+> **[Checked] / [Estimated] / [Not verified]**, and the [indicators](../indicators/methodology.qmd)
+> ship only what traces to a named field. The register is where that discipline is applied to the
+> evidence base itself.
+
+### The discovery queue (current)
+
+These sources are **identified and prioritised, not yet reviewed** — they do not have register
+IDs. The top of the recommended first-extraction order:
+
+| # | Source | Role | Why first |
+|---:|---|---|---|
+| 1 | Companies House Public Data API reference + OpenAPI spec | Official definition | Canonical endpoint/resource inventory; anchors the data dictionary |
+| 2 | Companies House `api-enumerations` | Official definition | Canonical status/PSC-statement constants; schema-drift tests |
+| 3 | Charges list resource | Official definition | Directly relevant to the `CHARGES_OUTSTANDING` rule |
+| 4 | CH data products / download portal / daily PSC snapshot | Official definition | Establishes the bulk routes for population context |
+| 9–11 | BEIS PSC-register review; 2nd PSC-regulations review; Jofre & Knobel (2025) | Measured / evaluation | Closest methodological matches to this project |
+| 12 | Clatworthy & Peel (2016), UK private-company filing timeliness | Academic (measured) | Evidence for the late-filing work; separates behaviour from prediction |
+
+The main conclusion from discovery, recorded verbatim in the queue: the strongest starting
+evidence is **not** a conventional academic literature but a combination of official schemas and
+guidance, official evaluations and statistics, a small empirical PSC/filing/disqualification
+literature, and investigative/vendor material that shows possible uses but usually cannot validate
+an indicator. The current rule set is therefore defended as a **transparent representation of
+registrar-recorded states**, not as a validated fraud, trustworthiness, credit or
+insolvency-prediction model.
+
+### What's next
+
+As each queued source is read and extracted, it becomes one reviewed row here, following the rules
+above. Until then this page is the structure and the queue; the [prior-work page](prior-work.qmd)
+summarises the investigations and tools already drawn on.

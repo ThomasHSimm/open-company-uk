@@ -1,0 +1,35 @@
+---
+title: "Non-compliance patterns (planned)"
+---
+
+::: {.callout-note appearance="simple"}
+**Status: Planned.** This page is a placeholder. There is no analysis here yet, and none should
+be inferred.
+:::
+
+## Summary
+
+A future topic for this project is **non-compliance patterns** — recurring signals in how
+companies meet (or miss) their filing obligations, such as repeatedly late accounts, missing or
+unresolved PSC information, and dormancy used to minimise disclosure. These are distinct from the
+current per-company [indicator flags](methodology.qmd): the interest is in *patterns over time
+and across companies*, not a single company's current state. This page exists to mark the topic;
+the analysis is not written.
+
+## Details
+
+Candidate directions, recorded so the scope is visible — **none analysed yet**:
+
+- **Repeatedly late filings.** Reconstructing statutory deadlines (first-accounts rules, deadline
+  changes over time, COVID extensions) to identify repeat late filers, rather than counting raw
+  filing history. This is the `REPEAT_LATE_FILER` idea already scoped in the project plan as a
+  later phase.
+- **Missing or unresolved PSC information.** Statement patterns such as "PSC exists but not
+  identified" or "steps to find PSC not yet completed" over time — building on the
+  [PSC work](../datasets/psc.qmd).
+- **Dormancy.** How dormant status is used, and transitions in and out of it.
+
+Each of these is a recorded-fact pattern, not a judgement of wrongdoing, and any future work here
+would carry the same guardrails as the rest of the project: traceable to named register fields,
+no composite score, no named company results, and the limitations set out on the
+[limitations page](limitations.qmd). Until then, there is nothing to read here.

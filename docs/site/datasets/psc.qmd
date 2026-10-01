@@ -1,0 +1,106 @@
+---
+title: "PSC / ownership (status)"
+---
+
+::: {.callout-note appearance="simple"}
+**Status: In progress.** Reconnaissance of the PSC bulk snapshot is complete; the extractor is
+in design. No PSC dataset is published, and — by decision — only **code** will be, never the
+data. This page describes what the recon found and the design that follows from it.
+:::
+
+## Summary
+
+"PSC" means *persons with significant control* — broadly, the people and entities that own or
+control a UK company. Companies House publishes a daily bulk snapshot of this register, and this
+project has analysed it end to end to decide what can responsibly be built from it. The short
+version: the snapshot is large (about 16 million records), it retains history back to 2016, and
+it is rich enough to support company-level ownership features — but it is personal data, it has
+no stable identifier for a person, and its internal structure is full of traps. So the plan is to
+publish **code and company-level aggregates only**, keep any person-level table private, and
+state match confidence honestly rather than imply a clean ownership graph.
+
+This is deliberately a **status page**, not a dataset. It records the measured findings and the
+design decisions; it does not publish results.
+
+## Details
+
+### What the recon found
+
+The recon ran over **all 32 parts of the 2026-09-18 snapshot — 15,952,486 records, 0 bad lines**,
+in 404 seconds, joined against the 2026-08-01 Basic Company Data (5,695,465 live companies). Every
+figure below traces to `docs/recon-psc-results.md` / `docs/recon-psc-results.json`; the full
+write-up is `docs/recon-psc.md`. **[Checked]** (project measurement).
+
+- **History is reconstructable from 2016-04-06.** Ceased PSC records are retained — 2,655,316
+  records (16.6%) carry a `ceased_on` date, and every notified-on year since 2016 keeps a ceased
+  cohort. The product spans **10,917,257 distinct companies — nearly double the live register** —
+  so it holds PSC history for companies no longer live. 62,986 companies appear only as ceased
+  records. Point-in-time control reconstruction is therefore feasible.
+- **Statements exist, segregated at the tail.** 922,564 records (5.8%) are
+  `persons-with-significant-control-statement` records (e.g. "no PSC identified"), all in parts
+  31–32. The one-part probe that preceded the full recon wrongly concluded there were none —
+  because parts 1–30 genuinely contain none.
+- **Partitioning is meaningless.** The ~32 parts are neither random samples nor company-number
+  ranges — every part spans essentially the whole register, statements are segregated into
+  31–32, and recent years cluster in parts 25–30. **No per-part rate is usable; stream all
+  parts.**
+- **Composition.** Individual PSCs 87.1%, corporate 6.7%, statements 5.8%, legal-person 0.1%,
+  overseas-entity beneficial-owner variants ~0.3%, plus 545 super-secure records and 108
+  exemptions.
+- **Individuals.** Date of birth (year and month) present on 100%; identity-verification details
+  on 50.6% (ECCTA rollout, start years 2025–2026); `is_sanctioned` present on 34,444, true on 17.
+- **Corporate PSCs.** A registration number is present on 91.0%, of which 77.9% resolve to a live
+  company — a usable company-to-company ownership edge.
+- **Natures of control.** 35,169,887 assertions over 15,029,053 records; 55 distinct base rights
+  once suffix families (`-as-firm`, `-as-trust`, `-limited-liability-partnership`,
+  `-registered-overseas-entity`) are stripped.
+
+### Data-quality traps (document them before using)
+
+- **No stable person ID.** Linking the same person across companies is a fuzzy join. On a
+  conservative key — (forename, surname, birth year, birth month) — **28.8%** of keys appear on
+  ≥2 records and **28.0%** on ≥2 distinct companies: cross-company linkage is common, but the
+  method's confidence must be stated, not assumed. See [person matching in
+  pitfalls](../guide/pitfalls.qmd).
+- **Dirty dates.** 14,554 records have `ceased_on` before `notified_on`; 23,916 `notified_on`
+  dates predate the 2016 regime (min `1083-01-01`); 97 `ceased_on` outliers fall outside
+  2016–2026 (including `2924`, `9998`, `9999`). 17,729 individuals imply an age under 16 at
+  notification, 55 over 110. A cleaning rule is required before any time-series use.
+- **One-shot snapshot.** Only today's file is served; corrections over time are lost unless you
+  archive snapshots yourself.
+
+### Design decisions that follow
+
+- **Code only, never the data.** PSC records are personal data, and users can download the
+  snapshot directly from Companies House, so there is nothing to gain and real risk in
+  republishing it. The repository will ship the extractor and methodology only. Source:
+  `docs/recon-psc.md`, deck slide 17 notes.
+- **Private person table, public per-company aggregates.** Any person-level linkage table stays
+  private. What could be published (as code producing them, not as a shipped dataset) are
+  **company-level** features: PSC counts, corporate ownership chains, how many companies a person
+  controls (with honest match confidence), and unresolved-ownership statement flags — none of
+  which name an individual.
+- **Nationality excluded.** Nationality is present on 100% of individual records (4,666 distinct
+  raw values) but is **measured for data-quality documentation only and excluded from any
+  product** — a deliberate scope decision. Source: `docs/recon-psc.md`.
+- **Honest match confidence.** Because there is no stable person ID, any companies-per-person
+  statistic is reported with its matching method and confidence, never as a settled fact.
+
+### Prior work to build on
+
+This is well-trodden ground, and the plan is to reuse and benchmark against existing work rather
+than reinvent it (full summaries on [the prior-work page](../evidence/prior-work.qmd)):
+
+- **Global Witness + DataKind UK**, "The Companies We Keep" (2018) — matched people on name +
+  birth month/year + address; the natural benchmark for this project's person matching.
+- **Open Ownership** — its `bods-uk-psc-pipeline` publishes UK ownership in the Beneficial
+  Ownership Data Standard, and has been combined with procurement and sanctions data.
+- **OpenSanctions** — its `gb-coh-psc` converter turns Companies House ownership data into a
+  standard graph format.
+
+### Where to go next
+
+- [How the sources join](../guide/sources-map.qmd) — where PSC sits among the UK sources.
+- [Pitfalls](../guide/pitfalls.qmd) — the PSC-specific traps (one-shot snapshots, person
+  matching).
+- [Prior work](../evidence/prior-work.qmd) — what others have built with PSC data.
