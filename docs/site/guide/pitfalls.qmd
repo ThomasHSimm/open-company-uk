@@ -1,0 +1,152 @@
+---
+title: "Pitfalls we found, with examples"
+---
+
+## Summary
+
+Reading a single filing is a solved problem; turning millions of them into a trustworthy table
+is where the work is. Along the way this project hit a set of traps that are easy to miss and
+that change results quietly — a dash that means "nil" read as "missing", a figure that appears
+twice because the prior year is restated, employee counts tagged in pounds, a mis-detected tag
+prefix that silently drops a whole filing. None of these crash anything; they just give you
+wrong numbers that look fine. This page lists each one with a concrete example and its effect on
+analysis, so you can check for them in your own work.
+
+The failure mode this project treats as the enemy is **wrong-but-not-crashed**, not crashed.
+Each pitfall below is handled in the published datasets; they are documented here because the
+same traps apply to anyone building on this data from scratch.
+
+## Details
+
+Each pitfall: what it is, a concrete example, and the effect on analysis. Sources are named
+inline; the fullest treatment of each is in the `docs/accounts-*.md` files and `docs/AUDIT.md`.
+
+### 1. A dash means nil, not missing
+
+UK accounts print "–" for a nil value. If a parser reads that dash as *missing*, a later
+filing's comparative can quietly fill the gap — a look-ahead leak.
+
+- **Example:** a 2020 filing reports `Debtors —` (genuinely nil). Read as missing, a 2021 filing
+  that restates 2020 debtors as £4,000 can back-fill the 2020 cell with a value that was not
+  known at the time.
+- **Effect:** both pivot engines now coalesce a dash to `0` so it competes normally. Diffed
+  cell-by-cell, this changed **1,936,525** WIDE cells under `as_first_reported` (1,936,433
+  null→0, 92 real-value→0). Source: `docs/accounts-dash-nil-fix.md`, `docs/accounts-limitations.md`.
+
+### 2. Comparatives and restatements
+
+Every filing contains the current year **and** a prior-year comparative, so the same (company,
+period, concept) appears in more than one filing — and the two values do not always agree.
+
+- **Example:** a company's 2020 accounts report equity of £50,000 for 2020; its 2021 accounts,
+  which restate 2020 as a comparative, show £48,000. Same period, two values.
+- **Effect:** **9.36%** of repeated (company, period, concept) keys disagree with the
+  first-reported value across 2014–2026 — and it is not flat by year (keys first reported in
+  2016–2017 restate 13–15%, the rest of the span 8–10%). For any predictive work use the
+  **as-first-reported** values; the **latest** values incorporate figures that postdate the
+  period and leak the future. Source: `docs/accounts-restatement-2014-2026.md`,
+  `docs/accounts-restatement-by-year.md`, `docs/accounts-limitations.md`.
+
+### 3. Creditors is given only as parts
+
+Most filers report creditors **by maturity**, not as a single total — and even when a bare total
+is filed, it is often not a genuine sum.
+
+- **Example:** a filing reports `creditors due within one year = £30,000` and `after one year =
+  £10,000` but no combined `Creditors` line; another files a `Creditors` total that turns out to
+  equal just the within-one-year bucket.
+- **Effect:** the bare `Creditors` total is only about **4%** populated (3.82% in the published
+  file), and where a total *is* filed alongside the split, **80.3%** of such cases equal just the
+  `WithinOneYear` bucket rather than a real total. Use `creditors_within_one_year` and
+  `creditors_after_one_year`, not `Creditors`. Source: `docs/accounts-limitations.md`,
+  `docs/accounts-creditors-maturity-reconciliation.md`.
+
+### 4. Employee counts tagged in pounds
+
+The average-employees figure is sometimes tagged with a currency unit instead of a plain count.
+
+- **Example:** `<ix:nonFraction name="AverageNumberEmployeesDuringPeriod" unitRef="GBP">3` — a
+  headcount of 3, mis-labelled as £3.
+- **Effect:** about **29%** of employee facts carry a GBP unit; the median such value is 1.0, so
+  almost all are real headcounts with the wrong label, with a small tail of genuine monetary
+  values (e.g. staff costs). **Do not filter employees by unit** or you silently lose ~29% of
+  coverage. The dataset keeps every value as filed and sets `employees_unit_anomaly = 1` on
+  affected rows. Employee coverage *also* has a 2020–2021 reporting-regime break — an apparent
+  jump or gap across that boundary may be an artefact. Source: `docs/accounts-employee-unit-cutoff.md`,
+  `docs/accounts-limitations.md`.
+
+### 5. Scale and sign (and European number formats)
+
+An iXBRL numeric tag carries a sign and, via its `format`, a number convention. Ignore them and
+the magnitude or direction is wrong.
+
+- **Example:** a fact with `format="ixt2:numdotcomma"` and text `4.506` means **4,506**, not
+  4.506 — the dot is a thousands separator. A `sign="-"` attribute makes the value negative even
+  though the printed digits look positive.
+- **Effect:** comma-as-decimal formats (`numdotcomma`/`numcomma`/`numspacecomma`/
+  `numcommadecimal`) were misread by roughly 100–1,000× until fixed — **1,096** facts changed
+  value archive-wide (e.g. a real `CashBankOnHand` fact read as `3.349` instead of `3349`). In
+  the independent ONS tool check, all 363 `sign="-"` figures were handled correctly by
+  `ixbrlparse`. Source: `docs/accounts-validation-summary.md`,
+  `docs/source-material/deck-corrections.md`, `docs/source-material/tool-comparison-check.py`.
+
+### 6. Namespace prefixes
+
+iXBRL tags live in a namespace that a filing can bind to any prefix. Hardcode one prefix and you
+silently drop every filing that uses another.
+
+- **Example:** the extractor matched `ix:nonFraction`, but a filing binding inline-XBRL to a
+  different prefix (or the default namespace) — e.g. `<ixbrli:nonFraction>` — matched nothing, so
+  that filing extracted **zero facts** and simply vanished from the data without error.
+- **Effect:** fixing the prefix detection recovered **61,085** filings (measured directly;
+  concentrated 2014–2022). An earlier sample-based estimate of ~291,802 was wrong because it was
+  computed from stale scan files — corrected to the measured figure. Source:
+  `docs/accounts-validation-summary.md`, `docs/source-material/deck-corrections.md`.
+
+### 7. Plain-XML filings
+
+A small tail of filings are plain XBRL (`.xml`), not iXBRL (`.html`). An extractor built only
+for the HTML form skips them entirely.
+
+- **Example:** a monthly archive contains mostly `.html` iXBRL plus a minority of `.xml`
+  filings; the XML ones were previously dropped, so early-year coverage looked thinner than it
+  was.
+- **Effect:** plain-XML filings are **301,141** archive-wide (0.84%); they are now read through
+  an `ixbrlparse`-based adapter (**273,418** gained real facts), verified against Arelle on 186
+  filings (100% agreement on shared facts). The share is larger in early years, so check it
+  before trusting 2014–2018 coverage. Source: `docs/accounts-validation-summary.md`,
+  `docs/accounts-limitations.md`.
+
+### 8. One-shot PSC snapshots
+
+The PSC product is a **daily snapshot**, not an event stream — only today's file is served.
+
+- **Example:** a PSC's details are corrected between two days; unless you archived yesterday's
+  snapshot, the pre-correction state is gone.
+- **Effect:** to reconstruct history you must archive snapshots yourself. The good news: **ceased
+  PSC records are retained**, so control history is reconstructable from 2016-04-06 (the product
+  spans 10,917,257 distinct companies — nearly double the live register). The bad news: the ~32
+  parts are **not** random samples or company-number ranges (statements are segregated into
+  parts 31–32; recent years cluster in parts 25–30), so **no per-part rate is usable** — stream
+  all parts. Source: `docs/recon-psc.md`, `docs/recon-psc-results.md`.
+
+### 9. Person matching with no stable ID
+
+PSC and officer records have **no stable person identifier**, so linking the same person across
+companies is a fuzzy join.
+
+- **Example:** the same individual appears as a PSC of several companies with slightly different
+  name spellings and addresses; matching on (forename, surname, birth year, birth month)
+  collides real people and splits one person across variants.
+- **Effect:** on a conservative key, **28.8%** of person-keys appear on two or more records and
+  **28.0%** on two or more distinct companies — so cross-company linkage is common, but the
+  method's confidence must be stated, not assumed. Global Witness/DataKind matched on name +
+  birth month/year + address; this project will benchmark its matching against theirs. Source:
+  `docs/recon-psc-results.md`, [prior work](../evidence/prior-work.qmd).
+
+> **What it means for you.** If you build on this data directly, test for each of these before
+> trusting a result: a nil read as missing, a restated comparative, a creditors total that is
+> really one bucket, employees filtered by unit, an ignored scale/sign, a dropped filing from a
+> prefix mismatch, skipped XML, an un-archived PSC snapshot, and an over-confident person join.
+> The published [accounts dataset](../datasets/accounts.qmd) handles the accounts ones for you;
+> the [validation page](../datasets/accounts-validation.qmd) shows how each fix was checked.

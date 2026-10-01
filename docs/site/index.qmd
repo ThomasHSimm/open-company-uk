@@ -1,18 +1,96 @@
 ---
-title: "open-company-uk"
+title: "UK company data: explained, connected, usable"
+toc: false
 ---
 
-An open, reproducible pipeline for deriving transparent company-status, compliance, and
-ownership indicators from free UK Companies House data.
+UK company data is free, large and genuinely useful — and awkward to use. It is spread across
+several registers, published in formats built for filing rather than analysis, and shaped by
+rules that are easy to misread. This site does three things: it **explains** what Companies
+House and the other UK sources publish, it **connects** them by showing how they join and what
+each adds, and it **publishes** tested, ready-to-use datasets built from them. Where code adds
+something beyond what already exists, we add it; where it doesn't, we link to the best existing
+explanation instead.
 
-This is methodology, not a company-rating product. Register records cannot establish that a
-company is trustworthy, solvent, or non-fraudulent. The pipeline produces traceable
-attributes and discrete flags, never a composite score, and publishes no named company
-results or personal data.
+This is methodology and open data, **not a company-rating product**. Register records can
+support due-diligence signals; they cannot establish that a company is trustworthy, solvent or
+non-fraudulent. Nothing here produces a composite score, publishes named company results, or
+includes personal data.
 
-- [Methodology](methodology.qmd) explains the pipeline, evidence tiers, and severity semantics.
-- [Validation](validation.qmd) describes the positive-unlabelled study design.
-- [Limitations](limitations.qmd) states what the data and method cannot show.
+## Three ways in
 
-Not affiliated with or endorsed by Companies House or the Insolvency Service. Contains public
-sector information from both bodies licensed under the Open Government Licence v3.0.
+::: {.grid}
+
+::: {.g-col-12 .g-col-md-4}
+### [Guide](guide/companies-house.qmd)
+Where the data is and how it fits together. What [Companies House](guide/companies-house.qmd)
+publishes, [how the UK sources join](guide/sources-map.qmd), [what the accounts data
+is](guide/accounts-data.qmd), and the [pitfalls we hit](guide/pitfalls.qmd) reading it.
+:::
+
+::: {.g-col-12 .g-col-md-4}
+### [Datasets](datasets/accounts.qmd)
+Ready-to-use, tested tables. An open [2014–2026 accounts dataset](datasets/accounts.qmd)
+(WIDE and LONG), [how we know it is right](datasets/accounts-validation.qmd), and the
+[ownership / PSC work](datasets/psc.qmd) still in progress.
+:::
+
+::: {.g-col-12 .g-col-md-4}
+### [Indicators](indicators/methodology.qmd)
+Transparent register flags. A documented [rule registry](indicators/methodology.qmd) over
+Companies House data, [how it is validated](indicators/validation.qmd), and [what it cannot
+show](indicators/limitations.qmd) — per-company flags, never a single score.
+:::
+
+:::
+
+## Start here
+
+Pick the path that matches what you want.
+
+- **You want data to analyse.** Start with [the accounts dataset](datasets/accounts.qmd) —
+  one row per company per accounting period, 2014–2026, with a quickstart snippet and a column
+  dictionary. Read [the pitfalls](guide/pitfalls.qmd) before modelling; several of them
+  (dashes, restatements, mis-tagged employee counts) change results quietly if missed.
+- **You want code.** The pipeline is on [GitHub](https://github.com/ThomasHSimm/open-company-uk).
+  [The accounts guide](guide/accounts-data.qmd) explains the source format, and [the validation
+  page](datasets/accounts-validation.qmd) explains how the extractor was checked against two
+  independent parsers. The [indicator rules](indicators/methodology.qmd) are generated from
+  code, so the documentation cannot drift from the implementation.
+- **You want evidence.** [The landscape](landscape/who-uses.qmd) covers who uses UK company
+  data and [what the commercial market charges](landscape/market.qmd). [Prior
+  work](evidence/prior-work.qmd) summarises what others have built, and the [evidence
+  register](evidence/register.qmd) is where sources are catalogued as they are reviewed.
+
+## What this is, and is not
+
+- **No composite score, anywhere.** The indicator pipeline records discrete, registrar-sourced
+  facts as flags with a severity and an evidence string. Severity grades the seriousness of the
+  recorded state, not confidence in it. There is no single number.
+- **No named results, no personal data.** The repository publishes code, methodology and
+  synthetic fixtures only. Run outputs, officer/PSC-level data and named flag lists stay
+  private. The published accounts datasets contain financial facts and company numbers only.
+- **Open licence.** Source data is Crown copyright, published under the Open Government Licence
+  v3.0 and free to reuse with attribution. The OGL does not cover personal data, which is part
+  of why personal data is removed before anything is published.
+
+## Reading the confidence labels
+
+Figures across this site carry one of three labels, and each carries its **source's** confidence
+— the label is not an independent re-verification by this site unless it says so:
+
+- **[Checked]** — either a **project measurement** traceable to a committed repo file (e.g.
+  dataset coverage, the 99.999% parser agreement, iXBRL adoption), *or* an official/primary source
+  as recorded in the repo's source material (e.g. the register statistics from the Companies House
+  annual report). Where it is the latter, the label inherits that source's confidence; it has not
+  been independently re-derived here. Project measurements are tagged "(project measurement)".
+- **[Estimated]** — a reputable secondary source or a study estimate (e.g. the user-value figures,
+  most commercial prices). Treat as indicative.
+- **[Not verified]** — flagged uncertain by its own source, or not re-checked here (e.g. the FAME
+  and Beauhurst prices, the API rate limit, a civil-service spend total). Confirm before relying
+  on it.
+
+Commercial prices are indicative, dated to the source, and negotiable; legislation dates (the
+2025 thresholds, the 2028 reforms) are given with their confirmation date because they have moved
+before.
+
+Not affiliated with or endorsed by Companies House or the Insolvency Service.

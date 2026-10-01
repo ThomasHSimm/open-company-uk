@@ -1,0 +1,192 @@
+---
+title: "Accounts dataset (WIDE & LONG, 2014–2026)"
+---
+
+## Summary
+
+This is an open, analysis-ready version of twelve years of UK company accounts, built from
+Companies House's free monthly bulk archives. It comes in two tables. **WIDE** is one row per
+company per accounting period, with the core balance-sheet figures as columns — the table most
+people want for modelling. **LONG** is a fuller, **personal-data-removed** table — one row per
+fact, reaching the concepts the curated columns leave out — for anyone who needs more than WIDE.
+Coverage is continuous from January 2014 to August 2026 (152 monthly archives, no gaps), and both
+published tables contain **financial facts and company numbers only** — no names, addresses or
+other personal data. The complete as-filed archive (which *does* contain director names,
+addresses and loans) is kept private and **never published**; what you can download is the
+filtered subset described under *Licence* below.
+
+The one decision you must make before using WIDE is **which pivot** to read:
+`as_first_reported` (what was known at the time — use this for anything predictive) or `latest`
+(includes later restatements — do not use it for prediction). Everything else on this page is
+about using the tables correctly: the columns, the known limitations, and the licence.
+
+## Details
+
+### The two tables
+
+| Table | Grain | Contents | Size |
+|---|---|---|---|
+| **WIDE** | one row per (company, period-end) | nine core balance-sheet concepts + equity and creditors splits + helper columns | ~2.6 GB Parquet |
+| **LONG** (public subset) | one row per fact | the full concept set (~4,593 concepts) **with person-related and free-text concepts removed** — *not* the raw as-filed archive | ~9.2 GB Parquet, one file per year |
+
+::: {.callout-important appearance="simple"}
+**"LONG" here means the published, personal-data-removed subset.** The full LONG archive used
+*internally* to build these tables contains personal data — director names, addresses, the signing
+director, director loans and remuneration — and is **never published**. Only the filtered subset
+(numeric person-concept denylist + structured-field allowlist, described under *Licence*) is
+downloadable. The Kaggle "LONG" dataset is that subset, not the raw archive.
+:::
+
+Coverage: **152 monthly archives, continuous 2014-01 → 2026-08, 0 gaps.** WIDE has **33,513,017**
+rows in `as_first_reported` mode and **36,710,673** in `latest` mode. Source:
+`docs/accounts-wide-rebuild-verification.md`, `docs/accounts-limitations.md`. **[Checked]**
+(project measurement).
+
+> **Why it starts in 2014, not 2008.** The format WIDE reads (iXBRL) was adopted gradually —
+> ~0% of filings in 2010, ~97% by 2014 — so 2014 is where tagged coverage becomes near-universal,
+> not where Companies House's data stops. Pre-2014 would be a separate, much lower-fill-rate
+> extraction. **Coverage gaps within the span are non-random** — they correlate with filing
+> regime, exemption status and company size, so do not treat non-appearance as a random
+> exclusion. Source: `docs/accounts-limitations.md`.
+
+### The WIDE columns
+
+The nine core concepts, the dimensional splits, and the helper columns, with coverage measured
+on the flagship `as_first_reported` file (33,513,017 rows):
+
+| Column | Meaning | Unit | Coverage |
+|---|---|---|---:|
+| `company` | Companies House number (leading zeros preserved) | string | 100% |
+| `period_end` | Accounting period end date | date | 100% |
+| `Equity` | Total equity (shareholders' funds) | GBP | 75.68% |
+| `NetCurrentAssetsLiabilities` | Net current assets/liabilities | GBP | 85.08% |
+| `CurrentAssets` | Total current assets | GBP | 78.95% |
+| `Creditors` | Total creditors (all maturities) — **sparse; use the splits** | GBP | 3.82% |
+| `CashBankOnHand` | Cash and bank balances | GBP | 35.41% |
+| `Debtors` | Total debtors | GBP | 35.31% |
+| `PropertyPlantEquipment` | Property, plant & equipment (NBV) | GBP | 22.48% |
+| `TotalAssetsLessCurrentLiabilities` | Total assets less current liabilities | GBP | 80.63% |
+| `AverageNumberEmployeesDuringPeriod` | Average employees during the period | headcount | 60.69% |
+| `equity_share_capital` / `equity_retained_earnings` | Equity split | GBP | 30.80% / 29.42% |
+| `creditors_within_one_year` / `creditors_after_one_year` | Creditors by maturity | GBP | 32.69% / 13.72% |
+| `employees_unit_anomaly` | Was the employee value GBP-tagged? (diagnostic) | 0/1 | 60.69% |
+| `n_concepts_present` / `n_source_filings` | Completeness helpers | count | 100% |
+| `row_available_yyyymm` | Month by which the whole row was known | YYYYMM | 100% |
+
+The coverage percentages come from the dataset's own **`column-dictionary.md`**, which the
+pipeline generates and ships *with* the Kaggle dataset — it is **not** tracked in the git repo
+(the `kaggle*/` staging directories are gitignored), so it travels with the download rather than
+the source tree. Column *meanings* are also recorded in the tracked
+[`docs/accounts-wide-columns.md`](https://github.com/ThomasHSimm/open-company-uk/blob/main/docs/accounts-wide-columns.md).
+A matching `accounts-wide-provenance-{mode}.parquet` records which source filing each cell came
+from. **[Checked]** (pipeline-generated).
+
+> **Most rows are sparse, and that is expected.** A company reporting only `Equity` and
+> `CurrentAssets` for a year genuinely filed filleted accounts without the rest — it is not a gap
+> in the extraction. See [the accounts guide](../guide/accounts-data.qmd).
+
+### `as_first_reported` vs `latest`
+
+Both files share the same schema; they differ only in which filing wins each cell.
+
+- **`accounts-wide-as_first_reported.parquet` (flagship, default).** Each cell holds the value
+  from the **earliest** filing that reported it — only information available at the time, no
+  look-ahead. **Use this for any predictive or point-in-time work.**
+- **`accounts-wide-latest.parquet` (secondary).** Each cell holds the value from the **most
+  recent** filing, which can include later comparative restatements of an earlier period. **Do
+  not use this for predictive work** — a value can reflect information that postdates the period.
+
+Across the full span, **9.36%** of repeated (company, period, concept) values disagree between
+first-reported and a later filing, which is exactly why the two files are kept separate rather
+than collapsed into one ambiguous "current" column. Source: `docs/accounts-validation-summary.md`,
+`docs/accounts-restatement-2014-2026.md`.
+
+### Quickstart
+
+The files are Parquet, so polars, pandas, DuckDB or Spark all work. `row_available_yyyymm` is the
+month by which every value in a row had been filed, which makes point-in-time filtering a single
+comparison. The company number below (`00012345`) is a placeholder — substitute a real one.
+
+```python
+import polars as pl
+
+wide = pl.read_parquet("accounts-wide-as_first_reported.parquet")
+
+# one company's history (company numbers are TEXT — keep the leading zeros)
+(wide
+   .filter(pl.col("company") == "00012345")
+   .sort("period_end"))
+
+# only what was known as of a date: no look-ahead
+wide.filter(pl.col("row_available_yyyymm") <= 202312)
+```
+
+Rules of thumb, each because it changes how the data should be used:
+
+1. **Pivot mode** — `as_first_reported` for prediction; `latest` leaks the future (~9% of
+   repeated figures differ).
+2. **Creditors** — use `creditors_within_one_year` / `creditors_after_one_year`; the bare total
+   is ~4% populated and unreliable even when present.
+3. **Employees** — ~29% are GBP-tagged (median value 1.0, mostly real headcounts). The flag
+   marks them; no value is removed. Don't filter employees by unit.
+4. **Dashes** — a dash in the accounts means nil and is stored as `0`, not null.
+5. **Missing is not zero** — values are never imputed, and some missingness is non-random, so
+   decide explicitly how to handle gaps.
+
+Source: deck slides 15–16 and notes (`docs/source-material/companies-house-accounts-deck.md`);
+see also [pitfalls](../guide/pitfalls.qmd).
+
+### Limitations to know before modelling
+
+- **Balance-sheet only** for most companies (filleted filing): no turnover or profit.
+- **Starts in 2014** — earlier bulk data is barely machine-tagged.
+- **Some breakdowns skipped** — facts in multi-member or custom (typed-member) dimensional
+  contexts are not captured; ~38% of filings contain at least one such context (these are mostly
+  detailed notes, not the balance-sheet totals WIDE uses).
+- **Nine core concepts validated** — the other ~4,580 concepts in LONG are captured as filed but
+  **not** validated; check the source filing before relying on a rare one.
+- **Restatements (~9%)** and an **employee reporting break around 2020–2021**.
+- **Non-random gaps** — e.g. equity fill-rate varies by more than 10 percentage points across
+  months.
+- **GBP only in WIDE** — non-sterling filers are excluded (kept in LONG), not converted.
+
+Full detail and every reconciliation: `docs/accounts-limitations.md`. Source: deck slide 17.
+
+### Licence and personal-data policy
+
+Contains public sector information from Companies House, licensed under the **Open Government
+Licence v3.0**, free to reuse with attribution. Companies House and the UK Government do not
+endorse this dataset, and a derived dataset is not a complete or official representation of any
+company.
+
+Both published tables are **financial facts and company numbers only**. WIDE carries no names,
+addresses or director figures. LONG applies a maintainer-approved filter: a 95-concept numeric
+**denylist** (director/officer/key-management/related-party remuneration, loans and advances)
+and a 17-concept non-numeric **allowlist** of structured fields only (dates, the registered
+number, filing-software name, and categorical flags) — every other non-numeric concept, including
+all free text, is dropped. The private, unfiltered archive that includes personal data is **never
+published**. The OGL does not cover personal data, which is part of why this split exists.
+Source: `docs/accounts-public-long-concepts.md`, `docs/accounts-limitations.md`.
+
+### Get the data
+
+::: {.callout-important title="Kaggle links — publication pending"}
+The datasets are prepared for Kaggle under these slugs. **Confirm the dataset is public before
+relying on a link** — at the time of writing these are placeholders pending publication (deck
+notes: "add the Kaggle links once the datasets are published"). **[Not verified]**
+
+Both slugs below are the **published, personal-data-removed** datasets — neither is the private
+full archive.
+
+- WIDE: `thomassimm/uk-company-accounts-wide-2014-2026`
+  → `https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026`
+- LONG (personal-data-removed public subset): `thomassimm/uk-company-accounts-long-2014-2026`
+  → `https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026`
+
+Slugs are from each dataset's `dataset-metadata.json`, generated in the gitignored `kaggle*/`
+staging directories and shipped with the dataset — not tracked in the git repo.
+:::
+
+The pipeline that builds these tables is on
+[GitHub](https://github.com/ThomasHSimm/open-company-uk). See [how we know the data is
+right](accounts-validation.qmd) for the parser comparison and cross-checks.

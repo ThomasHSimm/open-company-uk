@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Companies House accounts data — open-company-uk</title>
+<meta name="description" content="What the Companies House bulk accounts data is, the rules that shape it, what it contains, how the open-company-uk pipeline turns it into an analysable dataset, and its limitations.">
+<style>
+  :root{
+    --paper:#FAFAF8; --ink:#1A1D21; --ink-soft:#4C525A; --faint:#767C84;
+    --accent:#16456B; --accent-soft:#E8EEF3; --link:#16456B;
+    --caveat-bg:#FBF3E1; --caveat-bd:#DDB255; --caveat-ink:#7E5A05;
+    --rule:#E3E1DB; --panel:#F2F1EC;
+    --serif:Charter,"Iowan Old Style","Palatino Linotype",Georgia,Cambria,serif;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#141719; --ink:#E9E7E1; --ink-soft:#AEB3B9; --faint:#878D94;
+      --accent:#83B4DC; --accent-soft:#1C2A35; --link:#8FBFE6;
+      --caveat-bg:#28220F; --caveat-bd:#8A6C2B; --caveat-ink:#E2BE6C;
+      --rule:#2A2E33; --panel:#1B1F22;
+    }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--serif); font-size:1.12rem; line-height:1.66;
+    font-kerning:normal; text-rendering:optimizeLegibility;
+  }
+  .wrap{max-width:46rem; margin:0 auto; padding:0 1.4rem}
+  a{color:var(--link); text-underline-offset:2px; text-decoration-thickness:1px}
+  a:hover{text-decoration-thickness:2px}
+
+  header.top{border-bottom:1px solid var(--rule)}
+  header.top .wrap{display:flex; align-items:baseline; justify-content:space-between;
+    padding-top:.9rem; padding-bottom:.9rem; gap:1rem}
+  .mark{font-family:var(--mono); font-size:.82rem; letter-spacing:.01em; color:var(--faint)}
+  .mark a{color:inherit; text-decoration:none}
+  .mark a:hover{color:var(--ink)}
+  nav.mini{font-family:var(--sans); font-size:.8rem}
+  nav.mini a{color:var(--ink-soft); text-decoration:none; margin-left:1rem}
+  nav.mini a:hover{color:var(--accent)}
+
+  .hero{padding:3.4rem 0 1.2rem}
+  h1{font-family:var(--sans); font-weight:650; font-size:2.35rem; line-height:1.08;
+    letter-spacing:-.018em; margin:0 0 1rem}
+  .lede{font-size:1.28rem; line-height:1.5; color:var(--ink); margin:0 0 .4rem}
+  .sub{color:var(--ink-soft); font-size:1.06rem}
+
+  main .wrap>section{padding:2.2rem 0; border-top:1px solid var(--rule)}
+  h2{font-family:var(--sans); font-weight:620; font-size:1.42rem; line-height:1.2;
+    letter-spacing:-.01em; margin:0 0 .9rem}
+  h3{font-family:var(--sans); font-weight:600; font-size:1.06rem; margin:1.6rem 0 .4rem}
+  p{margin:0 0 1rem}
+  .muted{color:var(--ink-soft)}
+  strong{font-weight:640}
+  code,.f{font-family:var(--mono); font-size:.86em; background:var(--panel);
+    padding:.08em .35em; border-radius:3px; word-break:break-word}
+
+  dl.facts{display:grid; grid-template-columns:auto 1fr; gap:.15rem 1.2rem;
+    font-family:var(--sans); font-size:.96rem; margin:.4rem 0 0;
+    border:1px solid var(--rule); border-radius:6px; padding:1rem 1.15rem}
+  dl.facts dt{color:var(--faint); font-size:.82rem; align-self:baseline; padding-top:.15rem}
+  dl.facts dd{margin:0 0 .35rem}
+  dl.facts dd:last-of-type{margin-bottom:0}
+
+  .caveat{background:var(--caveat-bg); border-left:3px solid var(--caveat-bd);
+    border-radius:0 5px 5px 0; padding:.85rem 1.05rem; margin:1.2rem 0;
+    font-size:1.02rem}
+  .caveat b{font-family:var(--sans); font-weight:600; font-size:.92rem; color:var(--caveat-ink);
+    display:block; margin-bottom:.15rem}
+
+  ul.tight{margin:.2rem 0 1rem; padding-left:1.2rem}
+  ul.tight li{margin:.3rem 0}
+  ul.plain{list-style:none; margin:.2rem 0 1rem; padding:0}
+  ul.plain li{margin:.55rem 0; padding-left:1.1rem; text-indent:-1.1rem}
+  ul.plain li::before{content:"—"; color:var(--accent); margin-right:.5rem}
+
+  .sources li{margin:.5rem 0}
+  .sources a{font-family:var(--sans); font-size:.96rem}
+  .sources .s{color:var(--faint); font-family:var(--sans); font-size:.82rem}
+
+  footer{border-top:1px solid var(--rule); margin-top:1rem}
+  footer .wrap{padding:1.8rem 1.4rem 3rem; color:var(--ink-soft);
+    font-family:var(--sans); font-size:.88rem; line-height:1.55}
+  .flag{outline:1px dashed var(--caveat-bd); outline-offset:2px; border-radius:2px}
+  @media (max-width:34rem){
+    h1{font-size:1.95rem}
+    body{font-size:1.06rem}
+    dl.facts{grid-template-columns:1fr}
+    dl.facts dt{padding-top:.5rem}
+  }
+</style>
+</head>
+<body>
+
+<header class="top"><div class="wrap">
+  <span class="mark"><a href="#">open-company-uk</a></span>
+  <nav class="mini">
+    <a href="#data">Data</a>
+    <a href="#rules">Rules</a>
+    <a href="#pipeline">Pipeline</a>
+    <a href="#limits">Limits</a>
+  </nav>
+</div></header>
+
+<main>
+<div class="wrap">
+
+  <section class="hero" style="border-top:none">
+    <h1>UK company accounts, made analysable</h1>
+    <p class="lede">Companies House publishes the annual accounts that almost every UK company must file. This project turns that free but awkward archive — millions of tagged HTML filings — into a compact, honest financial time series.</p>
+    <p class="sub">What the data is, the rules that shape it, what it actually contains, how it is processed, and — first-class here — what it cannot tell you.</p>
+  </section>
+
+  <section id="data">
+    <h2>What the data is</h2>
+    <p>Companies House releases a free <strong>bulk accounts data product</strong>: the annual accounts that companies have filed electronically, packaged as monthly ZIP archives. Each monthly file contains the accounts <em>received</em> that month — one document per filing, across every industry and company size.</p>
+    <p>Only <strong>electronically filed</strong> accounts appear — historically a majority of filings (around 60%), and rising as digital filing spreads. The records go back to <strong>2008</strong>. Inside each ZIP the documents are mostly <strong>inline XBRL</strong> (<span class="f">.html</span> files that are human-readable in a browser and machine-readable via embedded tags), with a small tail of plain <span class="f">.xml</span>.</p>
+    <p>Availability is uneven. The main download page carries only the most recent twelve months; older months live on a separate historic page going back to 2008. Some individual months are genuinely missing, and files occasionally drop off the listings while remaining reachable by direct URL — so complete historical coverage cannot be assumed, only measured.</p>
+    <dl class="facts">
+      <dt>Source</dt><dd>Companies House bulk accounts data product</dd>
+      <dt>Coverage</dt><dd>Electronically filed accounts, 2008–present</dd>
+      <dt>Cadence</dt><dd>Monthly archives (recent months also daily)</dd>
+      <dt>Format</dt><dd>Inline XBRL (HTML), small share of XML</dd>
+      <dt>Licence</dt><dd>Open Government Licence v3.0</dd>
+      <dt>Personal data</dt><dd>None in the financials (see below)</dd>
+    </dl>
+  </section>
+
+  <section id="rules">
+    <h2>The rules that shape it</h2>
+    <p>Under the <strong>Companies Act 2006</strong>, essentially every registered company must file annual accounts, with a filing window of nine months after the year-end for private companies. But <em>what</em> a company files depends on its size, and that is where most of the data's character comes from.</p>
+
+    <h3>The size regime</h3>
+    <p>A company is placed in a size band by meeting two of three tests — turnover, balance-sheet total, and average employees — over two consecutive years. From <strong>6 April 2025</strong> the monetary thresholds rose by roughly half (their first change since 2013):</p>
+    <ul class="tight">
+      <li><strong>Micro-entity</strong> — turnover ≤ £1m, balance sheet ≤ £500k, ≤ 10 employees.</li>
+      <li><strong>Small</strong> — turnover ≤ £15m, balance sheet ≤ £7.5m, ≤ 50 employees.</li>
+      <li><strong>Medium</strong> — turnover ≤ £54m, balance sheet ≤ £27m, ≤ 250 employees.</li>
+    </ul>
+    <p>Smaller companies get lighter obligations: micro-entities and small companies need no audit and file far less.</p>
+
+    <h3>Filleted accounts — the defining feature</h3>
+    <p>Under section 444 of the Act, small companies and micro-entities may file <strong>“filleted” accounts</strong>: they prepare full accounts for their shareholders and HMRC, but file only the <strong>balance sheet and its notes</strong> with Companies House — omitting the profit-and-loss account and directors' report. Most small companies do exactly this. Since the overwhelming majority of UK companies are small or micro, the public dataset is, in practice, a <strong>balance-sheet dataset</strong>: for most companies there is no turnover and no profit figure at all.</p>
+    <p>One useful quirk: the average-employees note is generally treated as <em>not</em> a profit-and-loss note, so it usually survives filleting — which is why headcount is far better covered than any income-statement item.</p>
+
+    <div class="caveat">
+      <b>Coming, but not retroactive</b>
+      Reforms under the Economic Crime and Corporate Transparency Act 2023 will require small companies and micro-entities to file a profit-and-loss account, with all accounts filed via commercial software in iXBRL and filleted/abridged options removed. After a pause, this was confirmed on 9 June 2026 for <strong>April 2028</strong> (delayed from 2027) — and small-company P&amp;L data may be kept private rather than published. None of it enriches the historical filings this dataset is built from.
+    </div>
+
+    <h3>How it is tagged</h3>
+    <p>Accounts are tagged against <strong>FRC taxonomies</strong> — FRS 105 for micro-entities, FRS 102 (including Section 1A) for small and larger companies — which define the machine-readable name for each figure. The taxonomies are revised often, across many generations. Rather than track every version, the pipeline targets each concept's stable <em>local</em> name, so it reads across taxonomy generations without a version map.</p>
+  </section>
+
+  <section id="contains">
+    <h2>What it contains</h2>
+    <p>From the filed balance sheets, the core financial concepts are things like <strong>equity</strong>, <strong>net current assets/liabilities</strong>, <strong>total assets less current liabilities</strong>, <strong>current assets</strong>, <strong>creditors</strong>, <strong>cash</strong>, <strong>debtors</strong>, <strong>property, plant &amp; equipment</strong>, and <strong>average employees</strong>. Coverage falls off steadily from equity (near-universal) down to the sparser line items.</p>
+    <p>Many figures are reported not as a single total but as <strong>dimensional breakdowns</strong> — for example creditors split into amounts due <em>within</em> and <em>after</em> one year, or equity split into share capital and retained earnings. The pipeline captures these named components as first-class rows, not just the totals, because for some concepts the components are all that a company reports.</p>
+    <div class="caveat">
+      <b>Creditors is dimensional, not a total</b>
+      In sampling, a genuine consolidated creditors total appears for only about 4% of company-periods — the figure is almost always reported as a maturity split instead. Treat the maturity components as the real signal; a missing creditors <em>total</em> is the normal case, not an absent filing.
+    </div>
+  </section>
+
+  <section id="pipeline">
+    <h2>How this pipeline processes it</h2>
+    <p>The goal is a dataset a modeller can trust, which means being explicit about every judgement rather than quietly smoothing the data. The processing is deliberately two-staged.</p>
+    <p><strong>Stage 1 — a full-fact monthly archive.</strong> Every tagged fact in each filing is extracted, with its resolved unit (pounds, count, ratio), scale, sign, reporting period, and provenance, and written to one Parquet file per month that mirrors the input. This does the expensive HTML parsing once; later work never has to touch the raw filings again.</p>
+    <p><strong>Stage 2 — slim model tables.</strong> A separate, cheap filter selects whatever a given model needs (say, employees plus a few balance-sheet fields and a date) from the Stage 1 archive.</p>
+    <p>Throughout, the design choices favour honesty over convenience:</p>
+    <ul class="plain">
+      <li><strong>Missingness is kept, never imputed.</strong> An absent figure is null, and the reason it is absent is often more informative than a guess.</li>
+      <li><strong>Conflicts are retained and tagged.</strong> Where a filing reports the same figure twice with different values, both are kept and labelled, rather than silently dropped.</li>
+      <li><strong>Provenance guards against look-ahead.</strong> Each filing carries the current year plus a prior-year comparative, and around 8% of repeated figures are later restated. The originally-filed value and its filing date are preserved, so time-series work can use what was actually known at the time instead of a later revision.</li>
+      <li><strong>Nothing is lost silently.</strong> Every fact is accounted for in an explicit tally that must balance — the failure mode this project treats as the enemy is wrong-but-not-crashed, not crashed.</li>
+    </ul>
+    <p class="muted">Only the nine core concepts above are validated for coverage and internal consistency. The wider set of concepts is captured faithfully but <strong>unvalidated</strong>; a concept inventory records what exists and flags anything that looks anomalous, so a rare field is never trusted blind.</p>
+  </section>
+
+  <section id="companies">
+    <h2>What it can tell you about a company</h2>
+    <p>Even as balance-sheet-only data, the archive supports a lot: the <strong>structure and trajectory</strong> of a company's finances over years — how assets, equity, creditors by maturity, cash and employees move — and balance-sheet-based signals such as negative equity or deteriorating net current assets.</p>
+    <p>This sits inside a broader project. <span class="mark" style="font-size:1em">open-company-uk</span> also derives <strong>registrar-recorded reliability indicators</strong> from Companies House data — a transparent rule registry with per-company flags rather than a single opaque score, validated against Insolvency Service records — and is extending into <strong>ownership and control</strong> via the PSC (persons with significant control) data: connectivity between companies, PSC counts, companies-per-person, and connected-company statistics.</p>
+    <div class="caveat">
+      <b>What it is not</b>
+      This is not a credit score and not a complete picture of a company. It reflects what the registrar holds, from filings that are mostly filleted, with non-random gaps. Read it as evidence to weigh, not a verdict.
+    </div>
+  </section>
+
+  <section id="limits">
+    <h2>Limitations</h2>
+    <p>Stated plainly, because they change how the data should be used:</p>
+    <ul class="plain">
+      <li><strong>Balance-sheet only, for most companies.</strong> Filleted filing means no turnover or profit for the small-and-micro majority.</li>
+      <li><strong>Creditors is ~96% dimensional.</strong> Use the maturity split; a missing total is expected.</li>
+      <li><strong>Employee-count regime break.</strong> Coverage jumps sharply around 2020→2021 owing to a reporting-rule change, not a real shift — do not read the earlier absence as signal.</li>
+      <li><strong>Some employee figures are mis-tagged</strong> with a currency unit rather than a count. Don't filter employees by unit, or you silently lose coverage.</li>
+      <li><strong>Non-random missingness.</strong> Equity coverage varies by month, so gaps are not simply random noise.</li>
+      <li><strong>Restatements (~8%).</strong> For anything predictive, use the originally-filed value, not a later comparative.</li>
+      <li><strong>Uneven history.</strong> Electronic filings only; some months missing; earlier years are less validated than 2019 onward.</li>
+      <li><strong>Only nine concepts validated;</strong> the rest are captured but unchecked.</li>
+    </ul>
+  </section>
+
+  <section id="licence">
+    <h2>Licence &amp; reuse</h2>
+    <p>The source data is Crown copyright, published under the <strong>Open Government Licence v3.0</strong>, and free to reuse with attribution. The financial facts are <strong>not personal data</strong>, so a derived financials dataset can be shared openly. Persons-with-significant-control and officer data are a separate, more restricted matter and are handled with corresponding care. Companies House and the UK Government do not endorse this project, and a derived dataset is not a complete or official representation of any company.</p>
+  </section>
+
+  <section id="sources" class="sources">
+    <h2>Sources &amp; further reading</h2>
+    <ul class="plain">
+      <li><a href="https://chguide.co.uk/bulk-data/accounts/">CH Guide — the accounts bulk data product</a> <span class="s">format, history to 2008</span></li>
+      <li><a href="https://companieshouse.blog.gov.uk/2021/09/07/when-and-how-to-file-your-annual-accounts-with-companies-house/">Companies House — when and how to file annual accounts</a></li>
+      <li><a href="https://www.icaew.com/technical/corporate-reporting/uk-gaap/uk-gaap-faqs/small-company-filing-options">ICAEW — small company filing options (filleted accounts)</a></li>
+      <li><a href="https://www.lexology.com/library/detail.aspx?g=ed22cbc7-9c28-4532-81b3-42a775443959">Company size thresholds from 6 April 2025</a></li>
+      <li><a href="https://www.icaew.com/insights/viewpoints-on-the-news/2026/jun-2026/companies-house-accounts-changes-confirmed-for-april-2028">ICAEW — accounts changes confirmed for April 2028 (ECCTA)</a></li>
+      <li><a href="https://www.fintags.co.uk/ixbrl-tagging-what-to-file-in-ixbrl">FRC taxonomies &amp; iXBRL tagging (FRS 102 / FRS 105)</a></li>
+      <li><a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/">Open Government Licence v3.0</a></li>
+    </ul>
+  </section>
+
+</div>
+</main>
+
+<footer><div class="wrap">
+  <p>Contains public sector information from Companies House, licensed under the Open Government Licence v3.0. This is an independent project and is not affiliated with or endorsed by Companies House.</p>
+  <p class="flag">Placeholders to confirm: repository URL, author/attribution name, and whether to link the concept inventory / dataset directly.</p>
+</div></footer>
+
+</body>
+</html>

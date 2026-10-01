@@ -1,0 +1,107 @@
+---
+title: "Companies House: what it publishes and how to get it"
+---
+
+## Summary
+
+Companies House is the UK's register of companies: it incorporates and dissolves companies,
+records what they file, and publishes almost all of it. The register has been free to search
+and download since 2015, and it is heavily used — billions of accesses a year. For an analyst,
+four things matter: three free **bulk data products** (basic company data, the accounts
+archive, and the daily PSC snapshot) plus a free **REST API** for current, per-company detail.
+The important catch is that the API returns register fields but **not** parsed financial
+figures — to get numbers out of accounts you still have to download and parse the filings
+yourself, which is what this project does at scale.
+
+For the low-level mechanics of each bulk product (file formats, where the historic archives
+live, how often they refresh), [CH Guide](https://chguide.co.uk/) already documents them well,
+and this guide links there rather than repeating them. The aim here is to explain what each
+source *adds* for analysis and where it will surprise you.
+
+## Details
+
+### What Companies House is
+
+Companies House is an executive agency of the Department for Business and Trade. It is the
+registrar for companies across England & Wales, Scotland and Northern Ireland. Historically it
+did very little checking of what companies filed; reforms under the **Economic Crime and
+Corporate Transparency Act 2023 (ECCTA)** are turning it from a passive record into a register
+that verifies identities and can query or reject information. That transition is still rolling
+out, so "verified" is not yet a safe assumption for older records.
+
+A few figures give the scale:
+
+| Figure | Value | Source & confidence |
+|---|---|---|
+| Companies on the register (31 March 2026) | 5.48m | CH annual report 2025/26. **[Checked]** |
+| Times register data was accessed in 2025/26 | 14.6bn (16.3bn in 2024/25) | CH annual report 2025/26. **[Checked]** |
+| Filings accepted in 2024/25 | 14.7m (13.5m digital) | CH annual report 2024/25. **[Checked]** |
+| Estimated annual value to users | £1–3bn | 2019 study for CH/BEIS. **[Estimated]** (a study estimate) |
+
+Source for all four: deck slide 3 and its notes, with primary sources listed in
+`docs/source-material/companies-house-accounts-notes.md`.
+
+> **What it means for you.** Free access since 2015 is why an open pipeline like this one is
+> possible at all: the raw material costs nothing. Free accesses grew from 1.3bn in 2015/16 to
+> over 16bn in 2023/24 (CH blog, June 2025; **[Checked]**).
+
+### The three bulk products and the API
+
+This is the practical core. Most analysts need only these four routes.
+
+| Source | What's in it | Format & frequency | Watch out for |
+|---|---|---|---|
+| **Basic Company Data** | Live companies: name, number, status, registered office, SIC codes, key dates | CSV, monthly | Live companies only; no history. Keep monthly copies to reconstruct past states. |
+| **Accounts bulk data** | Electronically filed annual accounts, tagged figure by figure | iXBRL/XML in ZIPs; daily and monthly, back to 2008 | E-filed only; mostly balance sheets (see below). |
+| **PSC snapshot** | People and entities with significant control, plus statements | JSON, daily | Only *today's* file is served — archive your own copies or lose corrections over time. |
+| **Officers bulk** | Directors and secretaries | On request only | Not a public bulk download. |
+| **APIs** | REST: profiles, officers, PSC, filings, charges, insolvency. Streaming: live changes. Document API: filed documents | JSON; free key; rate-limited | **No parsed financial figures; no bulk history.** |
+
+Source: deck slide 4 and its notes.
+
+Two terms, with concrete examples:
+
+- **iXBRL** ("inline XBRL"): an ordinary-looking HTML accounts page in which each figure is
+  tagged with a machine-readable name — for example `<nonFraction name="Equity">12,968` tags
+  the number 12,968 as the company's equity. A browser shows the page; a parser reads the tags.
+  See [the accounts guide](accounts-data.qmd) for what this means in practice.
+- **PSC**: a *person with significant control* — broadly, someone who owns or controls more
+  than 25% of a company, or otherwise exerts significant influence. The daily snapshot is
+  newline-delimited JSON, one record per line. See [the PSC status page](../datasets/psc.qmd).
+
+> **What it means for you.** The API is the right tool for current, per-company state (status,
+> overdue flags, insolvency links). It is the wrong tool for financials and for history: it
+> returns no parsed numbers from accounts, and no bulk back-catalogue. That gap — API-for-state,
+> bulk-download-plus-your-own-parser-for-financials — is the single most important thing to
+> understand about getting data out of Companies House.
+
+The published REST API rate limit is **about 600 requests per 5 minutes per key** (**[Not
+verified]** — stated from the developer docs in deck slide 4's notes but not re-checked here;
+confirm against the current [developer
+documentation](https://developer-specs.company-information.service.gov.uk/)). This project's own
+indicator pipeline deliberately runs below that (≈500/5min) because an API key may be shared
+across tools — see [the indicators methodology](../indicators/methodology.qmd).
+
+### Why we link to CH Guide instead of repeating it
+
+[CH Guide](https://chguide.co.uk/) is a thorough, well-maintained explanation of Companies
+House mechanics — the exact file layouts, the historic-archive pages back to 2008, the quirks
+of each download. Re-documenting that here would duplicate work that is already done well and
+would go stale faster than the original. So this guide links to CH Guide for mechanics and
+concentrates on the layer above it: how the sources **join**, what each one **adds** for
+analysis, and the [pitfalls](pitfalls.qmd) that only show up once you start using the data.
+
+### Where to go next
+
+- [How the UK sources join](sources-map.qmd) — the Gazette, Land Registry, payment practices
+  and more, each keyed to Companies House.
+- [The accounts data](accounts-data.qmd) — filleted filings, size thresholds, iXBRL and the
+  2028 changes.
+- [The accounts dataset](../datasets/accounts.qmd) — the tested, ready-to-use table built from
+  the accounts bulk product.
+
+::: {.callout-note appearance="minimal"}
+Every figure on this page is sourced to a named file in the repository. Primary sources for the
+register statistics are in `docs/source-material/companies-house-accounts-notes.md`; the slide
+text is in `docs/source-material/companies-house-accounts-deck.md`.
+:::

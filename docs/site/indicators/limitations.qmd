@@ -1,6 +1,18 @@
 ---
-title: "Limitations"
+title: "Indicators: limitations"
 ---
+
+## Summary
+
+The indicators describe what the registrar records, nothing more. Companies House treats its
+register as unverified information supplied by companies, identity checks are only part-way
+rolled out, and absence of a flag is weak evidence rather than a clean bill of health. The
+validation is positive-unlabelled, so it measures conditional recall, not accuracy against
+negative ground truth; and detecting insolvency is a narrow proxy, not a measure of
+trustworthiness, fraud or creditworthiness. Read the flags as traceable evidence to weigh, never
+as a verdict or a score.
+
+## Details
 
 - Companies House describes its register as unverified information supplied by companies.
   ECCTA identity verification is rolling out and does not retrospectively verify all officer

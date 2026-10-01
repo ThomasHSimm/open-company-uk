@@ -1,0 +1,185 @@
+---
+title: "How the UK sources join"
+---
+
+## Summary
+
+Companies House is not the only free UK source of company data — it is the spine that the
+others attach to. The Gazette, HM Land Registry, payment-practices reports, public-procurement
+records, charity registers, the overseas-entities register and the FCA register each add a
+different column to the same picture, and most of them join to a company on its **company
+number**. The catch is rarely price: most of these are free. The catch is **licences** (some
+forbid republishing) and **matching** (some sources carry the company number cleanly, others
+only sometimes). This page lists each source with what it adds, how it joins, how to get it,
+whether it can be republished, its known problems, who has used it before, and where this
+project stands on it.
+
+A second, blunter point sits underneath the map: some of the most predictive data **cannot** be
+got this way at all. Bank-credit behaviour, trade-payment histories and court judgments are
+private or paid, and no amount of open-data engineering reconstructs them. That boundary is set
+out at the end.
+
+## Details
+
+Each source below joins to Companies House mostly on the company number. "Our status" uses four
+values: **Done**, **In progress**, **Planned**, **Not planned**. Match-quality and access
+claims carry a **[Checked]** / **[Estimated]** label; everything traces to deck slides 6–8 and
+their notes (`docs/source-material/companies-house-accounts-deck.md` and
+`companies-house-accounts-notes.md`), the project plan (`docs/plan.md`), the README, and the
+literature queue (`literature/open-company-uk-source-queue-2026-08.md`).
+
+### Companies House itself
+
+Companies House is several sources in one. Treat each product separately.
+
+**Register (Basic Company Data)**
+
+- *What it adds:* the spine — name, number, status, registered office, SIC codes, incorporation
+  and accounts-due dates for every live company.
+- *Join key / match:* the company number *is* the key. **[Checked]**
+- *Access & licence:* free monthly CSV; OGL v3.0, republishable (personal data aside).
+- *Known problems:* live companies only, no history — reconstructing past states means keeping
+  your own monthly copies.
+- *Our status:* **Done** — used as population context and the stratification spine in the
+  [indicator validation](../indicators/validation.qmd).
+
+**Accounts bulk data**
+
+- *What it adds:* the actual financial figures — balance-sheet items, employee counts — tagged
+  in iXBRL/XML. See [the accounts guide](accounts-data.qmd).
+- *Join key / match:* company number, inside each filing. **[Checked]**
+- *Access & licence:* free daily/monthly ZIPs back to 2008; OGL v3.0. The financial facts are
+  not personal data, so a derived financials dataset can be published.
+- *Known problems:* electronically filed only; mostly balance sheets; the API returns no parsed
+  numbers, so you must parse the filings yourself.
+- *Our status:* **Done** — the published [2014–2026 accounts dataset](../datasets/accounts.qmd).
+
+**PSC (persons with significant control)**
+
+- *What it adds:* ownership and control — who owns or controls each company, and declared
+  statements where no PSC is identified.
+- *Join key / match:* company number; person-level linkage is fuzzy (no stable person ID —
+  see [the PSC page](../datasets/psc.qmd)). **[Checked]**
+- *Access & licence:* free daily JSON snapshot; OGL v3.0, but it contains personal data, so this
+  project publishes **code only**.
+- *Known problems:* only today's snapshot is served; corrections over time are lost unless you
+  archive. One-shot snapshot, not an event log.
+- *Our status:* **In progress** — recon complete, extractor in design.
+
+**Officers (directors and secretaries)**
+
+- *What it adds:* who runs the company; appointment/resignation history; ECCTA identity
+  verification fields.
+- *Join key / match:* company number via the API; person linkage is fuzzy. **[Checked]**
+- *Access & licence:* the *bulk* officers product is on request only, not a public download;
+  the per-company API is free. Personal data — code only.
+- *Our status:* **Done (via API, in the indicator pipeline)** — officer churn and
+  identity-verification attributes are derived per company; the bulk product is **Not planned**.
+
+**APIs (REST / Streaming / Document)**
+
+- *What it adds:* current, per-company state and the filed documents themselves.
+- *Access & licence:* free key; rate-limited (~600 req/5min per key, **[Not verified]** — see
+  [Companies House guide](companies-house.qmd)).
+- *Known problems:* no parsed financial figures; no bulk history.
+- *Our status:* **Done** — the indicator pipeline is API-first for freshness-sensitive state.
+
+### The Gazette
+
+- *What it adds:* official insolvency and strike-off notices with dates — winding-up petitions,
+  liquidations, strike-offs. Good for **outcome labels** and, more usefully, **timing**: how
+  far ahead of a winding-up petition does a register or accounts signal appear?
+- *Join key / match:* company number present in notices. **[Checked]**
+- *Access & licence:* free official API (JSON), paged; free web viewing is OGL. A separate
+  commercial **Data Service** exists — investigate a reproducible open acquisition route before
+  planning ingestion.
+- *Known problems:* separate the free OGL route from the paid Data Service.
+- *Prior work:* Transparency International UK used incorporation dates and notices as red flags
+  (see [prior work](../evidence/prior-work.qmd)).
+- *Our status:* **Planned** — the next specified external integration (`docs/plan.md`, README).
+
+### HM Land Registry — company property ownership {#hm-land-registry-company-property-ownership}
+
+- *What it adds:* which UK and overseas companies own property in England & Wales — asset
+  ownership, and a bridge to overseas owners.
+- *Join key / match:* company registration number. **[Checked]**
+- *Access & licence:* free monthly CSV (free since November 2017, account and licence required),
+  historical files via API. **The licence does not allow republishing** — so, as with PSC,
+  publish code only.
+- *Known problems:* republishing restriction; coverage is England & Wales.
+- *Prior work:* Private Eye (2015) → Who Owns England → TaxPolicy.org.uk (January 2026), which
+  cross-checked Land Registry against the overseas-entities register and published its method.
+- *Our status:* **Planned**.
+
+### Payment-practices reporting
+
+- *What it adds:* the only open signal on **payment behaviour** — large firms' average days to
+  pay, share of invoices paid late, and standard terms. This is the open stand-in for the
+  trade-payment data credit agencies sell privately.
+- *Join key / match:* company number on every report. **[Checked]**
+- *Access & licence:* all reports downloadable; open.
+- *Known problems:* **large companies only** — it does not cover the small/micro majority.
+- *Our status:* **Planned**.
+
+### Contracts Finder / Find a Tender
+
+- *What it adds:* public contracts and winning suppliers — public-sector exposure, and very new
+  suppliers winning contracts (a documented red flag).
+- *Join key / match:* **sometimes** — supplier identifiers are inconsistent, so matching needs
+  work. **[Estimated]** (contract→company-number match quality is not yet measured here).
+- *Access & licence:* bulk, Open Contracting Data Standard; open.
+- *Prior work:* Transparency International UK ("Track and Trace", "Behind the Masks"); Open
+  Ownership has combined PSC with procurement data.
+- *Our status:* **Planned**.
+
+### Charity registers (Charity Commission, OSCR, CCNI) {#charity-registers-charity-commission-oscr-ccni}
+
+- *What it adds:* the non-profit segment — many charities are also companies and carry a company
+  number; finances and trustees.
+- *Join key / match:* **mostly** — most charitable companies carry a company number.
+  **[Estimated]**.
+- *Access & licence:* bulk downloads; open.
+- *Prior work:* David Kane / 360Giving's **Find that Charity** already links 16 sources and
+  ~660,000 non-profits (the same author wrote `ixbrlparse`).
+- *Our status:* **Not planned as an own build** — reuse Find that Charity if a charity join is
+  needed.
+
+### Register of Overseas Entities
+
+- *What it adds:* foreign owners of UK property and their beneficial owners — ownership beyond
+  the UK, and the bridge between Land Registry and ownership.
+- *Join key / match:* its own overseas-entity ID; links to HMLR. **[Checked]**
+- *Access & licence:* held at Companies House, free.
+- *Prior work:* TaxPolicy.org.uk's 2026 cross-check (above).
+- *Our status:* **Planned**.
+
+### FCA register
+
+- *What it adds:* which firms are FCA-authorised — a flag for regulated financial firms.
+- *Join key / match:* **partly** — not a clean company-number key for all records. **[Checked]**
+- *Access & licence:* API only, ~10 requests per 10 seconds, so no practical bulk copy.
+- *Known problems:* rate limit makes bulk reconstruction impractical; use as a lookup flag.
+- *Our status:* **Planned**.
+
+### Data you can't easily get {#data-you-cant-easily-get}
+
+Some of the most predictive company data is private or paid, and no open-data pipeline
+reconstructs it. State the gap plainly rather than imply open data covers everything.
+
+| Source | Why it's hard to get | Terms / price (indicative, dated) |
+|---|---|---|
+| **Bank credit data on small firms** | Shared by designated banks only with four designated credit agencies (Experian, Equifax, Creditsafe, D&B) under the Commercial Credit Data Sharing scheme | Small Business, Enterprise and Employment Act 2015; D&B added 2019. Not public. **[Checked]** |
+| **Trade-payment behaviour** | Days-beyond-terms and payment scores built from agencies' own supplier networks | Proprietary, paid. **[Checked]** |
+| **County court judgments (CCJs)** | Register of Judgments via Registry Trust; a strong distress signal missing from open data | Searches from ~£10 each; bulk licences for agencies. *Indicative, Registry Trust / TrustOnline.* **[Estimated]** |
+| **Full profit & loss for small firms** | Filed with HMRC alongside the corporation-tax return, not with Companies House | Confidential. **[Checked]** |
+| **Official business microdata** | ONS business-register extracts | Accredited researchers only, via secure research services. **[Checked]** |
+| **Tax records** | HMRC Datalab | Approved research projects only. **[Checked]** |
+
+Source: deck slide 8 and its notes. The analytical consequence — that an open model can match
+commercial products on *describing* companies but not on *predicting non-payment* — is
+developed on [the market page](../landscape/market.qmd).
+
+> **What it means for you.** Plan joins around the company number, budget effort for licences
+> and matching rather than for access fees, and be honest in any model about the private layer
+> you cannot see. Left off deliberately: the HMRC VAT check (one number at a time), the
+> individual insolvency register (personal data), and food-hygiene ratings (no company numbers).

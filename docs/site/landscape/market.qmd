@@ -1,0 +1,76 @@
+---
+title: "The market: who sells company data, and where the value sits"
+---
+
+## Summary
+
+A market of commercial providers sells UK company data — from credit-reference agencies
+(Creditsafe, Dun & Bradstreet, Experian, Equifax) through research platforms (Moody's Bureau van
+Dijk's FAME, Beauhurst) to low-cost and freemium tools (Endole, Company Check, OpenCorporates,
+DataLedger). What they charge for is mostly **not the raw data**, which is free: it is cleaning,
+history, linking, a usable interface, scores and support. The important exception is a small
+**private data layer** — trade-payment behaviour, bank-credit data and court judgments — that is
+genuinely not public and carries much of the predictive power behind credit scores. So the fair
+summary is "most, not all": open data plus good engineering reproduces most of the *descriptive*
+stack, but not the private layer that predicts who will not pay.
+
+All prices below are **indicative only**, drawn from third-party price guides and vendor pages as
+summarised in the project deck (2026). They are negotiable, change often, and should be verified
+before quoting. Each carries a confidence label.
+
+## Details
+
+### Indicative prices
+
+| Provider | What you get | Indicative cost (2026) | Source & confidence |
+|---|---|---|---|
+| **Creditsafe** | Credit reports, scores, monitoring, API | ~£5–15 per UK report; small teams ~$200–600/month; enterprise ~$15k–75k+/yr | Vendr buyer guide. **[Estimated]** |
+| **Dun & Bradstreet** | DUNS entity IDs, risk scores, supplier monitoring | Own-file insights £245/yr; enterprise by quote | iwoca guide. **[Estimated]** — note £245 is for viewing your *own* credit file, not buying data about others |
+| **Experian / Equifax** | Business credit scores, enriched with bank data | Own profile ~£30/month; enterprise by quote | Rise Funding guide. **[Estimated]** — again, for your *own* business profile |
+| **Moody's BvD: FAME** | Standardised multi-year financials, ownership trees | ~£31k–75k/yr for 5–20 users | businessdataguide.com comparison. **[Not verified]** — the source itself flags the figure for verification |
+| **Beauhurst** | High-growth and investor-backed companies | Quote only; "five figures a year" | No public price — this is a guess. **[Not verified]** |
+| **Low-cost / open** | Endole, Company Check, OpenCorporates, DataLedger | Free tiers; datasets from ~£295 | DataLedger's own site (£295). **[Checked]** for DataLedger's own price |
+
+Source: deck slides 8–9 and notes (`docs/source-material/companies-house-accounts-deck.md`,
+`companies-house-accounts-notes.md`). The market splits into three groups: credit-reference
+agencies (scores, reports, monitoring), research platforms (deep standardised histories and
+ownership trees, often reached by universities through JISC licences), and low-cost/open tools
+(repackaged Companies House data, often freemium).
+
+### Where the value sits
+
+Think of the stack in four layers, cheapest at the bottom:
+
+| Layer | What it is | Who can do it |
+|---|---|---|
+| Scores, UI, alerts, API, support | The product wrapper buyers actually touch | Vendors; buyers often pay for reduced risk and effort here |
+| **Private data** | Trade payments, bank-credit (CCDS) data, court judgments | **Not open; cannot be rebuilt** |
+| Cleaning, linking, history, entity IDs | Making the raw data usable over time | Open pipelines can compete |
+| Open register data | Companies House, the Gazette, Land Registry | **Free** |
+
+Three conclusions follow, and the deck states them as the honest version rather than the
+marketing one:
+
+1. **Much of what you pay for is convenience.** Filed financials, officers and ownership are free;
+   vendors charge for cleaning, history, linking and a usable interface.
+2. **The real advantage is private data.** Payment behaviour, bank data and judgment feeds are not
+   public, and they drive the best credit scores. This is why "it's all open data" holds for
+   *most* of the stack, not all of it — "most, not all."
+3. **Open data can cover the bottom layers.** That is exactly what this project does for the
+   [accounts](../datasets/accounts.qmd): an open, reconciled, point-in-time-safe version of the
+   descriptive financial layer.
+
+> **The GIS comparison.** In an earlier look at GIS spending in the civil service, most of the
+> underlying geographic data was open and much of the spend went on software licences that made
+> open data easy to use. Company data follows a similar pattern — with one important difference:
+> the private data layer above, which has no equivalent in the GIS case. Source: deck slides 9–10
+> notes.
+
+> **What it means for you.** For *describing* companies — who they are, what they filed, who
+> controls them — open data plus good engineering gets you most of the way. For *predicting* who
+> will not pay, the private layer still matters, and any open model should say so plainly. The
+> sources that make up that private layer, and why they are out of reach, are listed under [data
+> you can't easily get](../guide/sources-map.qmd#data-you-cant-easily-get). A full
+> civil-service spend figure for company data is **[Not verified]** — the deck notes it would need
+> a dedicated search of Contracts Finder, G-Cloud award data and departmental spend files, and is
+> an estimate until done.

@@ -1718,3 +1718,110 @@ computed (namespace declaration presence != actual fact-tag prefix usage) — an
 that wants a per-filing "was this specific filing bug-affected" answer should use a direct
 before/after extraction diff (as Phase E does), not the census classification, regardless of
 whether the persisted Parquet files are ever regenerated.
+
+## Site restructure (`site_restruct` branch, 2026-10-02)
+
+Rebuilt `docs/site/` from a 5-page methodology site into a hub with a navbar of **Home · Guide ·
+Datasets · Indicators · Landscape · Evidence · Reference**, per the build prompt. **Text files
+only — no code under `src/`, `scripts/` or `tests/` was touched, and no `quarto render`/`preview`
+or other heavy command was run**, to avoid disturbing the parser-check benchmark that was running
+and had frozen code changes. The one-off render and link check are deferred until the maintainer
+confirms the benchmark's timed phase has finished.
+
+### What was built
+
+- New `_quarto.yml` (dropdown-menu navbar, `cosmo` theme, GitHub link, OGL/not-affiliated page
+  footer; title changed from "open-company-uk methodology" to "open-company-uk").
+- Rewritten `index.qmd`; four `guide/` pages; three `datasets/` pages; four `indicators/` pages
+  (three moved from the old top level + a new `non-compliance.qmd` placeholder marked Planned);
+  two `landscape/` pages; two `evidence/` pages; `reference.qmd`. Every page opens with a
+  plain-language Summary then a separate Details section; figures carry a named repo-file source
+  and a Checked/Estimated/Not-verified label.
+- `docs/site/_CHANGES.md` records every content move (named with a leading underscore so Quarto
+  does not render it into the published site — it is a maintainer reference, not a page).
+  `docs/source-material/ch-guide-contribution.md`
+  is a draft contribution for the maintainer to review (explicitly **not** submitted).
+
+### Source material staged
+
+The deck, notes, accounts explainer and the two parser-comparison scripts were in `~/Downloads`,
+not in `docs/source-material/` as the prompt anticipated. The text-based ones were copied in
+(latest variants: `…-notes(2).md` → `companies-house-accounts-notes.md`, `index.html` →
+`accounts-explainer.html`, both `.py` scripts). The binary `.pptx` was **not** copied (text-only
+constraint); its slide + speaker-note text was extracted with a stdlib `zipfile`+ElementTree
+reader into `companies-house-accounts-deck.md` (the scratchpad extractor script is not in the
+repo). `python-pptx`/`markitdown` were unavailable and were not installed.
+
+### Flag, don't decide / deviations flagged
+
+- **`indicators/methodology.qmd`**: the two links to the generated docs were changed from relative
+  `../rules.md` / `../data-dictionary.md` (which point outside the `docs/site/` Quarto project and
+  would render as broken links) to GitHub `blob/main` URLs. This is the only edit to
+  otherwise-"moved unchanged" content; flagged here and in `_CHANGES.md`.
+- **Restatement figure**: the old `accounts.qmd` cited 9.27%; the new dataset pages use **9.36%**
+  (the post-dash-nil-fix value from `docs/accounts-limitations.md` / `kaggle-v2/README.md`). Both
+  are sourced; 9.27% was pre-fix.
+- **Kaggle links** are presented as clearly-labelled placeholders (slugs from the
+  `dataset-metadata.json` files), **not** as verified live links — the deck notes say to add them
+  once published, so publication status was treated as unconfirmed rather than checked over the
+  network.
+- Four superseded top-level pages (`methodology`, `validation`, `limitations`, `accounts`) were
+  `git rm`-ed after their content moved; `accounts.qmd` is superseded by `datasets/accounts.qmd`
+  plus `guide/accounts-data.qmd`.
+
+### Assumptions needing live verification
+
+- The REST API rate limit (~600 req/5min) is repeated from the deck notes and labelled **[Not
+  verified]** on the site; confirm against current developer docs.
+- `evidence/register.qmd` is **structure only** — the populated append-only register is not yet
+  written; the page shows the discovery queue and schema and says so.
+- The one-off `quarto render` + internal-link check (acceptance criterion) is **not yet done** —
+  deferred until the benchmark is confirmed finished. Cross-page links were written to resolve
+  within `docs/site/` (section-relative paths) and all generated-doc / repo references use GitHub
+  `blob/main` URLs; these still need the live render to confirm.
+
+### Post-review fixes (same branch, 2026-10-02)
+
+Rendered once (17 pages) and link-checked after the maintainer confirmed the benchmark was done;
+then three maintainer review points were addressed:
+
+- **`CHANGES.md` was being published.** Quarto renders every `.md`/`.qmd` in the project, so the
+  internal moves-log appeared as a site page. Renamed to `_CHANGES.md` (Quarto skips leading-`_`
+  files); re-render dropped from 18 to 17 pages with no `CHANGES.html` in `_site`. References in
+  `reference.qmd` and this log updated.
+- **LONG could be read as downloadable-as-filed.** `datasets/accounts.qmd` previously said LONG is
+  "the full-fact archive: every tagged concept as filed", which implies the raw archive (names,
+  addresses, director loans) is the download. Reworded in four places (summary, table row, a new
+  callout, the Kaggle block) to state plainly that the published LONG is the personal-data-removed
+  subset and the full archive is never published.
+- **Citations to gitignored `kaggle*/` files.** The `kaggle/`, `kaggle-long/`, `kaggle-v2/`,
+  `kaggle-long-v2/` directories are gitignored (per the root `.gitignore`), so `Source:
+  kaggle-v2/column-dictionary.md`/`README.md` citations and the `reference.qmd` blob link pointed
+  at files not in the published repo — a `blob/main` 404 and a breach of "every number from a named
+  repo file". Re-sourced to tracked docs: row counts → `docs/accounts-wide-rebuild-verification.md`
+  (exact `33,513,017`/`36,710,673`); restatement → `docs/accounts-validation-summary.md`; creditors
+  and employees → `docs/accounts-limitations.md` + the respective reconciliation/cut-off docs; LONG
+  filter → `docs/accounts-public-long-concepts.md`. The per-column coverage percentages exist only
+  in the pipeline-generated `column-dictionary.md` that ships with the Kaggle dataset — kept, but
+  now attributed as generated-and-shipped-with-the-dataset (not a git-tracked repo file), not
+  presented as repo-sourced.
+
+### Verification done this round, and its limits
+
+- **Figures spot-checked against sources** (not self-reported): size thresholds and the 2025/2028
+  dates against `docs/source-material/accounts-explainer.html`; the 205/174 ONS sample, 164 repeats,
+  99-of-107 creditors, and all commercial prices against `companies-house-accounts-notes.md`; the
+  dataset/validation figures (`33,513,017`/`36,710,673`, 9.36%, 0.65 ms, 99.999%, 61,085, 273,418,
+  35,806,258, 80.3%) and PSC figures (15,952,486, 10,917,257, 28.8%) against their tracked docs —
+  all present.
+- **Confidence-label semantics made explicit** on the Home page: `[Checked]` is either a project
+  measurement (tagged as such) or an official source whose confidence the label *inherits* — not an
+  independent re-verification by the site. This matters because many `[Checked]` figures were taken
+  from the deck notes at the deck's stated (High) confidence.
+- **Limits of the checks run here (for the maintainer):** the link check validated only
+  repo-*internal* targets and in-page anchors on rendered `<a href>`. **External URLs were not
+  fetched** (CH Guide, Open Ownership, Kaggle, GitHub blob targets) — run `lychee docs/site/_site`
+  (or `quarto`'s link checker) **after merging to main**, since the `blob/main` links and
+  `docs/site/_CHANGES.md` only resolve once this branch is on main. The Kaggle dataset URLs are
+  placeholders and will 404 until the datasets are published. Image/asset `src` were scanned
+  (0 local assets; the pages have no images), but this is only relevant if images are added later.
