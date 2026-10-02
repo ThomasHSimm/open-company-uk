@@ -285,7 +285,7 @@ ul.task-list li input[type="checkbox"] {
 <h3 class="anchored" data-anchor-id="data-quality-traps-document-them-before-using">Data-quality traps (document them before using)</h3>
 <ul>
 <li><strong>No stable person ID.</strong> Linking the same person across companies is a fuzzy join. On a conservative key — (forename, surname, birth year, birth month) — <strong>28.8%</strong> of keys appear on ≥2 records and <strong>28.0%</strong> on ≥2 distinct companies: cross-company linkage is common, but the method’s confidence must be stated, not assumed. See <a href="../guide/pitfalls.html">person matching in pitfalls</a>.</li>
-<li><strong>Dirty dates.</strong> 14,554 records have <code>ceased_on</code> before <code>notified_on</code>; 23,916 <code>notified_on</code> dates predate the 2016 regime (min <code>1083-01-01</code>); 97 <code>ceased_on</code> outliers fall outside 2016–2026 (including <code>2924</code>, <code>9998</code>, <code>9999</code>). 17,729 individuals imply an age under 16 at notification, 55 over 110. A cleaning rule is required before any time-series use.</li>
+<li><strong>Dirty dates.</strong> 14,554 records have <code>ceased_on</code> before <code>notified_on</code>; 23,916 <code>notified_on</code> dates predate the 2016 regime (min <code>1083-01-01</code>); <strong>272</strong> <code>ceased_on</code> dates fall outside 2016–2026 (269 before 2016; 3 after: <code>2924</code>, <code>9998</code>, <code>9999</code>). 17,729 individuals imply an age under 16 at notification, 55 over 110. A cleaning rule is required before any time-series use. Source: <code>docs/recon-psc-results.json</code> (<code>overall.ceased_on.years</code>), corroborated by the loader’s <code>f_ceased_out_of_range</code> (see <code>docs/AUDIT.md</code>, “PSC loader Stage-1”). An earlier draft said 97, which was the 2016 ceased-date count (97,485) mis-transcribed. <strong>[Checked]</strong></li>
 <li><strong>One-shot snapshot.</strong> Only today’s file is served; corrections over time are lost unless you archive snapshots yourself.</li>
 </ul>
 </section>
@@ -393,7 +393,7 @@ ul.task-list li input[type="checkbox"] {
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp('/' + window.location.host + '/');
+        var filterRegex = new RegExp("https:\/\/ThomasHSimm\.github\.io\/open-company-uk\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

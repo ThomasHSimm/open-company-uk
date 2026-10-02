@@ -258,17 +258,23 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="details" class="level2">
 <h2 class="anchored" data-anchor-id="details">Details</h2>
-<div class="callout callout-style-default callout-warning callout-titled" title="Results pending — a parser check is currently running">
+<div class="callout callout-style-default callout-note callout-titled" title="Parser check: complete">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Warning</span>Results pending — a parser check is currently running
+<span class="screen-reader-only">Note</span>Parser check: complete
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>A further parser check is running at the time of writing. <strong>Nothing on this page anticipates its outcome.</strong> The figures below are the measured results of the completed parser-check chapter, each cited to a committed file (<code>docs/accounts-parser-check.md</code>, <code>docs/accounts-validation-summary.md</code>); any numbers the live run revises will be reconciled here once it finishes. <strong>[Checked]</strong> for the committed figures; the live run’s results are <strong>not yet available</strong>.</p>
+<p>The parser-comparison chapter is finished; every figure on this page is one of its measured results, taken from committed files only. The headlines:</p>
+<ul>
+<li><strong>99.999% agreement on numeric facts</strong> with <code>ixbrlparse</code> — 119,812 of 119,813 shared numeric facts, 95% CI [99.995%, 100%]. Source: <code>docs/accounts-parser-check.md</code>, <code>docs/accounts-validation-summary.md</code>.</li>
+<li><strong>~12× faster than <code>ixbrlparse</code>, ~1,520× faster than Arelle</strong> — 0.65 vs 7.7 vs ~992 ms/filing. Source: <code>docs/accounts-validation-summary.md</code>, <code>docs/accounts-parser-check.md</code>.</li>
+<li><strong>Three real bugs found and fixed</strong> — the <code>ix:</code> prefix bug (61,085 filings recovered), comma-as-decimal formats (1,096 facts), and a hyphenated format name (540 facts); plus plain-XML support added (273,418 filings). Restatement rate unchanged at 9.36%. Source: <code>docs/accounts-parser-check.md</code>, <code>docs/accounts-validation-summary.md</code>.</li>
+</ul>
+<p><strong>[Checked]</strong> — every figure traces to the committed files named above.</p>
 </div>
 </div>
 <section id="the-accounting-invariant" class="level3">
@@ -443,7 +449,7 @@ ul.task-list li input[type="checkbox"] {
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp('/' + window.location.host + '/');
+        var filterRegex = new RegExp("https:\/\/ThomasHSimm\.github\.io\/open-company-uk\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

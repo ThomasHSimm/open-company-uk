@@ -517,23 +517,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="get-the-data" class="level3">
 <h3 class="anchored" data-anchor-id="get-the-data">Get the data</h3>
-<div class="callout callout-style-default callout-important callout-titled" title="Kaggle links — publication pending">
+<div class="callout callout-style-default callout-tip callout-titled" title="Kaggle links">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Important</span>Kaggle links — publication pending
+<span class="screen-reader-only">Tip</span>Kaggle links
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>The datasets are prepared for Kaggle under these slugs. <strong>Confirm the dataset is public before relying on a link</strong> — at the time of writing these are placeholders pending publication (deck notes: “add the Kaggle links once the datasets are published”). <strong>[Not verified]</strong></p>
-<p>Both slugs below are the <strong>published, personal-data-removed</strong> datasets — neither is the private full archive.</p>
+<p>Both tables are published on Kaggle under the Open Government Licence v3.0. Both are the <strong>personal-data-removed</strong> datasets — neither is the private, full as-filed archive.</p>
 <ul>
-<li>WIDE: <code>thomassimm/uk-company-accounts-wide-2014-2026</code> → <code>https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026</code></li>
-<li>LONG (personal-data-removed public subset): <code>thomassimm/uk-company-accounts-long-2014-2026</code> → <code>https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026</code></li>
+<li><strong>WIDE</strong> — <a href="https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026">kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026</a></li>
+<li><strong>LONG</strong> (personal-data-removed public subset) — <a href="https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026">kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026</a></li>
 </ul>
-<p>Slugs are from each dataset’s <code>dataset-metadata.json</code>, generated in the gitignored <code>kaggle*/</code> staging directories and shipped with the dataset — not tracked in the git repo.</p>
+<p>Each dataset ships its own <code>column-dictionary.md</code> / <code>dataset-metadata.json</code>; those files are generated in the gitignored <code>kaggle*/</code> staging directories and travel with the download, not the git repo.</p>
 </div>
 </div>
 <p>The pipeline that builds these tables is on <a href="https://github.com/ThomasHSimm/open-company-uk">GitHub</a>. See <a href="../datasets/accounts-validation.html">how we know the data is right</a> for the parser comparison and cross-checks.</p>
@@ -616,7 +615,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp('/' + window.location.host + '/');
+        var filterRegex = new RegExp("https:\/\/ThomasHSimm\.github\.io\/open-company-uk\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
