@@ -18,6 +18,7 @@ from datetime import date, datetime
 from typing import Any
 
 from .cache import CachedResponse
+from .psc_natures import classify_kind, is_uk_company_number_format, summarise_natures
 
 log = logging.getLogger(__name__)
 
@@ -325,12 +326,21 @@ def derive_psc(
         fetch_status = "ok"
 
     # PSC list records. `zero` distinguishes "never fetched" (None -> unknown,
-    # not "zero PSCs") from a cached 404 (0 -> legitimately none filed).
+    # not "zero PSCs") from a cached 404 (0 -> legitimately none filed). The
+    # structured ownership features below follow the same rule: None when not
+    # fetched, and the "absent" value (0 / None / False) on a cached 404.
     zero = 0 if (psc is not None and psc.not_found) else None
+    absent_bool = None if zero is None else False
     if psc is None or psc.not_found or psc.data is None:
         n_records = n_ceased = n_active_records = zero
         psc_id_verified = psc_id_due = psc_id_stmt = zero
         psc_natures = None
+        max_ownership_band = max_voting_band = None
+        has_appointment_rights = has_significant_influence = absent_bool
+        n_distinct_natures = zero
+        n_individual = n_corporate = n_legal_person = n_super_secure = zero
+        corporate_reg_numbers = unmapped_natures = None
+        n_corporate_uk_format = zero
     else:
         records = psc.data.get("items") or []
         n_active_records, n_ceased = _psc_active_ceased(psc.data, records, psc.company_number)
@@ -343,6 +353,36 @@ def derive_psc(
             {n for r in active_records for n in (r.get("natures_of_control") or [])}
         )
         psc_natures = ",".join(natures) if natures else None
+        # Structured ownership-control features over ACTIVE records only (same scope
+        # as psc_natures_of_control). Decomposition lives in psc_natures.py so the
+        # bulk-snapshot loader and this path share one nature-of-control mapping.
+        summary = summarise_natures(natures)
+        max_ownership_band = summary.max_ownership_band
+        max_voting_band = summary.max_voting_band
+        has_appointment_rights = summary.has_appointment_rights
+        has_significant_influence = summary.has_significant_influence
+        n_distinct_natures = summary.n_distinct_natures
+        unmapped_natures = ",".join(summary.unmapped) if summary.unmapped else None
+        categories = [classify_kind(r.get("kind")) for r in active_records]
+        n_individual = categories.count("individual")
+        n_corporate = categories.count("corporate")
+        n_legal_person = categories.count("legal-person")
+        n_super_secure = categories.count("super-secure")
+        # Corporate-entity PSCs: capture the registration number verbatim (a company
+        # identifier, not personal data) for the future ownership-chain join, and
+        # count how many are UK-company-number format. No chain is built here.
+        reg_numbers: list[str] = []
+        n_corporate_uk_format = 0
+        for r in active_records:
+            if classify_kind(r.get("kind")) != "corporate":
+                continue
+            identification = r.get("identification") or {}
+            regno = identification.get("registration_number")
+            if regno:
+                reg_numbers.append(str(regno))
+                if is_uk_company_number_format(regno):
+                    n_corporate_uk_format += 1
+        corporate_reg_numbers = ",".join(reg_numbers) if reg_numbers else None
 
     # Active statement codes: verbatim `statement` values with no ceased_on.
     active_codes: list[str] = []
@@ -373,6 +413,18 @@ def derive_psc(
         "active_psc_statement_codes": ",".join(active_codes) if active_codes else None,
         "psc_information_state": info_state,
         "psc_natures_of_control": psc_natures,
+        "psc_max_ownership_band": max_ownership_band,
+        "psc_max_voting_band": max_voting_band,
+        "psc_has_appointment_rights": has_appointment_rights,
+        "psc_has_significant_influence": has_significant_influence,
+        "psc_n_distinct_natures": n_distinct_natures,
+        "psc_n_individual": n_individual,
+        "psc_n_corporate": n_corporate,
+        "psc_n_legal_person": n_legal_person,
+        "psc_n_super_secure": n_super_secure,
+        "psc_corporate_reg_numbers": corporate_reg_numbers,
+        "psc_n_corporate_uk_format_regno": n_corporate_uk_format,
+        "psc_unmapped_natures": unmapped_natures,
         "n_psc_id_verified": psc_id_verified,
         "n_psc_id_verification_due": psc_id_due,
         "n_psc_id_statement_filed": psc_id_stmt,
@@ -756,6 +808,111 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "definition": "Sorted, distinct, comma-joined natures-of-control across ACTIVE PSC "
         "records (e.g. ownership-of-shares-25-to-50-percent).",
         "caveats": "Verbatim enum values, never normalised. Ceased PSC records excluded.",
+    },
+    {
+        "field": "psc_max_ownership_band",
+        "tier": 2,
+        "source": "derived from psc:items[].natures_of_control (active records)",
+        "definition": "Highest share-ownership band held by any active PSC: one of "
+        "25-to-50-percent / 50-to-75-percent / 75-to-100-percent.",
+        "caveats": "Decomposition shared with the bulk loader via psc_natures.py (validated "
+        "against all 86 published nature codes). Registered-overseas-entity 'more-than-25-percent' "
+        "thresholds are captured as a band value but excluded from this max-band ranking (not "
+        "ordinally comparable to the '-to-' bands), so an ROE-only holding yields None, as does "
+        "no ownership nature at all.",
+    },
+    {
+        "field": "psc_max_voting_band",
+        "tier": 2,
+        "source": "derived from psc:items[].natures_of_control (active records)",
+        "definition": "Highest voting-rights band held by any active PSC (same band values as "
+        "psc_max_ownership_band).",
+        "caveats": "As psc_max_ownership_band: ROE 'more-than' thresholds are captured but not "
+        "ranked, so an ROE-only holding yields None.",
+    },
+    {
+        "field": "psc_has_appointment_rights",
+        "tier": 2,
+        "source": "derived from psc:items[].natures_of_control (active records)",
+        "definition": "True when any active PSC holds a right-to-appoint-and-remove nature.",
+        "caveats": "Covers the whole right-to-appoint-and-remove family (directors, LLP members, "
+        "firm/trust persons), not directors alone. None (unknown) only when the PSC list was not "
+        "fetched; False on a cached 404.",
+    },
+    {
+        "field": "psc_has_significant_influence",
+        "tier": 2,
+        "source": "derived from psc:items[].natures_of_control (active records)",
+        "definition": "True when any active PSC holds significant-influence-or-control.",
+        "caveats": "None (unknown) only when the PSC list was not fetched; False on a cached 404.",
+    },
+    {
+        "field": "psc_n_distinct_natures",
+        "tier": 2,
+        "source": "derived from psc:items[].natures_of_control (active records)",
+        "definition": "Count of distinct verbatim nature-of-control codes across active PSCs.",
+        "caveats": "Counts all distinct codes including any unmapped ones (see "
+        "psc_unmapped_natures). None when the list was not fetched; 0 on a cached 404.",
+    },
+    {
+        "field": "psc_n_individual",
+        "tier": 1,
+        "source": "psc:items[].kind (active records)",
+        "definition": "Active PSC records classified as individuals.",
+        "caveats": "Classification shared with the bulk loader via psc_natures.py. Counts active "
+        "records only; ROE individual beneficial-owner variants fold into this category.",
+    },
+    {
+        "field": "psc_n_corporate",
+        "tier": 1,
+        "source": "psc:items[].kind (active records)",
+        "definition": "Active PSC records classified as corporate entities.",
+        "caveats": "Includes ROE corporate beneficial-owner variants. The on-ramp to ownership "
+        "networks: see psc_corporate_reg_numbers.",
+    },
+    {
+        "field": "psc_n_legal_person",
+        "tier": 1,
+        "source": "psc:items[].kind (active records)",
+        "definition": "Active PSC records classified as legal persons.",
+        "caveats": "Counts active records only.",
+    },
+    {
+        "field": "psc_n_super_secure",
+        "tier": 1,
+        "source": "psc:items[].kind (active records)",
+        "definition": "Active PSC records classified as super-secure.",
+        "caveats": "Super-secure details are withheld from the register; read alongside the "
+        "profile flag has_super_secure_pscs, which can be set even when no list item appears.",
+    },
+    {
+        "field": "psc_corporate_reg_numbers",
+        "tier": 2,
+        "source": "psc:items[].identification.registration_number (active corporate records)",
+        "definition": "Comma-joined verbatim registration numbers of active corporate-entity PSCs.",
+        "caveats": "Company identifiers, not personal data. Captured verbatim for a future "
+        "ownership-chain join; no chain is built. None when there are no corporate PSCs with a "
+        "registration number.",
+    },
+    {
+        "field": "psc_n_corporate_uk_format_regno",
+        "tier": 2,
+        "source": "derived from psc:items[].identification.registration_number",
+        "definition": "Count of active corporate-PSC registration numbers that normalise to a "
+        "valid Companies House company number (8 digits or 2-letter prefix + 6 digits).",
+        "caveats": "A format gate via validate.normalise_company_number (the same rule as input "
+        "validation), not proof the company exists; it zero-pads short all-digit values, so a "
+        "short foreign id can read as UK-format. None when the list was not fetched; 0 on a 404.",
+    },
+    {
+        "field": "psc_unmapped_natures",
+        "tier": 2,
+        "source": "derived from psc:items[].natures_of_control (active records)",
+        "definition": "Comma-joined nature codes whose core right the shared mapping did not "
+        "recognise (normally empty).",
+        "caveats": "All 86 codes in the published enumeration (psc_descriptions.yml @ 0d3fb78) "
+        "decompose cleanly, so this is expected to be None; a non-empty value flags a code added "
+        "to the register since that enumeration, for review rather than silent dropping.",
     },
     {
         "field": "n_psc_id_verified",
