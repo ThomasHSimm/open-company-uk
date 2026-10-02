@@ -80,27 +80,28 @@ Name band = number of distinct baseline keys sharing a (forename, surname); "com
 
 **Baseline key**
 
-| name band | keys | median | p90 | p99 | max | % ≥2 co | % ≥11 co |
+| name band | keys | median | p90 | p99 | max (banded) | % ≥2 co | % ≥11 co |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| 1 (unique) | 4,440,327 | 1 | 2 | 7 | 2,858 | 24.98% | 0.30% |
-| 2–10 | 2,382,819 | 1 | 3 | 8 | 7,664 | 28.39% | 0.53% |
-| 11–100 | 1,442,391 | 1 | 3 | 8 | 4,811 | 32.62% | 0.57% |
-| 101–1000 | 304,605 | 1 | 4 | 12 | 1,168 | 46.72% | 1.34% |
+| 1 (unique) | 4,440,327 | 1 | 2 | 7 | ≥1,000 | 24.98% | 0.30% |
+| 2–10 | 2,382,819 | 1 | 3 | 8 | ≥1,000 | 28.39% | 0.53% |
+| 11–100 | 1,442,391 | 1 | 3 | 8 | ≥1,000 | 32.62% | 0.57% |
+| 101–1000 | 304,605 | 1 | 4 | 12 | ≥1,000 | 46.72% | 1.34% |
 
 **Strict key** (middle-name subset, banded by the same forename+surname commonness)
 
-| name band | keys | median | p90 | p99 | max | % ≥2 co | % ≥11 co |
+| name band | keys | median | p90 | p99 | max (banded) | % ≥2 co | % ≥11 co |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| 1 (unique) | 2,048,154 | 1 | 3 | 7 | 2,853 | 26.15% | 0.28% |
-| 2–10 | 1,362,213 | 1 | 3 | 8 | 1,871 | 29.08% | 0.47% |
-| 11–100 | 920,360 | 1 | 3 | 8 | 1,580 | 30.64% | 0.48% |
-| 101–1000 | 265,125 | 1 | 3 | 8 | 396 | 32.07% | 0.53% |
+| 1 (unique) | 2,048,154 | 1 | 3 | 7 | ≥1,000 | 26.15% | 0.28% |
+| 2–10 | 1,362,213 | 1 | 3 | 8 | ≥1,000 | 29.08% | 0.47% |
+| 11–100 | 920,360 | 1 | 3 | 8 | ≥1,000 | 30.64% | 0.48% |
+| 101–1000 | 265,125 | 1 | 3 | 8 | 100–999 | 32.07% | 0.53% |
 
-Reading: the **rarest band already shows a genuine tail** (max 2,858; 0.30% on ≥11 companies) — real
-multi-directorship, not a common-name artifact (C2's "usable within band" case). But the ≥2/≥11
-rates **do rise with name commonness** (≥11 goes 0.30→1.34% across baseline bands), and the strict
-key **flattens** that rise (0.28→0.53%) and cuts the common-name-band maximum from 1,168 to 396
-(11–100 band: 4,811→1,580). So part of the baseline tail in common-name bands is collision that the
+Reading: the **rarest band already shows a genuine tail** (its most-connected keys reach ≥1,000
+companies; 0.30% on ≥11 companies) — real multi-directorship, not a common-name artifact (C2's
+"usable within band" case). But the ≥2/≥11 rates **do rise with name commonness** (≥11 goes
+0.30→1.34% across baseline bands), and the strict key **flattens** that rise (0.28→0.53%) and lowers
+the common-name-band maxima — all remain ≥1,000 under the baseline key, and the strict key brings the
+top band's maximum below 1,000. So part of the baseline tail in common-name bands is collision that the
 middle name resolves — companies-per-person must carry its name-frequency band; a raw cross-name
 count conflates distinct people.
 
