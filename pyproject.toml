@@ -22,6 +22,7 @@ dev = [
     "polars>=1.0",
     "lxml>=5.0",
     "duckdb>=1.0",
+    "numpy>=1.24",
     "pyarrow>=14.0",
     "ixbrlparse>=0.11",
 ]
