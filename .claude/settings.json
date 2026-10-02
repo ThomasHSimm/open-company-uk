@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/home/tsispace/miniconda3/envs/env1/bin/python -m json.tool)"
+    ]
+  }
+}
