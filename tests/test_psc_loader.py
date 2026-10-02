@@ -261,6 +261,54 @@ def test_noc_suffix_families_and_base_rights(tmp_path):
     ]
 
 
+def test_noc_core_compound_suffix_and_unmapped_via_shared_mapping(tmp_path):
+    # psc_noc's suffixes/cores/band now come from ukcompany.psc_natures (item 2), so the
+    # loader inherits compound-suffix and ROE-band handling and never keeps its own copy.
+    data = {
+        "kind": "individual-person-with-significant-control",
+        "name_elements": {"forename": "Alex", "surname": "Example"},
+        "notified_on": "2020-01-01",
+        "natures_of_control": [
+            "ownership-of-shares-75-to-100-percent-as-trust-limited-liability-partnership",
+            "ownership-of-shares-more-than-25-percent-registered-overseas-entity",
+            "significant-influence-or-control",
+            "a-brand-new-unmapped-right",
+        ],
+        "links": {"self": "/company/00000001/persons-with-significant-control/individual/x"},
+    }
+    _write_part(tmp_path, 1, [json.dumps({"company_number": "00000001", "data": data})])
+    output_dir = tmp_path / "out"
+    report = load_psc(
+        str(tmp_path / "*.txt"), output_dir, SNAPSHOT_DATE,
+        data_governance=False, memory_limit_gb=1, spill_dir=str(tmp_path / "spill"),
+    )
+    import duckdb
+
+    con = duckdb.connect(":memory:")
+    by_raw = {
+        r[0]: (r[1], r[2], r[3])
+        for r in con.sql(
+            f"SELECT right_raw, suffix_family, band, core FROM "
+            f"read_parquet('{output_dir / 'psc_noc.parquet'}')"
+        ).fetchall()
+    }
+    # compound suffix stripped WHOLE -> correct core + band, not a half-stripped residue
+    assert by_raw[
+        "ownership-of-shares-75-to-100-percent-as-trust-limited-liability-partnership"
+    ] == ("as-trust-limited-liability-partnership", "75-to-100-percent", "ownership-of-shares")
+    # ROE 'more-than' band captured, core still recognised
+    assert by_raw[
+        "ownership-of-shares-more-than-25-percent-registered-overseas-entity"
+    ] == ("registered-overseas-entity", "more-than-25-percent", "ownership-of-shares")
+    # exact core, no band, no suffix
+    assert by_raw["significant-influence-or-control"] == (
+        "plain", None, "significant-influence-or-control")
+    # genuinely unknown -> core NULL, surfaced in the report (never guessed, never dropped)
+    assert by_raw["a-brand-new-unmapped-right"][2] is None
+    assert report["noc_unmapped_codes"] == {"a-brand-new-unmapped-right": 1}
+    assert report["noc_restatement"]["distinct_cores"] == 2  # NULL cores excluded
+
+
 def test_data_governance_true_requires_a_secret(tmp_path):
     _write_part(tmp_path, 1, [individual("00000001", "a")])
     try:

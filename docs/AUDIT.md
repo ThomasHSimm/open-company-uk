@@ -2135,3 +2135,63 @@ using the old naming.
 Real numbers were otherwise unchanged from the first pass (all category counts, totals-line
 reconciliation, NOC assertion count, date flags, middle-name fill) — the code changes above
 added new checks and columns without altering any existing figure.
+
+## PSC loader Stage-1 follow-up (2026-10-02), branch `feature/psc-loader`
+
+Addresses the review of the Tasks A+B run. Branch rebased onto `main` (which now carries
+`ukcompany.psc_natures` via the handoff 00/01/04 ff-merge); only `docs/AUDIT.md` conflicted on
+rebase (both histories kept). Code changes verified with a FULL run over the 32-part 2026-09-18
+snapshot (15,952,486 lines) at the **default 8 GB** limit; numbers below are from that run
+(`data/psc/2026-09-18-stage1/load_report.json`, gitignored) plus a governed single-part check.
+Synthetic fixtures only in tests; no personal data committed.
+
+- **Item 1 — out-of-range ceased dates: 272 is correct; "97" was an error.** Two definitions:
+  recon counts `ceased_on[:4]` digit-years outside [2016, 2026]; the loader's `f_ceased_out_of_range`
+  `TRY_CAST`s `ceased_on` to DATE then flags `EXTRACT(year) < 2016 OR > snapshot year`. Recounting
+  the **recon's own** `ceased_on.years` (recon-psc-results.json) sums to **272** (269 pre-2016 + 3
+  post-2026: 2924/9998/9999); the full run's `f_ceased_out_of_range` is also **272**. They AGREE —
+  no date-parsing bug. The "97" is not reproducible and is almost certainly **97485** (the 2016
+  ceased count) mis-transcribed. Kept the loader definition; `docs/site/datasets/psc.qmd`'s "97"
+  should be corrected to 272 (flagged, not changed here — site is re-scoped in Task D).
+- **Item 2 — one nature mapping.** Deleted the loader's own `NOC_SUFFIXES`; `psc_noc`'s suffixes,
+  cores and band pattern are now built in SQL from `ukcompany.psc_natures`
+  (`SUFFIXES_LONGEST_FIRST`, `CORE_PREFIXES`/`CORE_EXACT`, `BAND_PATTERN`, made public). `psc_noc`
+  now also emits `core`; suffixes strip longest-first (compounds whole), ROE `more-than` bands are
+  captured (`NULLIF` so "no band" is NULL not ''). **Restatement (one definition, documented in
+  load_report + `docs/psc-ownership-features.md`):** the snapshot's natures reduce to **86 distinct
+  codes → 7 cores → 24 suffix-stripped bases**. The old "54 vs 55" was a definitional mismatch:
+  recon strips a single suffix (compounds leave residue → more bases) while `psc_natures` strips
+  the longest. **Item 2c — codes not in the vendored enumeration: NONE.** The 86 distinct codes in
+  the snapshot are exactly the 86 in `tests/fixtures/psc_descriptions_natures.yml`; 0 in snapshot
+  outside it, all 86 present, **0 unmapped real codes**. (Data-quality note: 2 NULL array elements
+  in 2 records' `natures_of_control` → `noc_unmapped_codes = {"null": 2}`.)
+- **Item 3 — check the written files.** The run reads back each Parquet: `psc_records` category
+  counts vs the independent re-parse (equal), and `psc_noc` row count **35,169,887** vs the
+  array-length expectation (equal — and matching the recon's assertion total exactly). Added a
+  governed-mode assertion that the on-disk `psc_records` schema shares **zero** columns with
+  `GOVERNANCE_DROPPED_COLUMNS`; verified on a real governed part (0 personal columns on disk).
+- **Item 4 — memory.** Root cause was DuckDB's default `preserve_insertion_order = true`: the
+  ~16M-row records COPY buffered the whole result in input order, blowing the 8 GB cap in the first
+  seconds (the first thing the run does is that COPY). Fix = `SET preserve_insertion_order = false`
+  in `_connect` (stream + spill to `temp_directory`), **not** a higher limit. The full run now
+  completes **at 8 GB in 562 s**, writing a 3.76 GB `psc_records.parquet` and 441 MB
+  `psc_noc.parquet`. Settings surfaced in `load_report.duckdb_settings`.
+- **Item 5 — postcode district.** Already validated against `UK_POSTCODE_NORM_RE` before deriving a
+  district (district NULL when invalid). Full run: 14,861,207 present, 14,555,841 valid UK format,
+  **305,366 invalid** (district nulled).
+- **Item 6 — person keys.** Baseline HMAC (forename, surname, dob year+month) and a strict key that
+  also includes `middle_name`, both computed at load time before names are dropped. Secret read
+  from `PSC_PERSON_KEY_SECRET` (`.env`); the loader and CLI **raise** when it is missing in governed
+  mode — no default fallback (verified). Governed single-part check: person_key eligible
+  461,687/461,706 individuals, strict 250,335 (~54%, those with a recorded middle name).
+- **Item 7 — bad_lines split.** `bad_line_reasons` = `{invalid_json, missing_kind}`; full run both
+  0 (n_bad_lines 0; categories sum to lines).
+- **Item 8 (optional) — not done.** Stats are still gathered in ~10 re-parses of the NDJSON (562 s
+  total is acceptable); consolidating into one pass is left as a non-urgent optimisation.
+
+Verification: `ruff check src tests` passes; `pytest` **220 passed, 1 deselected** (the `@live`
+smoke test) with the `[dev]` extra installed. New test
+`tests/test_psc_loader.py::test_noc_core_compound_suffix_and_unmapped_via_shared_mapping`. Scope:
+`src/ukcompany/psc/loader.py`, `src/ukcompany/psc_natures.py` (constants made public),
+`tests/test_psc_loader.py`, this entry. **Task C (Stage 2) not started — awaiting maintainer review
+of these numbers.** Nothing pushed.

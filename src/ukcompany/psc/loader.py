@@ -20,6 +20,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from ..psc_natures import BAND_PATTERN, CORE_EXACT, CORE_PREFIXES, SUFFIXES_LONGEST_FIRST
+
 DEFAULT_MEMORY_LIMIT_GB = 8
 DEFAULT_SPILL_DIR = "data/psc/.duckdb-spill"
 
@@ -58,13 +60,6 @@ IDENTITY_VERIFICATION_KEYS: dict[str, str] = {
     "anti_money_laundering_supervisory_bodies": "iv_aml_supervisory_bodies",
     "preferred_name": "iv_preferred_name",
 }
-
-NOC_SUFFIXES = (
-    "-as-firm",
-    "-as-trust",
-    "-limited-liability-partnership",
-    "-registered-overseas-entity",
-)
 
 # Matches `scripts/recon_psc.py`'s `POSTCODE_NORM_RE`, anchored for a full-string match
 # against the normalised (upper-cased, whitespace-stripped) postcode. `postcode_district`
@@ -118,6 +113,12 @@ def _connect(memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB, spill_dir: str = DE
     connection = duckdb.connect(":memory:")
     connection.execute(f"SET memory_limit = '{int(memory_limit_gb)}GB'")
     connection.execute(f"SET temp_directory = {_sql_literal(spill_dir)}")
+    # Root-cause fix for the earlier OOM (not just a higher limit): with insertion-order
+    # preservation ON (DuckDB's default), a COPY of ~16M rows must buffer the whole result
+    # in input order before/while writing, which blows the memory cap; turning it off lets
+    # the pipeline stream and spill to temp_directory freely. Output row order is not relied
+    # on anywhere (readers sort when they need to).
+    connection.execute("SET preserve_insertion_order = false")
     return connection
 
 
@@ -147,6 +148,10 @@ def _parsed_sql(parts_glob: str, snapshot_date: str) -> str:
     WITH lines AS (
         SELECT
             filename,
+            -- A coarse within-file counter only: row_number() has no ORDER BY, so with
+            -- preserve_insertion_order=false it is NOT guaranteed to match physical line
+            -- order. Nothing depends on it for correctness - the stable key is record_id
+            -- (company_number || psc_id). Kept as a provenance aid, not an index.
             row_number() OVER (PARTITION BY filename) AS line_no,
             json,
             json->'data' AS d
@@ -297,16 +302,36 @@ def _records_select_sql(parts_glob: str, snapshot_date: str, *, data_governance:
 
 
 def _noc_select_sql(parts_glob: str, snapshot_date: str) -> str:
+    """psc_noc rows, one per (record, nature of control).
+
+    Suffix families, core rights and the band pattern are ALL built from
+    ``ukcompany.psc_natures`` - the single source of truth shared with the per-company
+    derive path - not from a copy kept here. Suffixes are matched longest-first so a
+    compound suffix (e.g. ``-as-trust-limited-liability-partnership``) is stripped whole
+    instead of leaving a residue. ``core`` is the recognised core right (NULL when the
+    shared mapping does not recognise it, surfaced in load_report, never guessed).
+    """
     parsed = _parsed_sql(parts_glob, snapshot_date)
     suffix_case = "\n".join(
         f"            WHEN right_raw LIKE '%{suffix}' THEN {_sql_literal(suffix.lstrip('-'))}"
-        for suffix in NOC_SUFFIXES
+        for suffix in SUFFIXES_LONGEST_FIRST
     )
     strip_case = "\n".join(
         f"            WHEN right_raw LIKE '%{suffix}' THEN "
         f"left(right_raw, length(right_raw) - {len(suffix)})"
-        for suffix in NOC_SUFFIXES
+        for suffix in SUFFIXES_LONGEST_FIRST
     )
+    core_case = "\n".join(
+        [
+            f"            WHEN base_right = {_sql_literal(base)} THEN {_sql_literal(core)}"
+            for base, core in CORE_EXACT.items()
+        ]
+        + [
+            f"            WHEN base_right LIKE {_sql_literal(prefix + '%')} THEN {_sql_literal(core)}"
+            for prefix, core in CORE_PREFIXES.items()
+        ]
+    )
+    band_pattern = _sql_literal(BAND_PATTERN)
     return f"""
     WITH exploded AS (
         SELECT record_id, unnest(natures_of_control_json::VARCHAR[]) AS right_raw
@@ -326,7 +351,11 @@ def _noc_select_sql(parts_glob: str, snapshot_date: str) -> str:
         FROM exploded
     )
     SELECT record_id, right_raw, base_right, suffix_family,
-        regexp_extract(base_right, '(\\d+-to-\\d+-percent)', 1) AS band
+        NULLIF(regexp_extract(base_right, {band_pattern}, 1), '') AS band,
+        CASE
+{core_case}
+            ELSE NULL
+        END AS core
     FROM families
     """
 
@@ -415,6 +444,20 @@ def load_psc(
         n_noc = connection.sql(
             f"SELECT COUNT(*) FROM read_parquet({_sql_literal(str(noc_path))})"
         ).fetchone()[0]
+        # Nature-of-control restatement, read from the WRITTEN psc_noc.parquet using the
+        # shared psc_natures definitions (core = recognised core right; base_right =
+        # code with the longest entity-suffix stripped, band kept). Any code the shared
+        # mapping does not recognise (core IS NULL) is surfaced with its count, never dropped.
+        noc_distinct_codes, noc_distinct_cores, noc_distinct_bases = connection.sql(
+            f"SELECT COUNT(DISTINCT right_raw), COUNT(DISTINCT core), COUNT(DISTINCT base_right) "
+            f"FROM read_parquet({_sql_literal(str(noc_path))})"
+        ).fetchone()
+        noc_unmapped_codes = dict(
+            connection.sql(
+                f"SELECT right_raw, COUNT(*) FROM read_parquet({_sql_literal(str(noc_path))}) "
+                f"WHERE core IS NULL GROUP BY right_raw ORDER BY COUNT(*) DESC, right_raw"
+            ).fetchall()
+        )
 
         # Every report/reconciliation statistic below is computed from a fresh, always-full
         # parse (never from the just-written table) — in --data-governance mode several of
@@ -495,6 +538,9 @@ def load_psc(
             f"  COUNT(*) FILTER (WHERE f_age_under_16_at_notified) "
             f"FROM ({stats})"
         ).fetchone()
+        # LIMIT 1 here is order-independent in practice: the snapshot carries exactly one
+        # totals line (asserted by category_counts['totals'] == 1 in the report), so there
+        # is only one matching row regardless of preserve_insertion_order.
         psc_totals = connection.sql(
             f"WITH lines AS ("
             f"    SELECT json->'data' AS d FROM read_ndjson_objects({_sql_literal(parts_glob)}, "
@@ -534,6 +580,21 @@ def load_psc(
                 f"psc_noc row count on disk {n_noc:,} != expected from stats "
                 f"{expected_noc_rows:,}"
             )
+        # Governed mode: assert ZERO personal columns survive in the written Parquet, read
+        # from the file's actual schema (not inferred from the SELECT list) - the last line of
+        # defence that the governance drop really happened on disk.
+        if data_governance:
+            on_disk_columns = {
+                row[0]
+                for row in connection.sql(
+                    f"DESCRIBE SELECT * FROM read_parquet({_sql_literal(str(records_path))})"
+                ).fetchall()
+            }
+            leaked = sorted(on_disk_columns & set(GOVERNANCE_DROPPED_COLUMNS))
+            if leaked:
+                consistency_errors.append(
+                    f"governed psc_records retains personal columns on disk: {leaked}"
+                )
         if consistency_errors:
             raise RuntimeError(
                 "PSC load consistency check failed: " + "; ".join(consistency_errors)
@@ -548,6 +609,11 @@ def load_psc(
     report = {
         "snapshot_date": snapshot_date,
         "data_governance": data_governance,
+        "duckdb_settings": {
+            "memory_limit_gb": memory_limit_gb,
+            "preserve_insertion_order": False,
+            "spill_dir": spill_dir,
+        },
         "n_lines": n_lines,
         "n_bad_lines": n_bad_lines,
         "bad_line_reasons": {
@@ -582,9 +648,19 @@ def load_psc(
             "f_age_under_16_at_notified": date_flags[3],
         },
         "n_noc_assertions": n_noc,
+        "noc_restatement": {
+            "distinct_codes": noc_distinct_codes,
+            "distinct_cores": noc_distinct_cores,
+            "distinct_suffix_stripped_bases": noc_distinct_bases,
+            "definition": "core = ukcompany.psc_natures recognised core right; base_right = code "
+            "with the longest matching entity-suffix stripped (band kept). This differs from "
+            "recon-psc's single-suffix base count - documented in docs/psc-ownership-features.md.",
+        },
+        "noc_unmapped_codes": noc_unmapped_codes,
         "consistency_check": {
             "passed": True,
             "psc_noc_row_count_expected": expected_noc_rows,
+            "governance_personal_columns_checked": data_governance,
         },
         "psc_totals_line": psc_totals_obj,
         "outputs": {
