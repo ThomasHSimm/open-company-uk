@@ -2243,3 +2243,14 @@ forename+surname+DOB(y,m); strict = baseline + middle name (~53% coverage, non-r
 
 Deliverable `docs/psc-checks-results.md` (new). No code changed in Task C. Stopping for maintainer
 review before any build on top of this. Nothing pushed.
+
+## CI dependency fix — DuckDB Python UDFs (2026-10-02)
+
+GitHub Actions failed four PSC loader tests because the PSC data-governance path
+registers Python scalar UDFs with DuckDB, which requires NumPy; the CI `dev`
+extra installed DuckDB but not NumPy. Added `numpy>=1.24` to the `dev` extra so
+the existing `pip install -e .[dev]` CI setup provides that runtime dependency.
+The Node.js and Ubuntu runner annotations were informational and unrelated to
+the test failure. Ruff and all 220 selected tests pass locally in `env1` (Python
+3.14); a rerun in GitHub Actions is still needed to confirm the fix on Python
+3.11.
