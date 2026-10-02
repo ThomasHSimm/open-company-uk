@@ -1825,3 +1825,138 @@ then three maintainer review points were addressed:
   `docs/site/_CHANGES.md` only resolve once this branch is on main. The Kaggle dataset URLs are
   placeholders and will 404 until the datasets are published. Image/asset `src` were scanned
   (0 local assets; the pages have no images), but this is only relevant if images are added later.
+
+## Handoff 00 — status reconciliation (2026-10-02)
+
+Read-only reconciliation of an October-2026 repo review against code and git history. Sole output:
+`docs/status-2026-10.md` (no code/data/docs otherwise changed). Headline findings, each cited in
+that file:
+
+- **Validation run DID happen and the bug was fixed.** The first run exposed two defects —
+  validation bypassed `score_all()`'s dissolved/closed exclusion gate and evaluated the whole cache
+  rather than the sampled cohort — producing an invalid 500/501 (= 99.8%) headline. Fixed
+  (`validation/evaluate.py:103-107`, `--positives` required) and covered by two tests
+  (`tests/test_insolvency_validation.py:99`, `:130`). Corrected run: 298 excluded / 202 flagged / 0
+  genuine misses; 100% conditional recall on the 202 screenable (`AUDIT.md:703-722`). TASKS.md and
+  README are stale on this.
+- **PSC bulk snapshot:** recon on `main`; downloader + Parquet loader with the `data_governance`
+  switch and HMAC person-keys on the unmerged `feature/psc-loader` (Tasks A+B; C+D absent).
+- **SIC section derivation exists** (`validation/labels.py:55`, reused by `control.py`); the "wrong
+  column" bug was fixed by switching the label source to `sic07_2_digit`.
+- **Accounts positioning is a real conflict** (plan.md/TASKS.md "out-of-scope/rejected" vs the
+  built, Kaggle-published module) — flagged for the maintainer, not decided.
+- **Accounts carry period dates + a month-resolution archive proxy, no per-filing filed/received
+  date** (`extract.py:38-52`, `pivot.py:126-132`).
+- **WIDE publication gates:** Creditors reconciliation, start-year recon and parser audit all done;
+  only the Kaggle/OGL human approval remained open.
+- Stale statements across TASKS.md/README/accounts-wide-columns.md/AUDIT narrative were **listed,
+  not fixed**, per that handoff's acceptance criteria.
+
+## Handoff 01 — point docs at the published Kaggle datasets (2026-10-02)
+
+Text-only doc-sync so the docs reflect the live Kaggle datasets. No data regenerated, staged or
+re-run; no extraction/pivot/guard executed.
+
+- **Maintainer clarification (via `AskUserQuestion`).** The handoff left the Kaggle URLs as literal
+  `<URL 1>`/`<URL 2>` placeholders and its "LONG is not published" line conflicted with the site.
+  Resolved live: the WIDE URL is exactly the repo slug
+  (`kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026`), and **both** the WIDE and
+  the personal-data-removed public LONG are published — the "LONG is not" line refers only to the
+  full private as-filed archive.
+- **`docs/site/datasets/accounts.qmd`** — replaced the "Kaggle links — publication pending /
+  [Not verified]" callout with a live-links box (both published datasets, OGL v3). The slugs were
+  already correct; the edit removed the pending/unverified framing.
+- **`docs/site/datasets/accounts-validation.qmd`** — replaced the "Results pending" callout with the
+  completed parser-check results, each with a `Source:` line, numbers taken from committed files
+  only (99.999% / 119,812-of-119,813; 0.65 vs 7.7 vs ~992 ms; prefix-bug 61,085, comma-decimal
+  1,096, hyphen-format 540, plain-XML 273,418; restatement 9.36% — `docs/accounts-parser-check.md`,
+  `docs/accounts-validation-summary.md`).
+- **`README.md`** — added an "Accounts dataset (bulk iXBRL)" section describing the
+  `ukcompany-accounts` subsystem, linking both published datasets, and stating that both public
+  tables are published under OGL v3 while the full as-filed archive (with personal data) is never
+  published.
+- **Task 4 — staging-guard record (reported, not acted on).** `kaggle_staging_guard.py` **ran and
+  passed on the staged-for-upload directories**: `docs/accounts-kaggle-safety-checks.md:36`
+  ("passed for both `kaggle/` and `kaggle-long/` as staged"), and re-run/passed on
+  `kaggle-v2/`/`kaggle-long-v2/` (`AUDIT.md:1579`, `:1702`). The actual Kaggle **upload is a manual
+  human step** ("human runs these; not run here", `AUDIT.md:1391-1400`); there is **no record of the
+  guard running against the post-upload live files** — only the staged inputs (hard-linked to what
+  was uploaded). The maintainer decides whether that gap matters.
+- **Task 5 — Kaggle card (read-only).** Both dataset URLs return **HTTP 200** (browser UA), so the
+  links are live, including the LONG slug taken from the repo. The card's **rendered content could
+  not be verified from this environment**: Kaggle is a JS SPA (WebFetch 404s automated fetchers;
+  curl returns only the login shell) and no `kaggle` CLI/credentials are available — nothing was
+  installed. **NEEDS LIVE VERIFICATION by the maintainer:** (a) licence shows **OGL v3 with
+  attribution** — note the staged `dataset-metadata.json` left `license` as `"other"` with OGL text
+  embedded, flagged unresolved (`AUDIT.md:1384-1386`, `:1406`), so the live card may still read
+  "Other"; (b) the WIDE card does **not** describe LONG as included (they are separate datasets);
+  (c) coverage reads **2014-01 → 2026-08** (`docs/accounts-coverage.md`).
+- **Assumption needing verification:** the LONG link uses the repo slug
+  (`uk-company-accounts-long-2014-2026`); it returns 200, but the maintainer chose "both published"
+  without pasting a distinct LONG URL.
+- **Verification.** Quarto 1.9.36 rendered both changed pages (exit 0); the rendered HTML carries
+  the live links and no longer contains "publication pending" or "Results pending". Link check: both
+  Kaggle URLs HTTP 200.
+- **Scope.** `docs/site/datasets/accounts.qmd`, `docs/site/datasets/accounts-validation.qmd`,
+  `README.md` (text only), plus `docs/status-2026-10.md` (handoff 00) and this entry. No code, data,
+  rules, severities, `FIELD_DOCS`, or generated docs (`rules.md`/`data-dictionary.md`) changed.
+  Branch `handoff-00-status-reconcile`; nothing pushed or deployed.
+
+## Handoff 04 — PSC ownership-structure features, attributes only (2026-10-02)
+
+Turned the verbatim `psc_natures_of_control` string into structured per-company attributes.
+**Attributes only: no new rules, no composite score.** No names or nationality are read or emitted.
+
+- **Path decision (via `AskUserQuestion`).** Handoff 04 was on hold pending the Handoff 00 Q2/Q7
+  finding that the unmerged `feature/psc-loader` (bulk loader, Tasks A+B) already decomposes
+  natures and captures corporate reg numbers. Reported the overlap; the maintainer chose the
+  **hybrid**: one shared nature-of-control mapping, consumed by the per-company derive path now and
+  by the bulk loader when it merges.
+- **New module `src/ukcompany/psc_natures.py`** (single source of truth): `decompose_nature`
+  (strip entity-type suffix → read `N-to-M-percent` band → match core right), `summarise_natures`,
+  `classify_kind`, `is_uk_company_number_format` (reuses `validate.normalise_company_number`).
+  `NOC_SUFFIXES` mirror the bulk loader's four families; **align the loader's DuckDB `psc_noc` SQL
+  to these constants when it merges** so the two paths keep one mapping.
+- **`derive.derive_psc`** now emits (active records only): `psc_max_ownership_band`,
+  `psc_max_voting_band`, `psc_has_appointment_rights`, `psc_has_significant_influence`,
+  `psc_n_distinct_natures`, `psc_n_individual` / `_corporate` / `_legal_person` / `_super_secure`,
+  `psc_corporate_reg_numbers` (verbatim; company identifiers, not personal data),
+  `psc_n_corporate_uk_format_regno`, and `psc_unmapped_natures`. Not-fetched → `None` (unknown);
+  cached 404 → the "absent" value (`0`/`None`/`False`), matching the existing PSC-field rule.
+- **FIELD_DOCS**: 12 new entries added; `docs/data-dictionary.md` regenerated via
+  `python -m ukcompany.cli data-dict` (not hand-edited).
+- **Tests**: `tests/test_psc_natures.py` (synthetic only) — decomposition across band/suffix
+  families, ROE "more-than" band (core mapped, band `None`), unmapped-core collection,
+  `classify_kind`, UK-format check, and the derive-level features incl. active-only scoping, 404,
+  and not-fetched.
+- **Report**: `docs/psc-ownership-features.md` — code-coverage table, unmapped-code handling,
+  corporate-PSC join rate, and the ECCTA-verification-as-rule options (A keep-as-attributes
+  [recommended] / B info-flag / C medium-once-rollout-complete) — **implemented none**, per the
+  constraint that ECCTA-as-rule is a maintainer decision.
+- **Enumeration verified (correcting this session's own earlier error).** An earlier draft of this
+  entry/report asserted natures were NOT in `psc_descriptions.yml` — wrong, and made without
+  fetching the file. The authoritative list is that file's `description:` section (86 nature codes;
+  `statement_description:` is the separate statement section). It was fetched (commit `0d3fb78`),
+  the `description:` block vendored as `tests/fixtures/psc_descriptions_natures.yml`, and a test
+  asserts all 86 decompose with **zero unmapped**. Fixes this surfaced: `decompose_nature` now
+  strips the **longest** (compound) suffix, and recognises the `part-`/plain
+  `right-to-share-surplus-assets` and `registered-owner-as-nominee` cores it previously dropped;
+  ROE `more-than-25-percent` bands are captured but excluded from max-band ranking. No `-se`
+  suffix exists. The 86 codes reduce to **7 cores / 24 suffix-stripped bases** — neither the "32"
+  estimate nor the recon's "55 distinct base rights", so those counts use different definitions and
+  must be reconciled before the bulk loader's `psc_noc` SQL and `psc_natures.py` merge (the loader
+  also still lists only the four single suffixes and must adopt the compound set).
+- **NEEDS LIVE VERIFICATION.** A real-cache census (codes seen in live data beyond the enumeration)
+  still needs a run; `psc_unmapped_natures` collects it. The corporate-PSC join rate is not
+  measurable from synthetic fixtures; the recon's 91.0%-carry-regno / 77.9%-resolve-to-live was
+  measured against the **2026-08-01** register, ~7 weeks older than the 2026-09-18 PSC snapshot —
+  label that staleness wherever published.
+- **Verification.** Installed the `[dev]` extra (`pip install -e .[dev]` → ixbrlparse 0.11.2,
+  duckdb 1.5.6, pyarrow) and ran the FULL suite — not relying on CI: `ruff check src tests` passes
+  and `pytest` is **202 passed, 1 deselected** (the deselected one is the `@live` smoke test),
+  including the new nature-decomposition and enumeration-coverage tests.
+- **Scope.** `src/ukcompany/psc_natures.py` (new), `src/ukcompany/derive.py` (derive_psc +
+  FIELD_DOCS + import), `tests/test_psc_natures.py` (new),
+  `tests/fixtures/psc_descriptions_natures.yml` (new, vendored enumeration @ 0d3fb78),
+  `docs/data-dictionary.md` (regenerated), `docs/psc-ownership-features.md` (new), this entry. No
+  rules, severities, scoring, `docs/rules.md`, fetch or production scoring behaviour changed.

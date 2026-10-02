@@ -98,6 +98,27 @@ directory. Publicly labelling named companies as flagged is a defamation
 exposure even when factually grounded; keep methodology public and results
 private.
 
+## Accounts dataset (bulk iXBRL)
+
+A separate subsystem (`ukcompany-accounts` CLI, package `ukcompany.accounts`) turns Companies
+House's free monthly bulk accounts archives into analysis-ready tables of financial facts. It
+downloads and extracts iXBRL (and plain-XML) filings, then produces two tables over a continuous
+**2014-01 → 2026-08** span (152 monthly archives, no gaps):
+
+- **WIDE** — one row per company per accounting period, the core balance-sheet concepts as
+  columns. Published:
+  [kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026](https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026)
+- **LONG** (personal-data-removed public subset) — one row per fact, the full concept set with
+  person-related and free-text concepts filtered out. Published:
+  [kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026](https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026)
+
+Both published tables carry **financial facts and company numbers only** — no names, addresses or
+director figures — under the Open Government Licence v3.0. The complete as-filed LONG archive
+(which *does* contain director names, addresses and loans) is kept **private and never published**;
+the Kaggle "LONG" dataset is the filtered subset, not that archive. Extractor accuracy, the parser
+comparison and every reconciliation are documented under [`docs/`](docs/) and on the methodology
+site under [`docs/site/datasets/`](docs/site/datasets/).
+
 ## Status / roadmap
 
 Built: the core fetch/cache/derive/rule pipeline; paginated officers and PSC

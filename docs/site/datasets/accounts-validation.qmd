@@ -20,13 +20,21 @@ itself found and fixed three real bugs in the project's own parser along the way
 
 ## Details
 
-::: {.callout-warning title="Results pending — a parser check is currently running"}
-A further parser check is running at the time of writing. **Nothing on this page anticipates its
-outcome.** The figures below are the measured results of the completed parser-check chapter,
-each cited to a committed file (`docs/accounts-parser-check.md`,
-`docs/accounts-validation-summary.md`); any numbers the live run revises will be reconciled here
-once it finishes. **[Checked]** for the committed figures; the live run's results are **not yet
-available**.
+::: {.callout-note title="Parser check: complete"}
+The parser-comparison chapter is finished; every figure on this page is one of its measured
+results, taken from committed files only. The headlines:
+
+- **99.999% agreement on numeric facts** with `ixbrlparse` — 119,812 of 119,813 shared numeric
+  facts, 95% CI [99.995%, 100%]. Source: `docs/accounts-parser-check.md`,
+  `docs/accounts-validation-summary.md`.
+- **~12× faster than `ixbrlparse`, ~1,520× faster than Arelle** — 0.65 vs 7.7 vs ~992 ms/filing.
+  Source: `docs/accounts-validation-summary.md`, `docs/accounts-parser-check.md`.
+- **Three real bugs found and fixed** — the `ix:` prefix bug (61,085 filings recovered),
+  comma-as-decimal formats (1,096 facts), and a hyphenated format name (540 facts); plus plain-XML
+  support added (273,418 filings). Restatement rate unchanged at 9.36%. Source:
+  `docs/accounts-parser-check.md`, `docs/accounts-validation-summary.md`.
+
+**[Checked]** — every figure traces to the committed files named above.
 :::
 
 ### 1. The accounting invariant

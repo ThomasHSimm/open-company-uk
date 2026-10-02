@@ -170,21 +170,16 @@ Source: `docs/accounts-public-long-concepts.md`, `docs/accounts-limitations.md`.
 
 ### Get the data
 
-::: {.callout-important title="Kaggle links — publication pending"}
-The datasets are prepared for Kaggle under these slugs. **Confirm the dataset is public before
-relying on a link** — at the time of writing these are placeholders pending publication (deck
-notes: "add the Kaggle links once the datasets are published"). **[Not verified]**
+::: {.callout-tip title="Kaggle links"}
+Both tables are published on Kaggle under the Open Government Licence v3.0. Both are the
+**personal-data-removed** datasets — neither is the private, full as-filed archive.
 
-Both slugs below are the **published, personal-data-removed** datasets — neither is the private
-full archive.
+- **WIDE** — [kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026](https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026)
+- **LONG** (personal-data-removed public subset) — [kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026](https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026)
 
-- WIDE: `thomassimm/uk-company-accounts-wide-2014-2026`
-  → `https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026`
-- LONG (personal-data-removed public subset): `thomassimm/uk-company-accounts-long-2014-2026`
-  → `https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026`
-
-Slugs are from each dataset's `dataset-metadata.json`, generated in the gitignored `kaggle*/`
-staging directories and shipped with the dataset — not tracked in the git repo.
+Each dataset ships its own `column-dictionary.md` / `dataset-metadata.json`; those files are
+generated in the gitignored `kaggle*/` staging directories and travel with the download, not the
+git repo.
 :::
 
 The pipeline that builds these tables is on
