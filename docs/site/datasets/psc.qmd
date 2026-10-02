@@ -63,9 +63,12 @@ write-up is `docs/recon-psc.md`. **[Checked]** (project measurement).
   method's confidence must be stated, not assumed. See [person matching in
   pitfalls](../guide/pitfalls.qmd).
 - **Dirty dates.** 14,554 records have `ceased_on` before `notified_on`; 23,916 `notified_on`
-  dates predate the 2016 regime (min `1083-01-01`); 97 `ceased_on` outliers fall outside
-  2016–2026 (including `2924`, `9998`, `9999`). 17,729 individuals imply an age under 16 at
-  notification, 55 over 110. A cleaning rule is required before any time-series use.
+  dates predate the 2016 regime (min `1083-01-01`); **272** `ceased_on` dates fall outside
+  2016–2026 (269 before 2016; 3 after: `2924`, `9998`, `9999`). 17,729 individuals imply an age
+  under 16 at notification, 55 over 110. A cleaning rule is required before any time-series use.
+  Source: `docs/recon-psc-results.json` (`overall.ceased_on.years`), corroborated by the loader's
+  `f_ceased_out_of_range` (see `docs/AUDIT.md`, "PSC loader Stage-1"). An earlier draft said 97,
+  which was the 2016 ceased-date count (97,485) mis-transcribed. **[Checked]**
 - **One-shot snapshot.** Only today's file is served; corrections over time are lost unless you
   archive snapshots yourself.
 
