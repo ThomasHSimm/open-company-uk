@@ -48,7 +48,7 @@ NOC_SUFFIXES = (
     "-as-trust",
     "-as-firm",
 )
-_SUFFIXES_LONGEST_FIRST = tuple(sorted(NOC_SUFFIXES, key=len, reverse=True))
+SUFFIXES_LONGEST_FIRST = tuple(sorted(NOC_SUFFIXES, key=len, reverse=True))
 
 # Rankable ownership/voting bands, in increasing order of control, used to pick a single
 # "maximum" band per company. ROE codes phrase their threshold as "more-than-25-percent":
@@ -57,14 +57,17 @@ _SUFFIXES_LONGEST_FIRST = tuple(sorted(NOC_SUFFIXES, key=len, reverse=True))
 # an ROE-only holding yields a maximum band of None.
 OWNERSHIP_BANDS = ("25-to-50-percent", "50-to-75-percent", "75-to-100-percent")
 _BAND_RANK = {band: rank for rank, band in enumerate(OWNERSHIP_BANDS, start=1)}
-_BAND_RE = re.compile(r"(\d+-to-\d+-percent|more-than-\d+-percent)")
+# Public so the bulk-snapshot loader can build its DuckDB `regexp_extract` from the SAME
+# pattern instead of hardcoding its own copy (single source of truth for the band form).
+BAND_PATTERN = r"(\d+-to-\d+-percent|more-than-\d+-percent)"
+_BAND_RE = re.compile(BAND_PATTERN)
 
 # Core rights recognised after suffix and band are stripped. Only the first four drive
 # features (bands / appointment / influence); the remainder are recognised so they are
 # NOT reported as unmapped, but they intentionally drive no feature. Both `part-` and
 # plain `right-to-share-surplus-assets` are real enumeration forms;
 # `registered-owner-as-nominee` is the ROE nominee family (jurisdiction infix, no band).
-_CORE_PREFIXES = {
+CORE_PREFIXES = {
     "ownership-of-shares-": "ownership-of-shares",
     "voting-rights-": "voting-rights",
     "right-to-appoint-and-remove-": "right-to-appoint-and-remove",
@@ -72,7 +75,7 @@ _CORE_PREFIXES = {
     "right-to-share-surplus-assets-": "right-to-share-surplus-assets",
     "registered-owner-as-nominee-": "registered-owner-as-nominee",
 }
-_CORE_EXACT = {"significant-influence-or-control": "significant-influence-or-control"}
+CORE_EXACT = {"significant-influence-or-control": "significant-influence-or-control"}
 
 # Per-company API PSC item `kind` values -> coarse category. Beneficial-owner
 # variants (registered-overseas-entity regime) map onto the same base category so
@@ -110,7 +113,7 @@ def decompose_nature(raw: str) -> NatureParts:
     """
     suffix_family = "plain"
     base = raw
-    for suffix in _SUFFIXES_LONGEST_FIRST:
+    for suffix in SUFFIXES_LONGEST_FIRST:
         if raw.endswith(suffix):
             suffix_family = suffix.lstrip("-")
             base = raw[: -len(suffix)]
@@ -120,10 +123,10 @@ def decompose_nature(raw: str) -> NatureParts:
     band = band_match.group(1) if band_match else None
 
     core: str | None = None
-    if base in _CORE_EXACT:
-        core = _CORE_EXACT[base]
+    if base in CORE_EXACT:
+        core = CORE_EXACT[base]
     else:
-        for prefix, name in _CORE_PREFIXES.items():
+        for prefix, name in CORE_PREFIXES.items():
             if base.startswith(prefix):
                 core = name
                 break
