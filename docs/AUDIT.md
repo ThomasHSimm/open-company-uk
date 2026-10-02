@@ -2195,3 +2195,51 @@ smoke test) with the `[dev]` extra installed. New test
 `src/ukcompany/psc/loader.py`, `src/ukcompany/psc_natures.py` (constants made public),
 `tests/test_psc_loader.py`, this entry. **Task C (Stage 2) not started — awaiting maintainer review
 of these numbers.** Nothing pushed.
+
+## PSC loader Stage-1 — correction & postcode addendum (2026-10-02)
+
+A correction to the entry above (left intact, not edited):
+
+- **Person-key eligibility was quoted from the 1-part governed check, not the full snapshot.**
+  The entry's "person_key eligible 461,687/461,706, strict 250,335" are the figures for part 1
+  only. Over the **full** 15.9M-line snapshot (`data/psc/2026-09-18-stage1/load_report.json`):
+  individual-kind records **13,887,210**; baseline-key-eligible (forename+surname+DOB year+month
+  all present) **13,886,736** (99.997% — only 474 fail: 110 missing a name element, 385 missing
+  DOB month/year); middle name present **7,365,984** (53.0%); strict-key-eligible **7,365,820**
+  (53.0%). "Eligible" = an individual record able to form the key. The strict key's ~53% coverage
+  is a **non-random** subset (middle-name recording correlates with vintage/registrar practice).
+- **Invalid postcodes where the country is a UK variant: 3,990** of the 305,366 invalid-UK-format
+  postcodes. Breakdown: United Kingdom 2,494, England 1,316, Scotland 105, Northern Ireland 40,
+  Wales 31, UK 2, Cymru 1, Great Britain 1. (The regex-adjacent "Ireland" = 4,498 is the Republic
+  of Ireland, a separate country, excluded from the UK-variant count.) These ~3,990 are UK-address
+  records whose postcode fails UK format, so `postcode_district` is nulled — the only subset where
+  a nulled district reflects a malformed UK postcode rather than a correctly-excluded foreign one.
+
+## PSC loader Task C — companies-per-person usability (2026-10-02)
+
+Focused Task C from the brief: is "companies per person" usable given no stable person ID? Full
+report (with pre-registered usability criteria written **before** computing):
+`docs/psc-checks-results.md`. Computed over the gitignored full-snapshot load joined to the
+2026-09-01 register; aggregates only, no individual-level output committed. Keys: baseline =
+forename+surname+DOB(y,m); strict = baseline + middle name (~53% coverage, non-random).
+
+- **Baseline→strict split (detectable splits only):** 2.07% of baseline keys (4.91% of records, the
+  relevant record-weighted figure) show a detectable split — an upper bound on *detectable* splits,
+  NOT a bound on all collisions (it cannot see collisions among the ~47% with no middle name, or
+  where both share a middle name).
+- **companies-per-person by name-frequency band:** even the rarest band (unique name) shows a
+  genuine tail (max 2,858; 0.30% on ≥11 companies) — real multi-directorship, not purely a
+  common-name artifact. But the ≥11 rate rises with name commonness (0.30→1.34% across baseline
+  bands) and the strict key flattens it (0.28→0.53%) and cuts the common-name-band max (11–100:
+  4,811→1,580) — part of the baseline tail is collision the middle name resolves.
+- **High-count tail (≥11 companies):** 38,343 baseline tail keys (~35% unique-name/genuine), halved
+  to 18,068 under the strict key. Of the 659,653 companies linked to the tail, **51.1% are
+  unmatched in the live register (dissolved/removed)**, 46.2% Private Limited — "ever" counts are
+  dominated by dissolved shells, so an active-only variant is the more defensible feature.
+- **Verdict (against the pre-registered rule):** usable as a documented **attribute** — never a
+  rule, never a clean identity — carrying its name-frequency band, a match-confidence caveat (2.07%
+  keys / 4.91% records show a detectable split — not a total-collision bound; strict key = higher
+  precision at ~53% recall), and active-only vs ever.
+
+Deliverable `docs/psc-checks-results.md` (new). No code changed in Task C. Stopping for maintainer
+review before any build on top of this. Nothing pushed.
