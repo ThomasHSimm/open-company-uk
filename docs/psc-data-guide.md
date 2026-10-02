@@ -76,16 +76,21 @@ How to read it:
 
 - **Company.** `company_number` sits *outside* `data`. The same number also appears inside
   `links.self`. A parser that only reads `data` sees no company at all. That may explain the "sparse
-  company number" problem you hit before **[check which file/script that was]**. In the bulk file
-  the field was present on every one of the 15.95M records.
+  company number" problem seen before (the originating script is not tracked down here —
+  **[Not verified]**). In the bulk file the field was present on every one of the **15,952,486**
+  records, with **0** mismatches between the top-level `company_number` and the one inside
+  `links.self`. **[Checked]** Source: `docs/AUDIT.md` (PSC loader Stage-1), `load_report.json`.
 - **Current or historical.** `ceased_on` is present, so this person *no longer* controls the
   company. 16.6% of records are like this.
 - **Address.** This is the *service* address, meaning an address for correspondence. It is not the
   home address. For the 7.5M records that could be joined to the register, 78.1% have the same
-  postcode as the company's registered office.
+  postcode as the company's registered office. Separately, **305,366** service-address postcodes are
+  not valid UK format (overwhelmingly foreign addresses); only **3,990** of those carry a UK-variant
+  country. **[Checked]** Source: `docs/AUDIT.md` (Stage-1 correction).
 - **Identifier.** The `<id>` in `links.self` identifies this person *within this company only*. The
-  same person at another company gets a different id **[check: expected from the API design, not
-  yet tested on the file]**.
+  same person at another company gets a different id — **confirmed on the file:** no `psc_id` (the
+  `<id>`) appears under more than one company (0 shared), so there is no cross-company person id.
+  **[Checked]** Source: `docs/AUDIT.md` (Stage-1), `load_report.json` `psc_id_shared_across_companies`.
 
 ### Record types (kinds)
 
@@ -187,7 +192,7 @@ judgement, not yet tested.]**
 | Home address | Can only match people on service address, which is often an accountant's or formation agent's office. |
 | Legal shareholders | Can't check the PSC data against the share register. That lives in confirmation statements, unstructured. |
 | A person ID across companies | Every "same person" link is an inference. |
-| Filing date of each change | Can't measure late reporting from this file alone. It would need filing history. **[check]** |
+| Filing date of each change | Can't measure late reporting from this file alone — **confirmed:** the file carries no per-change filing date; it needs filing history. **[Checked]** |
 | Past versions of the file | Corrections and deletions are invisible unless we save daily copies. |
 | Verification of what was filed | Before identity verification (ECCTA), entries were not checked by Companies House. Treat them as the company's own assertion. |
 
@@ -202,8 +207,11 @@ live register, because ended records and dead companies stay in.
 - *Rule:* every feature states whether it is *active at snapshot date* or *ever*.
 
 **2. Person matching can go wrong both ways.** The recon matched people on forename + surname +
-birth year + birth month. It ignored the middle name. The sample record format suggests the field is
-called `middle_name`, not `middle_names` **[check]**.
+birth year + birth month. It ignored the middle name. The field is called `middle_name` (confirmed).
+Of 13,887,210 individual records, **99.997% can form the baseline key** (forename + surname + birth
+year + month; only 474 cannot) and **53.0% also carry a middle name** for the strict key — so the
+strict key covers a non-random ~53% subset, not everyone. **[Checked]** Source:
+`docs/psc-checks-results.md`, `docs/AUDIT.md` (Stage-1 correction).
 
 - *Wrongly merged:* two different "Alex Example"s both born 03/1970 become one person. They appear
   to control both sets of companies.
@@ -225,7 +233,9 @@ called `middle_name`, not `middle_names` **[check]**.
 **3. Impossible or odd dates.**
 - 14,554 records end before they start.
 - 23,916 start before the regime existed (6 April 2016). The earliest is the year 1083.
-- End dates run up to 9999.
+- End dates run up to 9999. In total **272** ceased dates fall outside 2016–2026 (269 before 2016;
+  3 after: 2924, 9998, 9999). **[Checked]** Source: `docs/recon-psc-results.md` `ceased_on.years`;
+  the loader's `f_ceased_out_of_range` agrees (`docs/AUDIT.md`).
 - 17,729 individuals were under 16 at the start date. Some of these will be real (children can
   hold shares). Some will be data-entry errors in the birth year.
 - *Effect:* a naive "active on date X" test gets these wrong silently. Each needs an explicit rule
@@ -233,8 +243,9 @@ called `middle_name`, not `middle_names` **[check]**.
 
 **4. What `notified_on` means is unclear.** It may be the date the person *became* a controller, or
 the date the company *told* Companies House. Many records sit exactly on 2016-04-06, the regime
-start, which suggests the first meaning, at least for early records **[check against the API
-documentation]**. This matters for any "how recent was the change" feature.
+start, which suggests the first meaning, at least for early records **[Not verified]** (needs the API
+documentation — not resolved by the loader or Task C). This matters for any "how recent was the
+change" feature.
 
 **5. Super-secure is not missing.** These 545 records are legally withheld. Treating them as "no
 PSC reported" would flag people protected for their safety.
@@ -246,9 +257,13 @@ PSC reported" would flag people protected for their safety.
 Match the exact strings from Companies House's `psc_descriptions.yml`. Don't correct them.
 
 **7. Nature-of-control strings have suffixes.** For example,
-`ownership-of-shares-75-to-100-percent-as-trust` is the plain right held via a trust. There are 55
-base rights once the four suffix families are removed. Group before counting, or trust and firm
-holdings look like separate rights.
+`ownership-of-shares-75-to-100-percent-as-trust` is the plain right held via a trust. The recon
+counted 55 base rights after stripping four single suffixes; the authoritative enumeration
+(`psc_descriptions.yml`) has **86 codes**, which reduce to **7 core rights** / **24 suffix-stripped
+bases** once the full suffix set (including compound suffixes such as
+`-as-trust-limited-liability-partnership`) is removed — the difference is the suffix definition, not
+the data. **[Checked]** Source: `docs/psc-checks-results.md`, `tests/fixtures/psc_descriptions_natures.yml`
+(commit `0d3fb78`). Group before counting, or trust and firm holdings look like separate rights.
 
 **8. Corporate registration numbers are messy.** Only 81.7% have the standard 8-character form.
 Some failures to link will be formatting, such as missing leading zeros. Others are genuinely
@@ -260,11 +275,14 @@ set.
 
 **10. The summary line is a free cross-check that we aren't using yet.** The final line of the last
 part gives Companies House's own counts of PSCs, statements and exemptions. The recon counted this
-line as a record but didn't store its values. The extractor should check its own totals against
-it.
+line as a record but didn't store its values; the loader now does. **Reconciled (Stage 1):** the
+line states 15,029,813 PSCs, 922,564 statements and 108 exemptions — matching the parsed counts
+exactly (grand total 15,952,486 including the totals line). **[Checked]** Source: `docs/AUDIT.md`
+(Stage-1), `psc_totals.json`.
 
 **11. Snapshot size.** Each part is roughly 65 MB zipped (a 2021 figure from CH Guide), so about
-2 GB per day for all 32 parts **[check the current size]**. Daily archiving means roughly 0.7 TB a
+2 GB per day for all 32 parts **[Not verified]** (uncompressed parts measured at ~395 MB each × 32 ≈
+12.6 GB; the zipped-day total was not re-measured). Daily archiving means roughly 0.7 TB a
 year. Plan storage, or store only daily differences plus a periodic full copy.
 
 **12. Dates of the join base.** The recon linked PSC records to a register file about 7 weeks older.
@@ -300,15 +318,18 @@ users know what they are handling.
 
 ## 6. Checks still to run against the file
 
-1. Record the exact key name and fill rate for middle names in `name_elements`.
-2. Confirm whether the `links.self` id ever repeats across companies. Yes would mean a usable
-   person id. No would confirm there isn't one.
-3. Dump the full structure of `identity_verification_details` and look for any cross-company
-   identifier.
-4. Read the totals line and reconcile it against our own counts.
-5. Recount "linked to 2+ companies" for active-only records.
-6. Measure the zipped size of today's full set of parts.
-7. Settle the meaning of `notified_on` from the API documentation.
+1. ~~Record the exact key name and fill rate for middle names.~~ **Done:** `middle_name`, 53.0% of
+   individuals (§4.2).
+2. ~~Confirm whether the `links.self` id repeats across companies.~~ **Done:** it does not (0 shared
+   across companies) — there is no cross-company person id (§1).
+3. ~~Dump the structure of `identity_verification_details`.~~ **Done:** the loader extracts its full
+   key set (`IDENTITY_VERIFICATION_KEYS`); no cross-company identifier found.
+4. ~~Read the totals line and reconcile it.~~ **Done:** matches exactly (§4, trap 10).
+5. ~~Recount "linked to 2+ companies" for active-only records.~~ **Done:** companies-per-person is
+   reported banded by name frequency, active-only and ever separately (`docs/psc-checks-results.md`).
+6. Measure the zipped size of today's full set of parts. **[Not verified]** (uncompressed parts are
+   ~395 MB each × 32 ≈ 12.6 GB).
+7. Settle the meaning of `notified_on` from the API documentation. **[Not verified]**
 
 ---
 

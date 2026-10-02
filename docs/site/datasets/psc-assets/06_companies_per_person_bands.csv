@@ -1,0 +1,17 @@
+key,scope,name_band,keys,pct_2plus_companies,pct_11plus_companies
+baseline,ever,unique name,4440327,24.978,0.3006
+baseline,ever,2-10,2382819,28.39,0.5327
+baseline,ever,11-100,1442391,32.616,0.5704
+baseline,ever,101+,304605,46.718,1.3381
+baseline,active,unique name,4069722,23.49,0.1795
+baseline,active,2-10,2151838,26.833,0.3335
+baseline,active,11-100,1321421,30.64,0.3588
+baseline,active,101+,283634,44.429,0.8772
+strict,ever,unique name,2048154,26.145,0.2817
+strict,ever,2-10,1362213,29.077,0.4737
+strict,ever,11-100,920360,30.636,0.482
+strict,ever,101+,265125,32.069,0.5318
+strict,active,unique name,1880786,24.537,0.1766
+strict,active,2-10,1237759,27.248,0.2976
+strict,active,11-100,842817,28.514,0.3058
+strict,active,101+,243229,29.799,0.3256

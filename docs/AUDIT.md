@@ -2256,6 +2256,60 @@ the test failure. Ruff and all 220 selected tests pass locally in `env1` (Python
 3.14); a rerun in GitHub Actions is still needed to confirm the fix on Python
 3.11.
 
+## Handoff 06 — PSC site page (Task D, re-scoped) (2026-10-02)
+
+Branch `feature/psc-site-page` off `main`. The site executes no code: a script reads the private
+loader outputs and writes small, suppressed, aggregates-only assets; the page only displays them.
+Verified it renders with **no raw/Parquet data present** (see below). Nothing pushed.
+
+- **Task 1 — guide.** `docs/psc-data-guide.md`: resolved the `[check]` markers Task C/Stage-1 answer
+  (middle-name key = `middle_name`, 53.0% fill; `links.self` id never shared across companies, 0;
+  totals-line reconciled; 272 out-of-range ceased dates; 305,366 invalid postcodes of which 3,990
+  UK-variant; sparse-company-number non-issue — 0 mismatches), each with a Source line; §6 checks
+  marked done. **Unanswered, left `[Not verified]`:** `notified_on` semantics (needs API docs),
+  zipped-day size (not re-measured), and which earlier script first hit the sparse-number problem.
+  Also reconciled the "55 base rights" to the authoritative 86 codes → 7 cores / 24 bases.
+- **Task 2 — `scripts/psc_site_summaries.py`** → `docs/site/datasets/psc-assets/` (11 figures + CSVs
+  + `coverage.{csv,json}`). Reports **two populations** — all records (ever) and **live companies**
+  (register join). The nearest monthly register to the 2026-09-18 PSC snapshot is **2026-09-01
+  (17 days earlier); there is no mid-month register**, so live figures carry that gap (stated on the
+  page and in coverage). Figs 2/4/8 have all+live variants. Small counts (<10) are rendered `<10`
+  before plotting and never drawn (fig 3: 1 suppressed; fig 9: 4). **Fig 5 (notification lag)
+  dropped from the page this pass** — `notified_on` meaning unsettled — but its CSV is still emitted
+  (follow-up). Coverage: 15,952,486 lines; 10,917,257 companies (ever); 5,689,366 live, 5,536,905
+  matched (97.3%); totals line reconciles exactly.
+- **Task 3 — `docs/site/datasets/psc.qmd`** extended: status → "loader built; code + aggregates
+  published, data not"; two-population summary; coverage box; the figures with captions carrying the
+  required notes (bo_* = overseas-entity beneficial owners; "signficant" is CH's own spelling;
+  records hold several rights; ECCTA "as of snapshot, rollout ongoing"; suppressed-count notes); a
+  "what you can and can't answer" section; **§5 data-governance copied verbatim**; companies-per-
+  person shown only as banded aggregates with the exact Task-C wording ("≤2.07% of baseline keys
+  (4.91% of records) show a detectable split", strict 53% non-random, active-only vs ever, never a
+  person identity); threshold worded "more than 25%", regime April 2016; Source + Checked/Not
+  verified labels throughout.
+- **Task 4 — `docs/site/guide/sources-map.qmd`:** PSC status "In progress" → "Done (loader built;
+  code + aggregates published, data not)".
+- **Task 5 — leak check + no-data render + links.** Leak check over every committed CSV/figure: **no
+  name/key/nationality/DOB columns**; **no sub-10 count cell** (the only bare `<10` cells are the
+  `name_band` label "1", a dimension not a count); figures are category bar charts with no personal
+  fields. No-data render: `data/` renamed, `quarto render docs/site/datasets/psc.qmd` → exit 0,
+  `psc.html` built with all 11 PNGs, `data/` restored. Asset/link check: all 11 asset refs and 4
+  internal `.qmd` links resolve. **No maps this pass** (deferred).
+- **Post-review refinements.** (a) Confirmed no max/largest/top-N or single-key tail value (e.g. the
+  rarest-band single-key maximum) appears in `psc.qmd` or any committed CSV — band percentages only.
+  `docs/psc-checks-results.md`'s per-band max column has since been **scrubbed to banded buckets on
+  `main`** (see the 2026-10-02 scrub entry below). (b) Renamed the companies-per-person band "1" →
+  "unique name" (script + CSV +
+  figure), which also removes the last bare `<10`-looking cell from the leak scan. (c) Added the
+  caption "2.7% of live companies have no PSC record (cause not verified)". (d) `coverage.json` now
+  records both snapshot dates plus script provenance (`generated_by_script`, `script_sha256`,
+  `generated_against_commit`); a file can't contain its own commit hash, so the sha256 is the
+  verifiable link to the committed script.
+- **Scope.** `scripts/psc_site_summaries.py` (new), `docs/site/datasets/psc-assets/*` (new, 25
+  files), `docs/site/datasets/psc.qmd`, `docs/site/guide/sources-map.qmd`, `docs/psc-data-guide.md`,
+  this entry. Committed locally on `feature/psc-site-page`; PNGs committed (no CI regeneration);
+  nothing pushed.
+
 ## Scrub single-key maxima from the PSC companies-per-person tables (2026-10-02)
 
 Removed the per-band **maximum** companies-per-person values from `docs/psc-checks-results.md` (both

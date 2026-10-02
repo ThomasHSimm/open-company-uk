@@ -65,7 +65,9 @@ Companies House is several sources in one. Treat each product separately.
   project publishes **code only**.
 - *Known problems:* only today's snapshot is served; corrections over time are lost unless you
   archive. One-shot snapshot, not an event log.
-- *Our status:* **In progress** — recon complete, extractor in design.
+- *Our status:* **Done (loader built; code + aggregates published, data not)** — the bulk loader is
+  merged, Stage 1 and the companies-per-person usability check are done, and the
+  [PSC page](../datasets/psc.qmd) publishes company-level aggregate summaries (never the PSC data).
 
 **Officers (directors and secretaries)**
 

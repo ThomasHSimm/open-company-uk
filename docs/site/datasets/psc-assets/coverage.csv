@@ -1,0 +1,11 @@
+metric,value
+register_gap_days,17
+lines,15952486
+psc_records_excl_totals,15952485
+distinct_companies_in_product,10917257
+companies_with_active_psc_or_statement,10854237
+live_companies_in_register,5689366
+live_companies_matched_in_psc_product,5536905
+totals_line_persons,15029813
+totals_line_statements,922564
+totals_line_exemptions,108

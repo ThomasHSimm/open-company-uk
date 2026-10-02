@@ -1,0 +1,17 @@
+{
+ "snapshot_date": "2026-09-18",
+ "register_date": "2026-09-01",
+ "register_gap_days": 17,
+ "lines": 15952486,
+ "psc_records_excl_totals": 15952485,
+ "distinct_companies_in_product": 10917257,
+ "companies_with_active_psc_or_statement": 10854237,
+ "live_companies_in_register": 5689366,
+ "live_companies_matched_in_psc_product": 5536905,
+ "totals_line_persons": 15029813,
+ "totals_line_statements": 922564,
+ "totals_line_exemptions": 108,
+ "generated_by_script": "scripts/psc_site_summaries.py",
+ "script_sha256": "8c3e0d2357b29261e5b357020ca5286a54d20f2d2b87692808a5a222acac68e0",
+ "generated_against_commit": "19282a263de64424b3148d8aaa0717fee7840ed1"
+}
