@@ -2228,10 +2228,11 @@ forename+surname+DOB(y,m); strict = baseline + middle name (~53% coverage, non-r
   NOT a bound on all collisions (it cannot see collisions among the ~47% with no middle name, or
   where both share a middle name).
 - **companies-per-person by name-frequency band:** even the rarest band (unique name) shows a
-  genuine tail (max 2,858; 0.30% on ≥11 companies) — real multi-directorship, not purely a
-  common-name artifact. But the ≥11 rate rises with name commonness (0.30→1.34% across baseline
-  bands) and the strict key flattens it (0.28→0.53%) and cuts the common-name-band max (11–100:
-  4,811→1,580) — part of the baseline tail is collision the middle name resolves.
+  genuine tail (its most-connected keys reach ≥1,000 companies; 0.30% on ≥11 companies) — real
+  multi-directorship, not purely a common-name artifact. But the ≥11 rate rises with name commonness
+  (0.30→1.34% across baseline bands) and the strict key flattens it (0.28→0.53%) and lowers the
+  common-name-band maxima (all ≥1,000) — part of the baseline tail is collision the middle name
+  resolves. (Single-key maximum values scrubbed — see the 2026-10-02 scrub entry below.)
 - **High-count tail (≥11 companies):** 38,343 baseline tail keys (~35% unique-name/genuine), halved
   to 18,068 under the strict key. Of the 659,653 companies linked to the tail, **51.1% are
   unmatched in the live register (dissolved/removed)**, 46.2% Private Limited — "ever" counts are
@@ -2254,3 +2255,63 @@ The Node.js and Ubuntu runner annotations were informational and unrelated to
 the test failure. Ruff and all 220 selected tests pass locally in `env1` (Python
 3.14); a rerun in GitHub Actions is still needed to confirm the fix on Python
 3.11.
+
+## Scrub single-key maxima from the PSC companies-per-person tables (2026-10-02)
+
+Removed the per-band **maximum** companies-per-person values from `docs/psc-checks-results.md` (both
+the baseline and strict tables, and the §2 prose) and from the Task C AUDIT entry above, replacing
+them with banded statements (`≥1,000`, `100–999`). The maxima — chiefly the rarest-name band's
+**single-key** maximum — point at one person via the public register (a unique-name key on a very
+large number of companies is effectively identifiable), so even a per-band count with no name is a
+re-identification risk. Band percentages, medians and p90/p99 (distributional over hundreds of
+thousands of keys) are retained; only the single-key maximum column is banded.
+
+**Already-pushed note.** These values were already on `origin/main` (merged via PR #9), so this is a
+**forward** scrub: the current files no longer carry them, but they remain in git history. Public
+history is **not** rewritten — a no-name per-band count is a low-severity exposure and force-pushing
+`main` would cause more trouble than it prevents. Scrub committed on `main` (not pushed);
+`feature/psc-site-page` is rebased onto it. The site page and its CSVs never contained the maxima.
+
+## Public accounts LONG withdrawn from Kaggle; WIDE confirmed clean (2026-10-03)
+
+Branch `fix/withdraw-public-long`, text-only, not pushed.
+
+**Timeline.** The per-fact accounts **LONG** table was published on Kaggle (made public on
+**2026-10-02**; to be confirmed) and **deleted on 2026-10-03** after a read-only dimension check on
+the published v2 LONG. Download/view counts at deletion: **not provided** (add here if available).
+
+**Leak finding (aggregate; from the dimension check over the v2 public LONG,
+`data/accounts/v2/kaggle-long-src/*.parquet`).** Facts whose `dimension`/`member` matched
+Officer/Director/RelatedPart/KeyManagement/Trustee: **411,338 facts**, **23 distinct concepts (all
+numeric), all 23 outside the 95-concept numeric denylist**, across **44,225 companies**. These are
+related-party / key-management amounts (balances and loans owed to/by related parties, payments,
+income from related parties, and the increase/decrease variants) carried on dimensional **members**
+(e.g. `KeyManagementPersonnel`, `OtherRelatedParties`, `Associate1`). The concept-level denylist
+missed them because the person/related context lives in the member, not the concept name — in a
+single-director company a "loan owed to key management personnel" is effectively a per-person amount.
+This is why LONG was withdrawn.
+
+**WIDE confirmed unaffected (read-only).** Every WIDE value comes from either a dimensionless fact
+(the nine total concepts) or one of the four reviewed `(concept, dimension, member)` members
+(`Equity`×`EquityClassesDimension`×{`ShareCapital`,`RetainedEarningsAccumulatedLosses`};
+`Creditors`×`MaturitiesOrExpirationPeriodsDimension`×{`WithinOneYear`,`AfterOneYear`}). The pivot
+(`accounts/pivot.py`) admits totals only where `dimension IS NULL` and members only via an inner
+join on those four triples, so no related-party / officer / director / key-management context can
+enter. Confirmed the built WIDE schema: the 9 totals + 4 members + housekeeping columns only, **no
+related-party/officer/director/key-management columns**.
+
+**Site/README reworded (part 2).** Removed every claim that the public LONG is published and the
+LONG Kaggle link, stating it is **withdrawn pending a dimension-aware filter** (no leak detail on the
+site): `docs/site/datasets/accounts.qmd` (title, summary + withdrawal callout, the-tables section,
+limitations, licence, Kaggle box), `README.md` accounts section, `docs/site/guide/sources-map.qmd`,
+`docs/site/index.qmd`, `docs/site/guide/accounts-data.qmd`, `docs/site/_quarto.yml` nav. (The
+`docs/site/_CHANGES.md` row is a historical changelog, left as-is.)
+
+**v3 parked — design noted (not built).** (a) **Dimension allowlist**: admit a fact only if it is
+dimensionless or its `(dimension, member)` is on a reviewed allowlist (the maturity and
+equity-class members WIDE uses); drop all other dimensional contexts (related-party, officer,
+director, key-management, trustee). (b) **Denylist the 23 concepts, including their non-dimensional
+totals**, so even the dimensionless version of a related-party concept is dropped. (c) **Dimension-
+aware staging guard**: `scripts/kaggle_staging_guard.py` currently scans concepts only; extend it to
+scan `dimension`/`member` and fail on the person/related-party families. Rebuild and re-publish LONG
+only after the guard passes dimension-aware. Render + link check run; nothing pushed.

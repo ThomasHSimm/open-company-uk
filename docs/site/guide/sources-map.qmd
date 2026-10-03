@@ -52,7 +52,8 @@ Companies House is several sources in one. Treat each product separately.
   not personal data, so a derived financials dataset can be published.
 - *Known problems:* electronically filed only; mostly balance sheets; the API returns no parsed
   numbers, so you must parse the filings yourself.
-- *Our status:* **Done** — the published [2014–2026 accounts dataset](../datasets/accounts.qmd).
+- *Our status:* **Done** — the published [2014–2026 accounts **WIDE** dataset](../datasets/accounts.qmd)
+  (the per-fact LONG table is withdrawn pending a dimension-aware privacy filter).
 
 **PSC (persons with significant control)**
 

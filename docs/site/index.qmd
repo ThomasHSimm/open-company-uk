@@ -30,7 +30,8 @@ is](guide/accounts-data.qmd), and the [pitfalls we hit](guide/pitfalls.qmd) read
 ::: {.g-col-12 .g-col-md-4}
 ### [Datasets](datasets/accounts.qmd)
 Ready-to-use, tested tables. An open [2014–2026 accounts dataset](datasets/accounts.qmd)
-(WIDE and LONG), [how we know it is right](datasets/accounts-validation.qmd), and the
+(WIDE; the per-fact LONG is withdrawn pending a dimension-aware filter),
+[how we know it is right](datasets/accounts-validation.qmd), and the
 [ownership / PSC work](datasets/psc.qmd) still in progress.
 :::
 

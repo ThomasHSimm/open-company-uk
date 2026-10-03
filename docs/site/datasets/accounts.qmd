@@ -1,19 +1,24 @@
 ---
-title: "Accounts dataset (WIDE & LONG, 2014–2026)"
+title: "Accounts dataset (WIDE, 2014–2026)"
 ---
 
 ## Summary
 
 This is an open, analysis-ready version of twelve years of UK company accounts, built from
-Companies House's free monthly bulk archives. It comes in two tables. **WIDE** is one row per
-company per accounting period, with the core balance-sheet figures as columns — the table most
-people want for modelling. **LONG** is a fuller, **personal-data-removed** table — one row per
-fact, reaching the concepts the curated columns leave out — for anyone who needs more than WIDE.
-Coverage is continuous from January 2014 to August 2026 (152 monthly archives, no gaps), and both
-published tables contain **financial facts and company numbers only** — no names, addresses or
-other personal data. The complete as-filed archive (which *does* contain director names,
-addresses and loans) is kept private and **never published**; what you can download is the
-filtered subset described under *Licence* below.
+Companies House's free monthly bulk archives. The published table is **WIDE**: one row per company
+per accounting period, with the core balance-sheet figures as columns — the table most people want
+for modelling. Coverage is continuous from January 2014 to August 2026 (152 monthly archives, no
+gaps), and WIDE contains **financial facts and company numbers only** — no names, addresses or
+other personal data. The complete as-filed archive (which *does* contain director names, addresses
+and loans) is kept private and **never published**.
+
+::: {.callout-important appearance="simple"}
+**The per-fact LONG table has been withdrawn from Kaggle** pending a dimension-aware privacy filter.
+A LONG table was briefly published, then deleted when a review found its filter screened concept
+names but not dimensional contexts. Only **WIDE** is currently published, and WIDE is unaffected —
+its values come only from non-dimensional totals and four reviewed members (see *The WIDE table*
+below). LONG will return once the filter screens dimensional contexts too.
+:::
 
 The one decision you must make before using WIDE is **which pivot** to read:
 `as_first_reported` (what was known at the time — use this for anything predictive) or `latest`
@@ -22,20 +27,19 @@ about using the tables correctly: the columns, the known limitations, and the li
 
 ## Details
 
-### The two tables
+### The WIDE table
 
-| Table | Grain | Contents | Size |
+| Table | Grain | Contents | Status |
 |---|---|---|---|
-| **WIDE** | one row per (company, period-end) | nine core balance-sheet concepts + equity and creditors splits + helper columns | ~2.6 GB Parquet |
-| **LONG** (public subset) | one row per fact | the full concept set (~4,593 concepts) **with person-related and free-text concepts removed** — *not* the raw as-filed archive | ~9.2 GB Parquet, one file per year |
+| **WIDE** | one row per (company, period-end) | nine core balance-sheet concepts + equity and creditors splits + helper columns (~2.6 GB Parquet) | **published** |
+| **LONG** | one row per fact | a fuller per-fact table across the full concept set | **withdrawn** pending a dimension-aware filter; not currently downloadable |
 
-::: {.callout-important appearance="simple"}
-**"LONG" here means the published, personal-data-removed subset.** The full LONG archive used
-*internally* to build these tables contains personal data — director names, addresses, the signing
-director, director loans and remuneration — and is **never published**. Only the filtered subset
-(numeric person-concept denylist + structured-field allowlist, described under *Licence*) is
-downloadable. The Kaggle "LONG" dataset is that subset, not the raw archive.
-:::
+WIDE is built from genuine non-dimensional totals plus four reviewed dimensional members (the equity
+and creditors splits). It **never** includes related-party, officer, director or key-management
+contexts — the pivot only admits a dimensionless total or one of those four reviewed
+(concept, dimension, member) members, so a dimensional note fact has no WIDE column to land in. The
+withdrawn LONG held one row per fact; it returns when its filter screens dimensional contexts, not
+only concept names.
 
 Coverage: **152 monthly archives, continuous 2014-01 → 2026-08, 0 gaps.** WIDE has **33,513,017**
 rows in `as_first_reported` mode and **36,710,673** in `latest` mode. Source:
@@ -143,12 +147,12 @@ see also [pitfalls](../guide/pitfalls.qmd).
 - **Some breakdowns skipped** — facts in multi-member or custom (typed-member) dimensional
   contexts are not captured; ~38% of filings contain at least one such context (these are mostly
   detailed notes, not the balance-sheet totals WIDE uses).
-- **Nine core concepts validated** — the other ~4,580 concepts in LONG are captured as filed but
-  **not** validated; check the source filing before relying on a rare one.
+- **Nine core concepts validated** — the other ~4,580 concepts (held in the internal,
+  not-currently-published LONG) are captured as filed but **not** validated.
 - **Restatements (~9%)** and an **employee reporting break around 2020–2021**.
 - **Non-random gaps** — e.g. equity fill-rate varies by more than 10 percentage points across
   months.
-- **GBP only in WIDE** — non-sterling filers are excluded (kept in LONG), not converted.
+- **GBP only in WIDE** — non-sterling filers are excluded (kept in the internal LONG), not converted.
 
 Full detail and every reconciliation: `docs/accounts-limitations.md`. Source: deck slide 17.
 
@@ -159,27 +163,24 @@ Licence v3.0**, free to reuse with attribution. Companies House and the UK Gover
 endorse this dataset, and a derived dataset is not a complete or official representation of any
 company.
 
-Both published tables are **financial facts and company numbers only**. WIDE carries no names,
-addresses or director figures. LONG applies a maintainer-approved filter: a 95-concept numeric
-**denylist** (director/officer/key-management/related-party remuneration, loans and advances)
-and a 17-concept non-numeric **allowlist** of structured fields only (dates, the registered
-number, filing-software name, and categorical flags) — every other non-numeric concept, including
-all free text, is dropped. The private, unfiltered archive that includes personal data is **never
-published**. The OGL does not cover personal data, which is part of why this split exists.
+The published **WIDE** table is **financial facts and company numbers only** — no names, addresses
+or director figures (guaranteed by the pivot, which admits only non-dimensional totals and four
+reviewed members). The per-fact **LONG** table is **withdrawn from Kaggle** pending a
+dimension-aware filter and is not currently downloadable; the private, unfiltered archive that
+includes personal data is **never published**. The OGL does not cover personal data.
 Source: `docs/accounts-public-long-concepts.md`, `docs/accounts-limitations.md`.
 
 ### Get the data
 
-::: {.callout-tip title="Kaggle links"}
-Both tables are published on Kaggle under the Open Government Licence v3.0. Both are the
-**personal-data-removed** datasets — neither is the private, full as-filed archive.
+::: {.callout-tip title="Kaggle link"}
+**WIDE** is published on Kaggle under the Open Government Licence v3.0 (financial facts and company
+numbers only — not the private as-filed archive):
 
 - **WIDE** — [kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026](https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026)
-- **LONG** (personal-data-removed public subset) — [kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026](https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026)
 
-Each dataset ships its own `column-dictionary.md` / `dataset-metadata.json`; those files are
-generated in the gitignored `kaggle*/` staging directories and travel with the download, not the
-git repo.
+The per-fact **LONG** table has been **withdrawn** pending a dimension-aware privacy filter and is
+not currently available. WIDE ships its own `column-dictionary.md` / `dataset-metadata.json` in the
+gitignored `kaggle*/` staging directory, travelling with the download.
 :::
 
 The pipeline that builds these tables is on
