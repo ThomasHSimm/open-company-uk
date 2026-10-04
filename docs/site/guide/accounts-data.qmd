@@ -106,8 +106,8 @@ moved once, so re-confirm before relying on it.
 
 - [Pitfalls we found](pitfalls.qmd) — the tag-level and reconciliation problems that change
   analysis if missed.
-- [The accounts dataset](../datasets/accounts.qmd) — the tested WIDE and LONG tables built from
-  this data, with a quickstart.
+- [The accounts dataset](../datasets/accounts.qmd) — the published WIDE table built from this data,
+  with a quickstart (the per-fact LONG is withdrawn pending a dimension-aware filter).
 - [How we know it is right](../datasets/accounts-validation.qmd) — the parser comparison and
   cross-checks.
 

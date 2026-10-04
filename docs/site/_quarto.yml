@@ -21,7 +21,7 @@ website:
             href: guide/pitfalls.qmd
       - text: Datasets
         menu:
-          - text: "Accounts (WIDE & LONG)"
+          - text: "Accounts (WIDE)"
             href: datasets/accounts.qmd
           - text: "Accounts validation"
             href: datasets/accounts-validation.qmd

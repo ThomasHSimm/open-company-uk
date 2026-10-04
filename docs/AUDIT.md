@@ -2272,132 +2272,46 @@ history is **not** rewritten — a no-name per-band count is a low-severity expo
 `main` would cause more trouble than it prevents. Scrub committed on `main` (not pushed);
 `feature/psc-site-page` is rebased onto it. The site page and its CSVs never contained the maxima.
 
-## Handoff 07 — PSC regular loads and per-company bulk features (2026-10-03)
+## Public accounts LONG withdrawn from Kaggle; WIDE confirmed clean (2026-10-03)
 
-Made PSC loading repeatable and built a per-company feature table for every company in the bulk
-snapshot, matching `derive_psc`'s definitions, with a parity test and a register-coverage report.
+Branch `fix/withdraw-public-long`, text-only, not pushed.
 
-**Maintainer decisions.** D1 (archive cadence) = **first-of-month + latest** (implemented in
-`ukcompany.psc.archive.plan_retention`/`prune_archive`). Build approach = **vectorised
-`psc_natures` + parity test** (confirmed). D2 (companies-per-person) — see the flag below.
+**Timeline.** The per-fact accounts **LONG** table was published on Kaggle (made public on
+**2026-10-02**; to be confirmed) and **deleted on 2026-10-03** after a read-only dimension check on
+the published v2 LONG. Download/view counts at deletion: **not provided** (add here if available).
 
-**Task 1 — repeatable load (`ukcompany-psc refresh`).** New `src/ukcompany/psc/archive.py`
-adds checksum verification against the manifest, D1 retention, idempotent zip extraction (DuckDB
-cannot read a zip container, so the loader needs extracted `.txt`), and a zipped-vs-extracted
-size report. New `refresh` CLI subcommand runs download → verify → prune → extract → load →
-checks end to end, idempotently. **Added a fail-loud totals-line reconciliation to
-`loader.py`** (previously only the category/noc-count and governed-column checks raised): the
-snapshot's one `totals#…` record is reconciled against the parsed person/statement/exemption
-counts and the load raises on any mismatch. New constant `PSC_PERSON_CATEGORIES` (derived from
-`KIND_TO_CATEGORY` so it cannot drift). Run on the **2026-09-25** archive (a complete 32-part
-zip set with a manifest was on disk; the 2026-09-18 copy was extracted-only, no zips, so it
-could not exercise checksum verification): checksums verified, totals reconciled (persons
-15,052,596 / statements 923,664 / exemptions 108, all match), **694 s wall, ~10 GB peak RSS**
-at an 8 GB DuckDB limit; archive 2.22 GB zipped → 13.1 GB extracted. Prune was run `--prune-dry-run`
-(nothing to remove with one snapshot present) to avoid deleting real data during the demo; the
-real deletion path is unit-tested.
+**Leak finding (aggregate; from the dimension check over the v2 public LONG,
+`data/accounts/v2/kaggle-long-src/*.parquet`).** Facts whose `dimension`/`member` matched
+Officer/Director/RelatedPart/KeyManagement/Trustee: **411,338 facts**, **23 distinct concepts (all
+numeric), all 23 outside the 95-concept numeric denylist**, across **44,225 companies**. These are
+related-party / key-management amounts (balances and loans owed to/by related parties, payments,
+income from related parties, and the increase/decrease variants) carried on dimensional **members**
+(e.g. `KeyManagementPersonnel`, `OtherRelatedParties`, `Associate1`). The concept-level denylist
+missed them because the person/related context lives in the member, not the concept name — in a
+single-director company a "loan owed to key management personnel" is effectively a per-person amount.
+This is why LONG was withdrawn.
 
-**Task 2 — per-company features (`ukcompany-psc features`, `psc/features.py`).** 10,932,116
-companies (identified 10,374,976 / statement_only 493,850 / none_reported 63,290). Built from the
-**governed** load, which is the only mode that carries the pseudonymous `person_key` (plus every
-non-PII feature input); both output tiers derive from that one source. One definition: the heavy
-grouping is in DuckDB but `summarise_natures`, `classify_kind` and `is_uk_company_number_format`
-are applied in Python over the distinct vocabularies (13,032 distinct nature code-sets, ~10
-kinds, 394,101 distinct corporate regnos) and joined back — no second implementation of those
-rules. Two tiers via `--data-governance`: governed (21 cols, no person linkage; written schema
-asserted to lack the band) and private (22 cols, adds `companies_per_person_max_band`). Each tier
-built in ~40 s at ~13 GB RSS (10 GB limit). `psc_fetch_status` is intentionally omitted (no
-bulk analogue). Documented in `docs/psc-bulk-features.md`.
+**WIDE confirmed unaffected (read-only).** Every WIDE value comes from either a dimensionless fact
+(the nine total concepts) or one of the four reviewed `(concept, dimension, member)` members
+(`Equity`×`EquityClassesDimension`×{`ShareCapital`,`RetainedEarningsAccumulatedLosses`};
+`Creditors`×`MaturitiesOrExpirationPeriodsDimension`×{`WithinOneYear`,`AfterOneYear`}). The pivot
+(`accounts/pivot.py`) admits totals only where `dimension IS NULL` and members only via an inner
+join on those four triples, so no related-party / officer / director / key-management context can
+enter. Confirmed the built WIDE schema: the 9 totals + 4 members + housekeeping columns only, **no
+related-party/officer/director/key-management columns**.
 
-**Task 3 — parity (`scripts/psc_parity_check.py`, `docs/psc-parity-2026-09-25.md`).** 999
-companies in both the API cache and the snapshot. Agreement 99.8–100% on 18 of 20 features;
-`n_psc_id_verification_due`/`n_psc_id_statement_filed` at 94.7%. Every disagreement is temporal
-(the two sources are different instants; ECCTA identity verification is rolling out live), not a
-definition difference — the synthetic parity unit test (`tests/test_psc_features.py`) agrees 100%
-on identical input across individual/corporate/legal-person/super-secure/statement/exemption/
-ceased/IV cases.
+**Site/README reworded (part 2).** Removed every claim that the public LONG is published and the
+LONG Kaggle link, stating it is **withdrawn pending a dimension-aware filter** (no leak detail on the
+site): `docs/site/datasets/accounts.qmd` (title, summary + withdrawal callout, the-tables section,
+limitations, licence, Kaggle box), `README.md` accounts section, `docs/site/guide/sources-map.qmd`,
+`docs/site/index.qmd`, `docs/site/guide/accounts-data.qmd`, `docs/site/_quarto.yml` nav. (The
+`docs/site/_CHANGES.md` row is a historical changelog, left as-is.)
 
-**Task 4 — coverage (`scripts/psc_coverage_check.py`, `docs/psc-coverage-2026-09-25.md`).**
-Vs the 2026-09-01 one-file register: 97.32% of register companies covered (97.63% of Active).
-Uncovered-by-type is interpretable — PSC-regime types (private limited 99.4%, LLP, PLC, CIC,
-guarantee, overseas entities) near-fully covered; types ~100% uncovered (Charitable Incorporated
-Organisations, Registered Societies, Scottish CIOs, Royal Charter, ICVCs, UK EIGs, I&P Societies)
-are outside the PSC regime. The snapshot carries ~10.93M companies vs ~5.69M on the register
-(which excludes dissolved companies), i.e. ~5.40M dissolved/historical companies retain PSC
-records in the snapshot.
-
-**D2 flag — needs an explicit maintainer decision before the band goes public.** The D2 answer
-"also publish coarse bands" contradicts this handoff's own hard constraint ("companies-per-person
-must not appear in any public output") and the project's governance posture: companies-per-person
-is person-derived linkage, and on a single-PSC company a band such as "11+" is a re-identifiable
-statement about a named individual's cross-company footprint — the same class of exposure that
-caused the accounts-LONG withdrawal. The band is therefore currently in the **private tier only**
-(governed tier excludes it; written-schema assertion enforces that). Awaiting confirmation of one
-of: (a) keep private-only; (b) publish only for companies with ≥2 active PSCs; (c) publish for all.
-A second, smaller D2 point: the band's scope is implemented as **active roles only** (the D2
-default), which differs from Task C's **ever (active + ceased)** definition — also to confirm.
-
-**Assumptions needing live verification.**
-- Active/ceased in the bulk path uses `ceased_on IS NULL` only — the snapshot has no top-level
-  `active_count`/`ceased_count` and the loader does not extract the per-item `ceased` boolean, so
-  a `ceased:true`-without-`ceased_on` record (rare) reads as active. The API path prefers the
-  top-level counts; this is a documented, minor source of parity drift.
-- Identity-verification counts use a block-presence proxy (any extracted `iv_*` field present),
-  because `raw` is dropped in governed mode. Matched the API path on 99.9% of `n_psc_id_verified`.
-- `companies_per_person_max_band` links on the governed load's HMAC `person_key`; the band output
-  exposes no name/DOB/key.
-
-**Deviations from stated file scope.** Added two CLI subcommands (`refresh`, `features`), a new
-module (`psc/archive.py`, `psc/features.py`) and two analysis scripts — all within the stated
-task intent. No change to rules, severities, `SOLVENT_CASE_TYPES`, `EXCLUDED_STATUSES` or any
-judgement-layer constant. `FIELD_DOCS` unchanged (the bulk features reuse `derive_psc`'s already-
-documented fields; the one new column is documented in `docs/psc-bulk-features.md`), so the
-generated data dictionary needs no regeneration. All 233 tests and ruff pass.
-
-**D2 resolved (2026-10-04).** Maintainer confirmed: "public tier" in the handoff meant
-governed-mode output, not a publication — no PSC data is published from this project at all (code
-and suppressed site aggregates only). The companies-per-person band therefore stays in the
-**private (ungoverned) tier only and is absent from the governed tier** (as implemented). Scope
-set to **ever (active + ceased)**, matching Task C, and made the default (`features.py`
-`companies_per_person_active_only=False`; CLI opt-in `--companies-per-person-active-only`). Private
-tier rebuilt on the ever scope: band distribution `1` 4,067,183 / `2-10` 5,250,935 / `11+` 666,089
-/ none 947,909. Parity and coverage are unaffected (neither reads the band).
-
-## Handoff 07 follow-up — ceased rule, both CPP bands, parity timing/monotonicity (2026-10-04)
-
-Four maintainer-requested refinements on `feature/psc-bulk-features`.
-
-**(1) Per-item `ceased` boolean + derive_psc's exact active/ceased rule.** The loader now extracts
-the per-item `ceased` boolean (`TRY_CAST(d->>'ceased' AS BOOLEAN)`, kept in both tiers) and the
-load report carries a diagnostic (`ceased_boolean`: `ceased_true`, `ceased_true_without_ceased_on`).
-The feature builder's `is_active` now uses derive_psc's rule exactly:
-`NOT COALESCE(ceased, ceased_on IS NOT NULL)` (boolean first, else `ceased_on` presence). On the
-re-loaded 2026-09-25 snapshot the diagnostic is **ceased_true=87, ceased_true_without_ceased_on=0**
-— every `ceased:true` record also carries a `ceased_on`, so on this snapshot the new rule yields
-the same split as the old `ceased_on`-only rule; the loader now matches the API path regardless.
-Re-load: 676 s, ~10.4 GB, totals reconciled.
-
-**(2) Parity timing & direction + ECCTA monotonicity (`scripts/psc_parity_check.py`).** For every
-disagreement the report now records the API cache's fetch date vs the snapshot date and the signed
-direction; full per-disagreement detail (incl. company number, a public identifier) is in the
-`.json` sidecar, the markdown stays aggregate. The API cache was fetched 2026-08-03..07, ~7 weeks
-before the 2026-09-25 snapshot. Added a monotonicity check on the counts expected to only
-accumulate. **Finding:** `n_psc_id_verified` has 0 violations, but all **53**
-`n_psc_id_statement_filed` disagreements are violations — the count *fell* from the (older) cache
-to the snapshot, for companies with **no** PSC membership change. This falsifies the accumulation
-assumption for that field: `appointment_verification_statement_date` reflects the current ECCTA
-verification cycle and clears on reset (like `n_psc_id_verification_due`, which shows the same
-53-company Aug→Sep decrease and is excluded from the check). It is a point-in-time field, not a
-parity defect — feature logic is identical across paths (synthetic unit test = 100%).
-
-**(3) Both companies-per-person bands in the ungoverned tier.** The private tier now emits
-**`companies_per_person_band_ever`** (active + ceased, as Task C) and
-**`companies_per_person_band_active`** (current footprint); the governed tier emits **neither**
-(written-schema assertion covers both column names). Removed the single-band `--companies-per-
-person-active-only` scope flag. Private-tier cross-tab (ever, active) shows them diverging, e.g.
-349,162 companies at 2-10 ever / 1 active and 192,860 at 2-10 ever / none active — so the two
-scopes carry distinct information. Governed tier: 21 columns, no band; private: both bands present.
-
-**(4) Branch + commit.** All work committed locally on **`feature/psc-bulk-features`**; not pushed.
-
-Tests: full suite green; ruff clean. `data/` outputs remain gitignored.
+**v3 parked — design noted (not built).** (a) **Dimension allowlist**: admit a fact only if it is
+dimensionless or its `(dimension, member)` is on a reviewed allowlist (the maturity and
+equity-class members WIDE uses); drop all other dimensional contexts (related-party, officer,
+director, key-management, trustee). (b) **Denylist the 23 concepts, including their non-dimensional
+totals**, so even the dimensionless version of a related-party concept is dropped. (c) **Dimension-
+aware staging guard**: `scripts/kaggle_staging_guard.py` currently scans concepts only; extend it to
+scan `dimension`/`member` and fail on the person/related-party families. Rebuild and re-publish LONG
+only after the guard passes dimension-aware. Render + link check run; nothing pushed.
