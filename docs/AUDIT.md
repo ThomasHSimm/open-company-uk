@@ -2315,3 +2315,69 @@ totals**, so even the dimensionless version of a related-party concept is droppe
 aware staging guard**: `scripts/kaggle_staging_guard.py` currently scans concepts only; extend it to
 scan `dimension`/`member` and fail on the person/related-party families. Rebuild and re-publish LONG
 only after the guard passes dimension-aware. Render + link check run; nothing pushed.
+
+## CI dependency for PSC feature tests (2026-10-04)
+
+The PSC feature module imports pandas, and `tests/test_psc_features.py` exercises
+DuckDB's pandas-backed `.df()` result. Added `pandas>=2.0` to the `dev` extra so
+the GitHub Actions `pip install -e .[dev]` step installs it before test collection.
+
+## Handoff 08 — per-company features from the basic-company snapshot (2026-10-04)
+
+Produced per-company features for every live company from the monthly basic-company bulk file,
+mirroring the PSC pattern (one definition, parity, coverage, governed/ungoverned tiers). Branch
+`feature/snapshot-features` off main. Snapshot: **2026-08** (2026-08-01 reference date).
+
+**Task 1 — refresh (`ukcompany-snapshot refresh`, new `snapshot/cli.py`, `snapshot/archive.py`).**
+Added checksum verification against the manifest, a retention policy (first snapshot of each month
++ latest; a near-no-op at monthly cadence, implemented + tested for symmetry with PSC), and a
+one-shot refresh that downloads, verifies, prunes, loads and reconciles the row count against the
+manifest, failing loudly on any mismatch. New `ukcompany-snapshot` entry point; `snapshot:` block
+in settings.yaml. Run on the existing 2026-08 archive (`--skip-download --prune-dry-run`):
+checksums verified, **5,695,466 rows** reconciled against the manifest, ~2 s, ~0.9 GB.
+
+**Task 2 — features (`snapshot/features.py`, `ukcompany-snapshot features`).** 5,695,465 companies
+(one malformed line dropped by DuckDB's `ignore_errors`; the manifest/refresh count uses the same
+Polars method and reconciles exactly). One definition: `_months_between` for age and
+`sic_section_from_code` for SIC sections are reused (applied over distinct values, joined back) —
+no second implementation. Features: status/type/age (age against the snapshot date); SIC sections,
+code count, and three SEPARATE flags (dormant 99999, non-trading 74990, n.e.c.); previous-name
+count (capped at 10 = "10 or more"); charge counts (total/outstanding/part-satisfied/satisfied);
+accounts category, accounts/confirmation overdue (computed vs snapshot date), never-filed;
+registered-office concentration. The n.e.c. list (`NEC_SIC_CODES`, 38 codes) is one constant
+enumerated from SIC-2007 condensed-list "n.e.c." descriptions (ONS UK SIC 2007), a malformed
+4-digit `9305` excluded. Two tiers via `data_governance`: governed (22 cols, no exact-address),
+ungoverned (23 cols, adds `n_companies_same_address`); written-schema assertion enforces the drop.
+Each tier built in ~1.5 min at ~4.8 GB. Address normalisation is one function
+(`normalise_address`); the count is insensitive to it (2,634,652 distinct addresses standard vs
+2,633,802 loose, a 0.03% shift).
+
+**Task 3 — parity (`scripts/snapshot_parity_check.py`, `docs/snapshot-parity-2026-08.md`).** 714
+companies in both the API cache and the snapshot. `has_charges` 100%; `date_of_creation`/
+`age_months` 99.3%; `n_previous_names` 96.5%, `sic_sections` 96.8%, overdue flags 97.2–97.5%. All
+96 disagreements have the API cache newer than the snapshot (fetched 2026-08-07 vs 2026-08-01) —
+consistent with change in that window. The 5 `date_of_creation` disagreements are all Charitable
+Incorporated Organisations (CE/CS-prefixed): the API omits `date_of_creation` for CIOs while the
+bulk records it — a source field-availability difference, not a parsing error (carries into
+`age_months`). `company_status`/`company_type` use different vocabularies (register category vs API
+slug) and are reported as cross-tabs, not equality-compared.
+
+**Task 4 — distributions (`scripts/snapshot_distributions.py`,
+`docs/snapshot-distributions-2026-08.md`).** Fill rates per feature (core fields 100%;
+accounts_next_due 96.97%, confirmation 98.64%); registered-office concentration as percentiles and
+banded company counts (postcode median shared by ~17; 37% of companies alone at their exact
+address; the tail is formation agents — the largest postcode alone exceeds 1% of all companies);
+SIC/accounts flag shares.
+
+**Docs/tests.** FIELD_DOCS entries added for the 14 snapshot-new attributes; data dictionary
+regenerated. `docs/snapshot-features.md` documents the table. Synthetic-fixture tests
+(`tests/test_snapshot_archive.py`, `tests/test_snapshot_features.py`) cover the archive functions,
+feature values, both tiers, and parity vs derive_profile. All tests + ruff green. `data/` outputs
+gitignored.
+
+**Rule not verified.** The 21-month first-accounts deadline used by `accounts_never_filed` is NOT
+VERIFIED against current CH guidance in this build (no network); labelled inferred in FIELD_DOCS
+and the feature doc.
+
+**No judgement-layer change.** No rules, severities, SOLVENT_CASE_TYPES, EXCLUDED_STATUSES or
+composite score added. Attributes only.

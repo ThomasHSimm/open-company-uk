@@ -953,6 +953,130 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "VERIFIED against CH documentation. Observed live on 07083592 (statement filed, "
         "identity_verified_on absent). Rollout in progress.",
     },
+    # ------------------------------------------------------------------------
+    # Snapshot-derived features (Handoff 08): one row per live company from the
+    # basic-company bulk file, built by ukcompany.snapshot.features. Shared-name
+    # attributes already documented above (company_status, company_type,
+    # date_of_creation, age_months, n_previous_names, accounts_overdue) carry the
+    # same definitions; the snapshot source differs (dates are DD/MM/YYYY and the
+    # reference for age/overdue is the snapshot date, not today) - see
+    # docs/snapshot-features.md. Only the snapshot-new attributes are listed here.
+    # ------------------------------------------------------------------------
+    {
+        "field": "sic_sections",
+        "tier": 3,
+        "source": "snapshot:SICCode.SicText_1..4 -> sic_section_from_code",
+        "definition": "Distinct SIC-2007 section letters across the company's up-to-four SIC "
+        "codes, via the shared sic_section_from_code.",
+        "caveats": "SIC is self-declared by the company (Tier 3). Codes are read from the "
+        "'CODE - description' text. 'unknown' when a code is blank/unmappable.",
+    },
+    {
+        "field": "n_sic_codes",
+        "tier": 3,
+        "source": "snapshot:SICCode.SicText_1..4",
+        "definition": "Number of SIC codes recorded (0-4).",
+        "caveats": "Self-declared. The bulk file caps SIC codes at four.",
+    },
+    {
+        "field": "flag_dormant_sic",
+        "tier": 3,
+        "source": "snapshot:SICCode.SicText_* == 99999",
+        "definition": "Any SIC code is 99999 (Dormant Company).",
+        "caveats": "A self-declared SIC marker, SEPARATE from the DORMANT accounts category; the "
+        "two need not agree.",
+    },
+    {
+        "field": "flag_non_trading_sic",
+        "tier": 3,
+        "source": "snapshot:SICCode.SicText_* == 74990",
+        "definition": "Any SIC code is 74990 (Non-trading company).",
+        "caveats": "Self-declared; distinct from the dormant marker and the accounts category.",
+    },
+    {
+        "field": "flag_nec_sic",
+        "tier": 3,
+        "source": "snapshot:SICCode.SicText_* in NEC_SIC_CODES",
+        "definition": "Any SIC code is a 'not elsewhere classified' (n.e.c.) code.",
+        "caveats": "n.e.c. list enumerated from SIC-2007 condensed-list descriptions ending "
+        "'n.e.c.' (ONS UK SIC 2007); a malformed 4-digit variant in the data is excluded. "
+        "Self-declared.",
+    },
+    {
+        "field": "n_charges",
+        "tier": 1,
+        "source": "snapshot:Mortgages.NumMortCharges",
+        "definition": "Total charges (mortgages) recorded against the company.",
+        "caveats": "Registrar charge-register count.",
+    },
+    {
+        "field": "n_charges_outstanding",
+        "tier": 1,
+        "source": "snapshot:Mortgages.NumMortOutstanding",
+        "definition": "Charges currently outstanding.",
+        "caveats": "Registrar charge-register count.",
+    },
+    {
+        "field": "n_charges_part_satisfied",
+        "tier": 1,
+        "source": "snapshot:Mortgages.NumMortPartSatisfied",
+        "definition": "Charges recorded as part-satisfied.",
+        "caveats": "Registrar charge-register count.",
+    },
+    {
+        "field": "n_charges_satisfied",
+        "tier": 1,
+        "source": "snapshot:Mortgages.NumMortSatisfied",
+        "definition": "Charges recorded as satisfied.",
+        "caveats": "Registrar charge-register count.",
+    },
+    {
+        "field": "accounts_category",
+        "tier": 1,
+        "source": "snapshot:Accounts.AccountCategory",
+        "definition": "The accounts category of the last accounts filed (e.g. MICRO ENTITY, "
+        "DORMANT, NO ACCOUNTS FILED), upper-cased.",
+        "caveats": "Registrar-assigned from the filing; 'NO ACCOUNTS FILED' includes companies "
+        "not yet past their first deadline (see accounts_never_filed).",
+    },
+    {
+        "field": "confirmation_statement_overdue",
+        "tier": 1,
+        "source": "snapshot:ConfStmtNextDueDate < snapshot_date",
+        "definition": "The confirmation statement's next-due date is before the snapshot date.",
+        "caveats": "Computed against the snapshot date (the reference), never today. Null due "
+        "date (e.g. brand-new company) is treated as not overdue.",
+    },
+    {
+        "field": "accounts_never_filed",
+        "tier": 1,
+        "source": "snapshot:Accounts.AccountCategory + IncorporationDate",
+        "definition": "Accounts category is 'NO ACCOUNTS FILED' AND the snapshot date is past "
+        "the first-accounts deadline (incorporation + 21 months).",
+        "caveats": "The 21-month private-company first-accounts deadline is NOT VERIFIED against "
+        "current CH guidance in this build - treat as inferred (see docs/snapshot-features.md). "
+        "Does not distinguish company types with different deadlines.",
+    },
+    {
+        "field": "n_companies_same_postcode",
+        "tier": 1,
+        "source": "snapshot:RegAddress.PostCode (derived concentration)",
+        "definition": "Number of live companies sharing the company's registered-office postcode "
+        "in this snapshot.",
+        "caveats": "The upper tail is formation agents / virtual offices. A concentration count, "
+        "not a relationship. Governed tier.",
+    },
+    {
+        "field": "n_companies_same_address",
+        "tier": 1,
+        "source": "snapshot:RegAddress.PostCode + AddressLine1 (derived concentration)",
+        "definition": "Number of live companies sharing the company's normalised registered "
+        "address (postcode + first line) in this snapshot.",
+        "caveats": "UNGOVERNED tier only - registered offices are sometimes home addresses, so a "
+        "per-address count says something about a household. Normalisation per "
+        "ukcompany.snapshot.features.normalise_address; counts are insensitive to it (<0.1% of "
+        "distinct addresses shift under strict vs loose).",
+    },
 ]
 
 
