@@ -920,7 +920,10 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "source": "psc:items[].identity_verification_details (present)",
         "definition": "PSC records carrying an ECCTA identity-verification block.",
         "caveats": "Rollout in progress (2025-2026); absence means unverified-or-not-yet-due, not "
-        "non-compliance. Counts the block's presence, not a completed identity_verified_on.",
+        "non-compliance. Counts the block's presence, not a completed identity_verified_on. This "
+        "block-presence count is cumulative - unlike n_psc_id_verification_due and "
+        "n_psc_id_statement_filed, which are point-in-time - and showed zero decreases in "
+        "bulk-vs-API parity (docs/psc-parity-2026-09-25.md).",
     },
     {
         "field": "n_psc_id_verification_due",
@@ -929,7 +932,11 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "definition": "PSC records with a verification statement due "
         "(appointment_verification_statement_due_on) and no completed identity_verified_on.",
         "caveats": "Rollout in progress; absence of the block means unverified-or-not-yet-due, not "
-        "non-compliance. Key names as observed live 2026-08 (see AUDIT).",
+        "non-compliance. POINT-IN-TIME, not cumulative: it reflects the current verification "
+        "cycle and falls when a due is cleared by completed verification, so a later snapshot can "
+        "show fewer. The annual-cycle reset mechanism is INFERRED (from bulk-vs-API behaviour, "
+        "docs/psc-parity-2026-09-25.md), NOT VERIFIED against CH documentation. Key names as "
+        "observed live 2026-08 (see AUDIT).",
     },
     {
         "field": "n_psc_id_statement_filed",
@@ -938,8 +945,13 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "appointment_verification_statement_date",
         "definition": "PSC records with a filed appointment-verification statement.",
         "caveats": "A SEPARATE signal from identity verification: a filed statement does not set "
-        "identity_verified_on and does not clear n_psc_id_verification_due. Observed live on "
-        "07083592 (statement filed, identity_verified_on absent). Rollout in progress.",
+        "identity_verified_on and does not clear n_psc_id_verification_due. POINT-IN-TIME, not "
+        "cumulative: it reflects the current verification cycle, so a later snapshot can show "
+        "fewer - it decreased for 53 companies between the 2026-08 API cache and the 2026-09-25 "
+        "bulk snapshot with no PSC membership change (docs/psc-parity-2026-09-25.md). The inferred "
+        "cause (appointment_verification_statement_date clears when the cycle resets) is NOT "
+        "VERIFIED against CH documentation. Observed live on 07083592 (statement filed, "
+        "identity_verified_on absent). Rollout in progress.",
     },
 ]
 

@@ -106,12 +106,16 @@ def exemption(company: str) -> str:
     return json.dumps({"company_number": company, "data": data})
 
 
-def totals_line() -> str:
+def totals_line(persons: int = 4, statements: int = 1, exemptions: int = 1) -> str:
+    # Defaults match test_load_covers_every_kind_and_accounting_invariant's scenario
+    # (2 individual + 1 corporate + 1 super_secure = 4 persons, 1 statement, 1 exemption),
+    # so that the loader's fail-loud totals-line reconciliation passes there; tests that
+    # want a mismatch pass explicit wrong counts.
     data = {
         "kind": "totals#persons-of-significant-control-snapshot",
-        "persons_of_significant_control_count": 6,
-        "statements_count": 1,
-        "exemptions_count": 1,
+        "persons_of_significant_control_count": persons,
+        "statements_count": statements,
+        "exemptions_count": exemptions,
         "generated_at": f"{SNAPSHOT_DATE}T06:00:00Z",
     }
     return json.dumps({"data": data})
@@ -153,10 +157,76 @@ def test_load_covers_every_kind_and_accounting_invariant(tmp_path):
         "unknown": 1,
     }
     assert report["unknown_kinds"] == {}  # the one unknown row is malformed, kind is NULL
-    assert report["psc_totals_line"]["persons_of_significant_control_count"] == 6
+    assert report["psc_totals_line"]["persons_of_significant_control_count"] == 4
     assert Path(report["outputs"]["psc_totals"]).exists()
+    # Fail-loud totals-line reconciliation passes here and is recorded in the report.
+    recon = report["totals_reconciliation"]
+    assert recon["persons_of_significant_control_count"] == {
+        "parsed": 4, "ch_stated": 4, "match": True
+    }
+    assert recon["statements_count"]["match"] is True
+    assert recon["exemptions_count"]["match"] is True
     # Each individual() fixture carries 2 natures_of_control entries, corporate() carries 1.
     assert report["n_noc_assertions"] == 2 + 2 + 1
+
+
+def test_totals_line_mismatch_fails_loudly(tmp_path):
+    import pytest
+
+    # Two individuals (2 persons parsed) but the totals line claims 99 — the loader must
+    # refuse to produce a report rather than silently load a snapshot it cannot reconcile.
+    lines = [
+        individual("00000001", "psc001"),
+        individual("00000002", "psc002"),
+        totals_line(persons=99, statements=0, exemptions=0),
+    ]
+    _write_part(tmp_path, 1, lines)
+    with pytest.raises(RuntimeError, match="totals-line reconciliation failed"):
+        load_psc(
+            str(tmp_path / "*.txt"), tmp_path / "out", SNAPSHOT_DATE,
+            data_governance=False, memory_limit_gb=1, spill_dir=str(tmp_path / "spill"),
+        )
+
+
+def test_ceased_boolean_extracted_and_counted(tmp_path):
+    # An individual ceased via the `ceased` boolean with NO ceased_on date - exactly the case
+    # where the boolean-first rule and a ceased_on-only rule disagree.
+    ceased_bool_line = json.dumps({
+        "company_number": "00000001",
+        "data": {
+            "kind": "individual-person-with-significant-control",
+            "name_elements": {"forename": "Cy", "surname": "Gone"},
+            "ceased": True,
+            "natures_of_control": ["ownership-of-shares-25-to-50-percent"],
+            "notified_on": "2018-01-01",
+            "links": {"self": "/company/00000001/persons-with-significant-control/individual/x"},
+        },
+    })
+    _write_part(tmp_path, 1, [ceased_bool_line, individual("00000002", "p2")])
+    report = load_psc(
+        str(tmp_path / "*.txt"), tmp_path / "out", SNAPSHOT_DATE,
+        data_governance=False, memory_limit_gb=1, spill_dir=str(tmp_path / "spill"),
+    )
+    assert report["ceased_boolean"]["ceased_true"] == 1
+    assert report["ceased_boolean"]["ceased_true_without_ceased_on"] == 1
+    import duckdb
+    ceased_vals = duckdb.sql(
+        f"SELECT ceased FROM read_parquet('{tmp_path / 'out' / 'psc_records.parquet'}') "
+        f"WHERE company_number = '00000001'"
+    ).fetchone()
+    assert ceased_vals[0] is True
+
+
+def test_no_totals_line_skips_reconciliation(tmp_path):
+    # A partial snapshot (e.g. a single non-final part) carries no totals line; the load
+    # still succeeds and records that no reconciliation was possible.
+    _write_part(tmp_path, 1, [individual("00000001", "psc001")])
+    report = load_psc(
+        str(tmp_path / "*.txt"), tmp_path / "out", SNAPSHOT_DATE,
+        data_governance=False, memory_limit_gb=1, spill_dir=str(tmp_path / "spill"),
+    )
+    assert report["totals_reconciliation"] is None
+    assert report["consistency_check"]["totals_line_reconciled"] is False
 
 
 def test_middle_name_key_is_present_and_fill_rate_reported(tmp_path):
