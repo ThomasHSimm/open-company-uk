@@ -44,6 +44,17 @@ KIND_TO_CATEGORY: dict[str, str] = {
     "totals#persons-of-significant-control-snapshot": "totals",
 }
 
+# The categories that CH's totals line counts under `persons_of_significant_control_count`
+# (every PSC/beneficial-owner person record, i.e. everything that is not a statement,
+# exemption or the totals line itself). Derived from KIND_TO_CATEGORY so it cannot drift:
+# 'unknown' is the classifier fallback, never a value here, so an unclassified person record
+# is excluded from the parsed persons count and therefore trips the totals reconciliation.
+PSC_PERSON_CATEGORIES = frozenset(
+    category
+    for category in KIND_TO_CATEGORY.values()
+    if category not in {"statement", "exemption", "totals"}
+)
+
 # The full key set of `identity_verification_details`, confirmed by scanning every one of
 # the 15,952,486 lines in the 2026-09-18 snapshot (not sampled) before writing this list,
 # per the brief's "first dump the distinct key paths, then extract all of them" instruction.
@@ -204,6 +215,10 @@ def _parsed_sql(parts_glob: str, snapshot_date: str) -> str:
             d->>'ceased_on' AS ceased_on_raw,
             TRY_CAST(d->>'notified_on' AS DATE) AS notified_on,
             TRY_CAST(d->>'ceased_on' AS DATE) AS ceased_on,
+            -- Per-item `ceased` boolean (mainly super-secure records carry it). Kept so the
+            -- feature path can apply derive_psc's exact rule: ceased := the boolean when
+            -- present, else `ceased_on` presence.
+            TRY_CAST(d->>'ceased' AS BOOLEAN) AS ceased,
             d->'natures_of_control' AS natures_of_control_json,
             CASE WHEN json IS NOT NULL THEN to_json(d) END AS raw
         FROM lines
@@ -250,7 +265,7 @@ _RECORDS_COLUMNS_PRIVATE = (
     "iv_verification_end_on_raw", "iv_verification_statement_date_raw",
     "iv_verification_statement_due_on_raw", "iv_acsp_name",
     "iv_aml_supervisory_bodies", "iv_preferred_name",
-    "notified_on_raw", "ceased_on_raw", "notified_on", "ceased_on",
+    "notified_on_raw", "ceased_on_raw", "notified_on", "ceased_on", "ceased",
     "f_ceased_before_notified", "f_pre_regime", "f_ceased_out_of_range",
     "f_age_under_16_at_notified",
     "raw",
@@ -538,6 +553,14 @@ def load_psc(
             f"  COUNT(*) FILTER (WHERE f_age_under_16_at_notified) "
             f"FROM ({stats})"
         ).fetchone()
+        # Diagnostic for the feature path's active/ceased rule: records whose `ceased`
+        # boolean is true but which carry no `ceased_on` date. These are exactly the rows
+        # where the boolean-first derive_psc rule and a `ceased_on IS NULL` rule disagree.
+        ceased_bool_true, ceased_bool_true_no_date = connection.sql(
+            f"SELECT COUNT(*) FILTER (WHERE ceased), "
+            f"       COUNT(*) FILTER (WHERE ceased AND ceased_on IS NULL) "
+            f"FROM ({stats})"
+        ).fetchone()
         # LIMIT 1 here is order-independent in practice: the snapshot carries exactly one
         # totals line (asserted by category_counts['totals'] == 1 in the report), so there
         # is only one matching row regardless of preserve_insertion_order.
@@ -595,6 +618,42 @@ def load_psc(
                 consistency_errors.append(
                     f"governed psc_records retains personal columns on disk: {leaked}"
                 )
+        # Totals-line reconciliation: the snapshot ships exactly one authoritative totals
+        # record stating CH's own counts. Reconcile our parsed counts against it and FAIL
+        # LOUDLY on any mismatch - a divergence means we dropped, double-counted or
+        # mis-classified records relative to what CH says the snapshot contains. Only runs
+        # when a totals line is present (a partial/single-part snapshot has none, in which
+        # case there is nothing authoritative to reconcile against).
+        totals_reconciliation = None
+        if psc_totals is not None and psc_totals[0]:
+            ch_totals = json.loads(psc_totals[0])
+            parsed_persons = sum(
+                category_counts.get(category, 0) for category in PSC_PERSON_CATEGORIES
+            )
+            checks = {
+                "persons_of_significant_control_count": (
+                    parsed_persons,
+                    ch_totals.get("persons_of_significant_control_count"),
+                ),
+                "statements_count": (
+                    category_counts.get("statement", 0),
+                    ch_totals.get("statements_count"),
+                ),
+                "exemptions_count": (
+                    category_counts.get("exemption", 0),
+                    ch_totals.get("exemptions_count"),
+                ),
+            }
+            totals_reconciliation = {
+                field: {"parsed": parsed, "ch_stated": stated, "match": parsed == stated}
+                for field, (parsed, stated) in checks.items()
+            }
+            for field, (parsed, stated) in checks.items():
+                if stated is not None and parsed != stated:
+                    consistency_errors.append(
+                        f"totals-line reconciliation failed for {field}: parsed "
+                        f"{parsed:,} != CH-stated {stated:,}"
+                    )
         if consistency_errors:
             raise RuntimeError(
                 "PSC load consistency check failed: " + "; ".join(consistency_errors)
@@ -647,6 +706,10 @@ def load_psc(
             "f_ceased_out_of_range": date_flags[2],
             "f_age_under_16_at_notified": date_flags[3],
         },
+        "ceased_boolean": {
+            "ceased_true": ceased_bool_true,
+            "ceased_true_without_ceased_on": ceased_bool_true_no_date,
+        },
         "n_noc_assertions": n_noc,
         "noc_restatement": {
             "distinct_codes": noc_distinct_codes,
@@ -661,7 +724,9 @@ def load_psc(
             "passed": True,
             "psc_noc_row_count_expected": expected_noc_rows,
             "governance_personal_columns_checked": data_governance,
+            "totals_line_reconciled": totals_reconciliation is not None,
         },
+        "totals_reconciliation": totals_reconciliation,
         "psc_totals_line": psc_totals_obj,
         "outputs": {
             "psc_records": str(records_path),
