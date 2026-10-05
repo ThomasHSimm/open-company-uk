@@ -96,18 +96,26 @@ formation agents / virtual offices (the largest postcode alone is ~1.5% of all c
   `docs/snapshot-distributions-2026-08.md`: fill rates, concentration percentiles + banded
   company counts, and SIC/accounts flag shares.
 
-## No silent drops
+## No silent drops (blanks vs malformed, separated)
 
-The feature build reads with `ignore_errors` (so one stray row never aborts a multi-GB load) and
-then **reconciles** its loaded company count against an independent full count from the Polars
-loader (which counts every physical record). The difference — rows present in the file but not
-loaded as companies (blank lines, ragged rows, rows with no company number) — is written to
-`unloaded_rows_report.json`, reported as `n_rows_not_loaded`, and the build **fails** if it exceeds
-`SNAPSHOT_MAX_BAD_ROWS` (1000). For 2026-08 this difference is **1**: a single blank line in part 4
-(verified against Python's `csv` reader — company 09056746's quoted previous-name field containing
-a newline parses correctly as one record; the blank line is the only non-company physical row).
-DuckDB's **5,695,465** is the true company count; the manifest's Polars `total_rows` (5,695,466)
-counts that blank line, which is the whole of the 1-row difference. There is no dropped company.
+The feature build reads with `store_rejects=true` (plus `ignore_errors`, `strict_mode=false` and a
+pinned dialect), which — confirmed working in **DuckDB 1.5.6** when the read is materialised —
+diverts every **malformed** (wrong-column-count) row, per line, into the `reject_errors` table
+rather than dropping it silently. The two failure modes are then handled differently:
+
+- **Malformed rows** (MISSING / TOO MANY COLUMNS) are counted (`n_malformed_rows`), quarantined to
+  `malformed_rows.csv` (line, error type, raw CSV line), and the build **fails** if they exceed
+  `SNAPSHOT_MAX_MALFORMED_ROWS` (**5**) — a malformed row can be a real company, so the tolerance
+  is tiny.
+- **Blank lines** are skipped by DuckDB and are *not* rejects; they are counted
+  (`n_blank_or_other_rows`, via the Polars full-record count minus companies minus malformed) and
+  **allowed** in any number.
+
+For 2026-08: **0 malformed, 1 blank** — a single blank line in part 4 (line 454677), verified
+against Python's `csv` reader (company 09056746's quoted previous-name field containing a newline
+parses correctly as one record; the blank line is the only non-company physical row). DuckDB's
+**5,695,465** is the true company count; the manifest's Polars `total_rows` (5,695,466) counts that
+blank line, which is the whole of the 1-row difference. No company is dropped.
 
 ## Caveats
 

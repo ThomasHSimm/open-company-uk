@@ -33,7 +33,7 @@ _FIELDS = [
 ] + [f"PreviousName_{i}.CompanyName" for i in range(1, 11)]
 
 _ROWS = [
-    {"CompanyNumber": "00000001", "CompanyStatus": "Active",
+    {"CompanyName": "EXAMPLE CO LTD", "CompanyNumber": "00000001", "CompanyStatus": "Active",
      "CompanyCategory": "Private Limited Company", "IncorporationDate": "15/01/2020",
      "RegAddress.PostCode": "AB1 2CD", "RegAddress.AddressLine1": "1 High Street",
      "Accounts.AccountCategory": "MICRO ENTITY", "Accounts.NextDueDate": "01/01/2027",
@@ -42,22 +42,22 @@ _ROWS = [
      "Mortgages.NumMortSatisfied": "1",
      "SICCode.SicText_1": "62012 - Business and domestic software development",
      "PreviousName_1.CompanyName": "OLD NAME LTD"},
-    {"CompanyNumber": "00000002", "CompanyStatus": "Active",
+    {"CompanyName": "EXAMPLE CO LTD", "CompanyNumber": "00000002", "CompanyStatus": "Active",
      "CompanyCategory": "Private Limited Company", "IncorporationDate": "01/01/2010",
      "RegAddress.PostCode": "AB1 2CD", "RegAddress.AddressLine1": "1 High Street",
      "Accounts.AccountCategory": "DORMANT", "Accounts.NextDueDate": "01/01/2020",
      "ConfStmtNextDueDate": "01/01/2020", "SICCode.SicText_1": "99999 - Dormant Company"},
-    {"CompanyNumber": "00000003", "CompanyStatus": "Active",
+    {"CompanyName": "EXAMPLE CO LTD", "CompanyNumber": "00000003", "CompanyStatus": "Active",
      "CompanyCategory": "Private Limited Company", "IncorporationDate": "01/06/2023",
      "RegAddress.PostCode": "XY9 9ZZ", "RegAddress.AddressLine1": "9 Other Road",
      "Accounts.AccountCategory": "MICRO ENTITY", "Accounts.NextDueDate": "01/01/2027",
      "SICCode.SicText_1": "74990 - Non-trading company"},
-    {"CompanyNumber": "00000004", "CompanyStatus": "Active",
+    {"CompanyName": "EXAMPLE CO LTD", "CompanyNumber": "00000004", "CompanyStatus": "Active",
      "CompanyCategory": "Private Limited Company", "IncorporationDate": "01/01/2000",
      "RegAddress.PostCode": "ZZ1 1ZZ", "RegAddress.AddressLine1": "4 Old Lane",
      "Accounts.AccountCategory": "NO ACCOUNTS FILED", "Accounts.NextDueDate": "01/01/2010",
      "SICCode.SicText_1": "82990 - Business support service activities n.e.c."},
-    {"CompanyNumber": "00000005", "CompanyStatus": "Active",
+    {"CompanyName": "EXAMPLE CO LTD", "CompanyNumber": "00000005", "CompanyStatus": "Active",
      "CompanyCategory": "Private Limited Company", "IncorporationDate": "01/07/2026",
      "RegAddress.PostCode": "ZZ2 2ZZ", "RegAddress.AddressLine1": "5 New Way",
      "Accounts.AccountCategory": "NO ACCOUNTS FILED", "Accounts.NextDueDate": "01/04/2028",
@@ -65,21 +65,22 @@ _ROWS = [
 ]
 
 
-def _write_snapshot(tmp_path, extra_raw_lines=None):
+def _write_snapshot(tmp_path, extra_raw_lines=None, rows=None):
     head = io.StringIO()
-    csv.DictWriter(head, fieldnames=_FIELDS).writeheader()
+    csv.DictWriter(head, fieldnames=_FIELDS, lineterminator="\n").writeheader()
     body = io.StringIO()
-    writer = csv.DictWriter(body, fieldnames=_FIELDS)
-    for row in _ROWS:
+    writer = csv.DictWriter(body, fieldnames=_FIELDS, lineterminator="\n")
+    for row in (rows if rows is not None else _ROWS):
         writer.writerow({field: row.get(field, "") for field in _FIELDS})
-    # Extra raw lines are inserted mid-file (right after the header) so a blank/ragged line is
-    # not merely a trailing newline.
+    # Extra raw lines are appended after the good rows, so the CSV sniffer locks the column count
+    # from the clean rows first and store_rejects can then divert a malformed row.
     extra = "".join(raw + "\n" for raw in (extra_raw_lines or []))
-    content = head.getvalue() + extra + body.getvalue()
+    content = head.getvalue() + body.getvalue() + extra
     zip_path = tmp_path / "BasicCompanyData-2099-01-01-part1_1.zip"
     with zipfile.ZipFile(zip_path, "w") as zf:
         zf.writestr("BasicCompanyData-2099-01-01-part1_1.csv", content)
     return str(tmp_path / "BasicCompanyData-*.zip")
+
 
 
 def _rows_by_company(parquet_path):
@@ -121,7 +122,8 @@ def test_snapshot_feature_values(tmp_path):
     # Never-filed now uses CH's computed next-due date, not a hand-coded 21-month rule.
     assert rows["00000004"]["accounts_never_filed"]         # NO ACCOUNTS FILED + next-due 2010 (past)
     assert not rows["00000005"]["accounts_never_filed"]     # NO ACCOUNTS FILED + next-due 2028 (future)
-    assert report["n_rows_not_loaded"] == 0                 # clean synthetic data, all loaded
+    assert report["n_malformed_rows"] == 0                  # clean synthetic data
+    assert report["n_blank_or_other_rows"] == 0             # no blank/empty rows
 
 
 def test_snapshot_feature_tiers(tmp_path):
@@ -184,27 +186,41 @@ def test_snapshot_features_match_derive_profile(tmp_path):
 
 
 _EMPTY_ROW = "," * (len(_FIELDS) - 1)  # full-width row, every field empty (no company number)
+_MALFORMED_ROW = "TOOFEW,only,three"  # wrong column count -> a reject, not a blank
 
 
-def test_snapshot_counts_dropped_rows_not_silently(tmp_path):
-    # A full-width row with no company number is filtered out by the build but counted by the
-    # Polars loader; the reconciliation must surface it (never a silent drop).
+def test_snapshot_blank_or_empty_rows_allowed_and_counted(tmp_path):
+    # A full-width empty row (no company number) is not a company and not malformed; it is
+    # counted as blank/other and allowed.
     parts_glob = _write_snapshot(tmp_path, extra_raw_lines=[_EMPTY_ROW])
     report = build_snapshot_features(
         parts_glob, tmp_path / "ungov", SNAPSHOT_DATE,
         data_governance=False, memory_limit_gb=1, spill_dir=str(tmp_path / "spill"),
     )
-    assert report["n_companies"] == 5                 # the 5 real companies only
-    assert report["n_rows_not_loaded"] >= 1           # the empty row was counted, not silent
-    assert report["unloaded_rows_report"] is not None
+    assert report["n_companies"] == 5            # the 5 real companies only
+    assert report["n_malformed_rows"] == 0       # an empty full-width row is not malformed
+    assert report["n_blank_or_other_rows"] >= 1  # counted, not silent
+
+
+def test_snapshot_malformed_rows_quarantined_and_counted(tmp_path):
+    # A wrong-column-count row is captured per line by store_rejects, quarantined and counted
+    # (not silently dropped), and is distinguished from blank lines.
+    parts_glob = _write_snapshot(tmp_path, extra_raw_lines=[_MALFORMED_ROW])
+    report = build_snapshot_features(
+        parts_glob, tmp_path / "ungov", SNAPSHOT_DATE,
+        data_governance=False, memory_limit_gb=1, spill_dir=str(tmp_path / "spill"),
+    )
+    assert report["n_companies"] == 5            # the malformed row is not a company
+    assert report["n_malformed_rows"] == 1       # captured by store_rejects
+    assert report["malformed_quarantine"] is not None
     from pathlib import Path
-    assert Path(report["unloaded_rows_report"]).exists()
+    assert Path(report["malformed_quarantine"]).exists()
 
 
-def test_snapshot_fails_above_bad_row_threshold(tmp_path, monkeypatch):
-    monkeypatch.setattr(features_mod, "SNAPSHOT_MAX_BAD_ROWS", 0)  # any unloaded row now fails
-    parts_glob = _write_snapshot(tmp_path, extra_raw_lines=[_EMPTY_ROW])
-    with pytest.raises(RuntimeError, match="not loaded as companies"):
+def test_snapshot_fails_above_malformed_threshold(tmp_path, monkeypatch):
+    monkeypatch.setattr(features_mod, "SNAPSHOT_MAX_MALFORMED_ROWS", 0)  # any malformed row fails
+    parts_glob = _write_snapshot(tmp_path, extra_raw_lines=[_MALFORMED_ROW])
+    with pytest.raises(RuntimeError, match="malformed"):
         build_snapshot_features(
             parts_glob, tmp_path / "ungov", SNAPSHOT_DATE,
             data_governance=False, memory_limit_gb=1, spill_dir=str(tmp_path / "spill"),

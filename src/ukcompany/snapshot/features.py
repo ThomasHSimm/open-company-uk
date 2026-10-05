@@ -50,9 +50,10 @@ NEC_SIC_CODES = frozenset({
 DORMANT_SIC = "99999"       # "Dormant Company"
 NON_TRADING_SIC = "74990"   # "Non-trading company"
 
-# Fail the build if more than this many rows cannot be parsed (small vs ~5.7M). Unparseable
-# rows are quarantined and counted, never silently dropped.
-SNAPSHOT_MAX_BAD_ROWS = 1000
+# Fail the build if more than this many MALFORMED (wrong-column-count) rows are seen. A malformed
+# row could be a real company with a data glitch, so the tolerance is tiny (0-5); blank lines are
+# separate and allowed in any number. Malformed rows are quarantined and counted regardless.
+SNAPSHOT_MAX_MALFORMED_ROWS = 5
 
 GOVERNED_FEATURE_DROPPED = ("n_companies_same_address",)
 
@@ -135,10 +136,21 @@ def build_snapshot_features(
         raise FileNotFoundError(f"no snapshot parts matched {parts_glob}")
     csv_paths = [str(p) for p in SnapshotLoader(zips)._csv_paths()]
     csv_list = "[" + ", ".join(_sql_literal(p) for p in csv_paths) + "]"
-    # ignore_errors so a stray row never aborts the load; the count reconciliation below (vs the
-    # Polars loader, which counts every physical record) surfaces exactly how many rows were
-    # skipped - blank lines, ragged rows - so nothing is dropped *silently*.
-    read_sql = f"read_csv({csv_list}, header=true, all_varchar=true, ignore_errors=true)"
+    # Column names from the header line, stripped (DuckDB strips the bulk file's leading-whitespace
+    # headers, so the stripped names match its own column names). Parser-independent.
+    import csv as _csv
+
+    with open(csv_paths[0], newline="", encoding="utf-8", errors="replace") as _fh:
+        header_names = [name.strip() for name in next(_csv.reader(_fh))]
+    # store_rejects diverts every malformed (wrong-column-count) row to the reject_errors table,
+    # per line, instead of silently dropping it; ignore_errors keeps the load going. The dialect
+    # is pinned so there is no sniffer to choke on a malformed row in the sample. (Confirmed in
+    # DuckDB 1.5.6: with a materialised read - CREATE TABLE AS SELECT - reject_errors captures
+    # MISSING/TOO MANY COLUMNS per line; blank lines are skipped and are NOT rejects.)
+    read_sql = (
+        f"read_csv({csv_list}, header=true, all_varchar=true, delim=',', quote='\"', "
+        f"escape='\"', ignore_errors=true, store_rejects=true)"
+    )
 
     con = _connect(memory_limit_gb, spill_dir)
     try:
@@ -152,10 +164,7 @@ def build_snapshot_features(
             lambda pc, l1: normalise_address(pc, l1, loose=True),
             ["VARCHAR", "VARCHAR"], "VARCHAR",
         )
-        # Column names from DuckDB's own schema (it strips the bulk file's leading-whitespace
-        # headers); LIMIT 0 avoids parsing any data row.
-        col_names = con.sql(f"SELECT * FROM {read_sql} LIMIT 0").columns
-        col = _col_resolver([(name,) for name in col_names])
+        col = _col_resolver([(name,) for name in header_names])
 
         # --- base: one cleaned row per company, dates parsed (DD/MM/YYYY) ---
         pn_sum = " + ".join(
@@ -199,34 +208,36 @@ def build_snapshot_features(
         )
         n_companies = con.sql("SELECT COUNT(*) FROM base").fetchone()[0]
 
-        # No silent drops. DuckDB silently skips rows it cannot fit to the 55-column schema
-        # (ragged rows, blank lines), and store_rejects does not capture those under all_varchar,
-        # so we reconcile against an independent full count from the Polars loader (which counts
-        # every physical record, including ragged ones) - the same method the manifest uses. The
-        # difference is the number of rows present in the file but not loaded as companies; we
-        # quarantine them and FAIL above a small threshold.
+        # No silent drops, with blanks separated from malformed rows:
+        #  * MALFORMED (wrong column count) rows are captured per line by store_rejects in the
+        #    reject_errors table; these are quarantined and we FAIL if they exceed a tiny
+        #    threshold - a malformed row could be a real company, so we do not tolerate many.
+        #  * BLANK lines are skipped by DuckDB and are NOT rejects; they are counted (via the
+        #    Polars full-record count) and ALLOWED in any number.
+        try:
+            malformed = con.sql(
+                "SELECT COUNT(DISTINCT line) FROM reject_errors"
+            ).fetchone()[0]
+        except Exception:
+            malformed = 0  # store_rejects creates reject_errors only once a reject is seen
+        quarantine_path = None
+        if malformed:
+            quarantine_path = str(output_dir / "malformed_rows.csv")
+            con.execute(
+                "COPY (SELECT DISTINCT line, error_type, csv_line FROM reject_errors "
+                f"ORDER BY line) TO {_sql_literal(quarantine_path)} (FORMAT CSV, HEADER)"
+            )
+        # Blank / other non-company physical rows, for transparency (allowed). The Polars loader
+        # counts every physical record (good + blank + malformed); subtract companies + malformed.
         import polars as pl
 
-        n_expected = SnapshotLoader(zips).scan().select(pl.len()).collect().item()
-        n_not_loaded = n_expected - n_companies
-        quarantine_path = None
-        if n_not_loaded:
-            # Quarantine the rows Polars has but DuckDB dropped: anti-join on company number is
-            # not possible for ragged rows, so record the reconciliation for the operator.
-            quarantine_path = str(output_dir / "unloaded_rows_report.json")
-            Path(quarantine_path).write_text(json.dumps({
-                "snapshot_date": snapshot_date,
-                "n_expected_polars": n_expected,
-                "n_companies_loaded": n_companies,
-                "n_not_loaded": n_not_loaded,
-                "note": "rows present in the file (blank lines, ragged rows, or rows without a "
-                        "company number) that DuckDB did not load as companies",
-            }, indent=2), encoding="utf-8")
-        if n_not_loaded > SNAPSHOT_MAX_BAD_ROWS:
+        n_physical = SnapshotLoader(zips).scan().select(pl.len()).collect().item()
+        n_blank_or_other = n_physical - n_companies - malformed
+        if malformed > SNAPSHOT_MAX_MALFORMED_ROWS:
             raise RuntimeError(
-                f"snapshot feature build aborted: {n_not_loaded:,} rows present in the file were "
-                f"not loaded as companies (expected {n_expected:,}, loaded {n_companies:,}), "
-                f"exceeding the threshold of {SNAPSHOT_MAX_BAD_ROWS} (report: {quarantine_path})"
+                f"snapshot feature build aborted: {malformed:,} malformed (wrong-column-count) "
+                f"rows exceed the threshold of {SNAPSHOT_MAX_MALFORMED_ROWS} "
+                f"(quarantined to {quarantine_path})"
             )
 
         # --- age via the SHARED _months_between, over distinct incorporation dates ---
@@ -370,8 +381,9 @@ def build_snapshot_features(
         "tier": mode,
         "data_governance": data_governance,
         "n_companies": n_companies,
-        "n_rows_not_loaded": n_not_loaded,
-        "unloaded_rows_report": quarantine_path,
+        "n_malformed_rows": malformed,
+        "n_blank_or_other_rows": n_blank_or_other,
+        "malformed_quarantine": quarantine_path,
         "address_normalisation_sensitivity": {
             "distinct_addresses_standard": distinct_std,
             "distinct_addresses_loose": distinct_loose,

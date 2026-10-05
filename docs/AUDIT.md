@@ -2420,3 +2420,37 @@ parity; the 2026-10 refresh demonstrates the repeatable pipeline on fresh data.
 
 Both feature tiers rebuilt on 2026-08 under the new code (5,695,465 companies each; 1 row not
 loaded, surfaced). All 243 tests + ruff green. `data/` outputs gitignored.
+
+## Handoff 08 follow-up 2 — blank/malformed separation, deadline audit, 2026-10 build (2026-10-05)
+
+**(1) Blanks separated from malformed; store_rejects confirmed working in DuckDB 1.5.6.**
+`store_rejects=true` DOES work in 1.5.6 - but only on a *materialised* read (`CREATE TABLE AS
+SELECT`, not `COUNT(*)`, which the optimiser strips). The feature build now reads with
+`store_rejects` (plus a pinned dialect and `ignore_errors`); malformed rows (MISSING / TOO MANY
+COLUMNS) are captured per line in `reject_errors`, counted (`n_malformed_rows`), quarantined to
+`malformed_rows.csv`, and the build FAILS if they exceed `SNAPSHOT_MAX_MALFORMED_ROWS` (5) - a
+malformed row may be a real company, so the tolerance is tiny. BLANK lines are skipped by DuckDB
+(not rejects), counted separately (`n_blank_or_other_rows`, via the Polars full-record count minus
+companies minus malformed), and ALLOWED in any number. On 2026-08: 0 malformed, 1 blank. (Note:
+`strict_mode=false` was tried and rejected - it silently dropped 9 valid rows from the real
+2026-08 file by mis-handling quoted embedded newlines; the pinned dialect + materialised
+store_rejects works without it.)
+
+**(2) No other hand-built accounts-deadline logic.** Grep of src/ and scripts/ found only the
+already-removed 21-month rule. Everything else uses CH's own computed values: `rules.py`
+(`_accounts_overdue`/`_cs_overdue`) consumes the CH-computed `accounts_overdue`/
+`confirmation_statement_overdue` booleans; `derive_profile` reads `next_accounts.overdue`/`due_on`
+and `confirmation_statement.overdue`/`next_due` directly from the API. `ard_day`/`ard_month`/
+`next_accounts_period_end` are captured (derive.py comment "phase-1.2 deadline reconstruction")
+but that reconstruction is NOT implemented - flagged for whoever builds it to use CH's computed
+deadline (or mark it inferred). No change made.
+
+**(3) 2026-10 feature table built; 2026-08 kept.** Built both tiers for 2026-10 (2026-10-01):
+5,704,711 companies each, 0 malformed, 1 blank. 2026-08 rebuilt under the final code (5,695,465
+each, 0 malformed, 1 blank) and retained for the API-cache parity. Governed tiers carry no
+exact-address column; ungoverned add it.
+
+Tests: a mixed-line-ending bug in the synthetic-snapshot test helper (csv.DictWriter's default
+\r\n vs appended \n) had been defeating DuckDB's newline sniffer; fixed by forcing \n. 10 snapshot
+tests (incl. malformed-quarantine and threshold) + 244 total pass; ruff clean. docs/snapshot-
+features.md updated. `data/` outputs gitignored.

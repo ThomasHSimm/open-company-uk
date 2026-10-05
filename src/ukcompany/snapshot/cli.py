@@ -124,7 +124,8 @@ def cmd_features(args: argparse.Namespace) -> int:
     )
     print(f"tier: {report['tier']}  companies: {report['n_companies']:,}")
     print(f"snapshot date (reference): {report['snapshot_date']}")
-    print(f"rows not loaded (blank/ragged, reconciled): {report['n_rows_not_loaded']}")
+    print(f"malformed rows (quarantined): {report['n_malformed_rows']}  "
+          f"blank/other rows (allowed): {report['n_blank_or_other_rows']}")
     print(f"outputs: {report['outputs']}")
     return 0
 
