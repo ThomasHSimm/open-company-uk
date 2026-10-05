@@ -1,0 +1,889 @@
+{
+  "snapshot_date": "2026-08-01",
+  "n_overlap": 714,
+  "absent_from_bulk": 299,
+  "agree": {
+    "date_of_creation": 709,
+    "age_months": 709,
+    "n_previous_names": 689,
+    "sic_sections": 691,
+    "has_charges": 714,
+    "accounts_overdue": 696,
+    "confirmation_statement_overdue": 694
+  },
+  "compared": {
+    "date_of_creation": 714,
+    "age_months": 714,
+    "n_previous_names": 714,
+    "sic_sections": 714,
+    "has_charges": 714,
+    "accounts_overdue": 714,
+    "confirmation_statement_overdue": 714
+  },
+  "disagreements": [
+    {
+      "company_number": "00249759",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "00944342",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "01195913",
+      "feature": "n_previous_names",
+      "api": 2,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "01411706",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "01844521",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "02053424",
+      "feature": "n_previous_names",
+      "api": 2,
+      "bulk": 1,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "02287634",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "02328674",
+      "feature": "n_previous_names",
+      "api": 2,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "02516654",
+      "feature": "n_previous_names",
+      "api": 3,
+      "bulk": 1,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "03177988",
+      "feature": "n_previous_names",
+      "api": 2,
+      "bulk": 1,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "03309508",
+      "feature": "n_previous_names",
+      "api": 3,
+      "bulk": 1,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "03683445",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "04145329",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "04156882",
+      "feature": "n_previous_names",
+      "api": 3,
+      "bulk": 1,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "04174271",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "04342234",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "04953407",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "05540382",
+      "feature": "n_previous_names",
+      "api": 2,
+      "bulk": 1,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "05826371",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "07846227",
+      "feature": "confirmation_statement_overdue",
+      "api": false,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "10848427",
+      "feature": "n_previous_names",
+      "api": 3,
+      "bulk": 2,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "11726602",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "11726602",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "12719144",
+      "feature": "confirmation_statement_overdue",
+      "api": false,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "13273749",
+      "feature": "n_previous_names",
+      "api": 2,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "13490099",
+      "feature": "confirmation_statement_overdue",
+      "api": false,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "13657828",
+      "feature": "accounts_overdue",
+      "api": false,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "14928026",
+      "feature": "confirmation_statement_overdue",
+      "api": false,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "15018605",
+      "feature": "confirmation_statement_overdue",
+      "api": true,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE001307",
+      "feature": "date_of_creation",
+      "api": null,
+      "bulk": "2013-10-24",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE001307",
+      "feature": "age_months",
+      "api": null,
+      "bulk": 154,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE001307",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE001307",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE001307",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE003478",
+      "feature": "date_of_creation",
+      "api": null,
+      "bulk": "2015-06-05",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE003478",
+      "feature": "age_months",
+      "api": null,
+      "bulk": 134,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE003478",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE003478",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE003478",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE013232",
+      "feature": "date_of_creation",
+      "api": null,
+      "bulk": "2018-02-09",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE013232",
+      "feature": "age_months",
+      "api": null,
+      "bulk": 102,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE013232",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE013232",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE013232",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE020485",
+      "feature": "date_of_creation",
+      "api": null,
+      "bulk": "2020-01-29",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE020485",
+      "feature": "age_months",
+      "api": null,
+      "bulk": 79,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE020485",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE020485",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CE020485",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CS002329",
+      "feature": "date_of_creation",
+      "api": null,
+      "bulk": "2016-03-15",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CS002329",
+      "feature": "age_months",
+      "api": null,
+      "bulk": 125,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CS002329",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CS002329",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "CS002329",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "LP006936",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "LP006936",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "LP006936",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "LP010498",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "LP010498",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "LP010498",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "LP010498",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "LP022037",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "LP022037",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "LP022037",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "LP022037",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "NC000976",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "NI017846",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-03",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "NI017846",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-03",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "OC308234",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "OC321660",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "OC383890",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "OC412501",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "OC412573",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "OC419984",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "OE018921",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "OE018921",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SC104575",
+      "feature": "n_previous_names",
+      "api": 3,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SC142426",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SC216869",
+      "feature": "n_previous_names",
+      "api": 1,
+      "bulk": 0,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL012804",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL012804",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL012804",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL019392",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL019392",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL019392",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL027366",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-03",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL027366",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-03",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL027366",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-03",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL027747",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-03",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL027747",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-03",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL027747",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-03",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL029113",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL029113",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL029113",
+      "feature": "confirmation_statement_overdue",
+      "api": null,
+      "bulk": true,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL032814",
+      "feature": "sic_sections",
+      "api": "",
+      "bulk": "unknown",
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    },
+    {
+      "company_number": "SL032814",
+      "feature": "accounts_overdue",
+      "api": null,
+      "bulk": false,
+      "cache_fetched_on": "2026-08-07",
+      "snapshot_date": "2026-08-01",
+      "cache_vs_snapshot": "cache_newer"
+    }
+  ]
+}

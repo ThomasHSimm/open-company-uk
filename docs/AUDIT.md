@@ -2315,3 +2315,142 @@ totals**, so even the dimensionless version of a related-party concept is droppe
 aware staging guard**: `scripts/kaggle_staging_guard.py` currently scans concepts only; extend it to
 scan `dimension`/`member` and fail on the person/related-party families. Rebuild and re-publish LONG
 only after the guard passes dimension-aware. Render + link check run; nothing pushed.
+
+## CI dependency for PSC feature tests (2026-10-04)
+
+The PSC feature module imports pandas, and `tests/test_psc_features.py` exercises
+DuckDB's pandas-backed `.df()` result. Added `pandas>=2.0` to the `dev` extra so
+the GitHub Actions `pip install -e .[dev]` step installs it before test collection.
+
+## Handoff 08 — per-company features from the basic-company snapshot (2026-10-04)
+
+Produced per-company features for every live company from the monthly basic-company bulk file,
+mirroring the PSC pattern (one definition, parity, coverage, governed/ungoverned tiers). Branch
+`feature/snapshot-features` off main. Snapshot: **2026-08** (2026-08-01 reference date).
+
+**Task 1 — refresh (`ukcompany-snapshot refresh`, new `snapshot/cli.py`, `snapshot/archive.py`).**
+Added checksum verification against the manifest, a retention policy (first snapshot of each month
++ latest; a near-no-op at monthly cadence, implemented + tested for symmetry with PSC), and a
+one-shot refresh that downloads, verifies, prunes, loads and reconciles the row count against the
+manifest, failing loudly on any mismatch. New `ukcompany-snapshot` entry point; `snapshot:` block
+in settings.yaml. Run on the existing 2026-08 archive (`--skip-download --prune-dry-run`):
+checksums verified, **5,695,466 rows** reconciled against the manifest, ~2 s, ~0.9 GB.
+
+**Task 2 — features (`snapshot/features.py`, `ukcompany-snapshot features`).** 5,695,465 companies
+(one malformed line dropped by DuckDB's `ignore_errors`; the manifest/refresh count uses the same
+Polars method and reconciles exactly). One definition: `_months_between` for age and
+`sic_section_from_code` for SIC sections are reused (applied over distinct values, joined back) —
+no second implementation. Features: status/type/age (age against the snapshot date); SIC sections,
+code count, and three SEPARATE flags (dormant 99999, non-trading 74990, n.e.c.); previous-name
+count (capped at 10 = "10 or more"); charge counts (total/outstanding/part-satisfied/satisfied);
+accounts category, accounts/confirmation overdue (computed vs snapshot date), never-filed;
+registered-office concentration. The n.e.c. list (`NEC_SIC_CODES`, 38 codes) is one constant
+enumerated from SIC-2007 condensed-list "n.e.c." descriptions (ONS UK SIC 2007), a malformed
+4-digit `9305` excluded. Two tiers via `data_governance`: governed (22 cols, no exact-address),
+ungoverned (23 cols, adds `n_companies_same_address`); written-schema assertion enforces the drop.
+Each tier built in ~1.5 min at ~4.8 GB. Address normalisation is one function
+(`normalise_address`); the count is insensitive to it (2,634,652 distinct addresses standard vs
+2,633,802 loose, a 0.03% shift).
+
+**Task 3 — parity (`scripts/snapshot_parity_check.py`, `docs/snapshot-parity-2026-08.md`).** 714
+companies in both the API cache and the snapshot. `has_charges` 100%; `date_of_creation`/
+`age_months` 99.3%; `n_previous_names` 96.5%, `sic_sections` 96.8%, overdue flags 97.2–97.5%. All
+96 disagreements have the API cache newer than the snapshot (fetched 2026-08-07 vs 2026-08-01) —
+consistent with change in that window. The 5 `date_of_creation` disagreements are all Charitable
+Incorporated Organisations (CE/CS-prefixed): the API omits `date_of_creation` for CIOs while the
+bulk records it — a source field-availability difference, not a parsing error (carries into
+`age_months`). `company_status`/`company_type` use different vocabularies (register category vs API
+slug) and are reported as cross-tabs, not equality-compared.
+
+**Task 4 — distributions (`scripts/snapshot_distributions.py`,
+`docs/snapshot-distributions-2026-08.md`).** Fill rates per feature (core fields 100%;
+accounts_next_due 96.97%, confirmation 98.64%); registered-office concentration as percentiles and
+banded company counts (postcode median shared by ~17; 37% of companies alone at their exact
+address; the tail is formation agents — the largest postcode alone exceeds 1% of all companies);
+SIC/accounts flag shares.
+
+**Docs/tests.** FIELD_DOCS entries added for the 14 snapshot-new attributes; data dictionary
+regenerated. `docs/snapshot-features.md` documents the table. Synthetic-fixture tests
+(`tests/test_snapshot_archive.py`, `tests/test_snapshot_features.py`) cover the archive functions,
+feature values, both tiers, and parity vs derive_profile. All tests + ruff green. `data/` outputs
+gitignored.
+
+**Rule not verified.** The 21-month first-accounts deadline used by `accounts_never_filed` is NOT
+VERIFIED against current CH guidance in this build (no network); labelled inferred in FIELD_DOCS
+and the feature doc.
+
+**No judgement-layer change.** No rules, severities, SOLVENT_CASE_TYPES, EXCLUDED_STATUSES or
+composite score added. Attributes only.
+
+## Handoff 08 follow-up — bad-line handling, CH-deadline never-filed, latest refresh (2026-10-05)
+
+Three maintainer-requested fixes on `feature/snapshot-features`.
+
+**(1) The "dropped malformed line" — identified; no real company lost; no silent drops.** DuckDB's
+strict parse of the 2026-08 snapshot yields 5,695,465 records with **zero** parse rejects; the
+1-row gap vs the manifest's Polars count (5,695,466) is a single **blank line in part 4**
+(line 454677), confirmed against Python's `csv` reader. Company **09056746**'s
+`PreviousName_10.CompanyName` contains a quoted embedded newline that parses correctly as one
+record (not a bad line). So there is no malformed company row and no CSV option to fix. Hardened
+the feature build against *silent* drops regardless: it reads with `ignore_errors` (one stray row
+never aborts a multi-GB load) and then **reconciles** the loaded company count against an
+independent full count from the Polars loader (which counts every physical record). The difference
+(`n_rows_not_loaded`) is reported, written to `unloaded_rows_report.json`, and the build **fails**
+above `SNAPSHOT_MAX_BAD_ROWS` (1000). For 2026-08 it is 1 (the blank line). Column names are taken
+from DuckDB's own schema (`SELECT * ... LIMIT 0`), which strips the file's leading-whitespace
+headers. Synthetic tests cover the reconciliation (an empty-field row is counted, not silent) and
+the threshold (fails when exceeded).
+
+**(2) never-filed rule replaced with CH's computed deadline.** `accounts_never_filed` is now
+`AccountCategory = 'NO ACCOUNTS FILED' AND Accounts.NextDueDate < snapshot_date` — CH's own
+next-due date, which already handles the PLC 18-month deadline, the 3-months-from-ARD alternative,
+ARD changes and extensions. Old vs new on 2026-08: the inferred "incorporation + 21 months" rule
+flagged **225,955 (3.97%)**; the CH-deadline rule flags **64,981 (1.14%)** — 160,974 of the old
+hits were companies whose CH deadline had not actually passed. FIELD_DOCS updated (new source +
+definition, NOT-VERIFIED label removed); data dictionary regenerated. `FIRST_ACCOUNTS_DEADLINE_MONTHS`
+removed.
+
+**(3) August confirmed, latest snapshot refreshed.** August was chosen because all 1,013 API
+profile caches were fetched in 2026-08 (2026-08-07) and the on-disk snapshot is 2026-08-01, so the
+parity test compares like with like. Ran `ukcompany-snapshot refresh` on the latest published
+month: **2026-10** (2026-10-01), 7 parts downloaded (~2.7 GB), checksums verified, retention kept
+both 2026-08 and 2026-10 (2026-08 retained for the parity alignment), **5,704,712 rows** loaded and
+reconciled against the manifest, 49 s. The feature table remains built on 2026-08 for the API-cache
+parity; the 2026-10 refresh demonstrates the repeatable pipeline on fresh data.
+
+Both feature tiers rebuilt on 2026-08 under the new code (5,695,465 companies each; 1 row not
+loaded, surfaced). All 243 tests + ruff green. `data/` outputs gitignored.
+
+## Handoff 08 follow-up 2 — blank/malformed separation, deadline audit, 2026-10 build (2026-10-05)
+
+**(1) Blanks separated from malformed; store_rejects confirmed working in DuckDB 1.5.6.**
+`store_rejects=true` DOES work in 1.5.6 - but only on a *materialised* read (`CREATE TABLE AS
+SELECT`, not `COUNT(*)`, which the optimiser strips). The feature build now reads with
+`store_rejects` (plus a pinned dialect and `ignore_errors`); malformed rows (MISSING / TOO MANY
+COLUMNS) are captured per line in `reject_errors`, counted (`n_malformed_rows`), quarantined to
+`malformed_rows.csv`, and the build FAILS if they exceed `SNAPSHOT_MAX_MALFORMED_ROWS` (5) - a
+malformed row may be a real company, so the tolerance is tiny. BLANK lines are skipped by DuckDB
+(not rejects), counted separately (`n_blank_or_other_rows`, via the Polars full-record count minus
+companies minus malformed), and ALLOWED in any number. On 2026-08: 0 malformed, 1 blank. (Note:
+`strict_mode=false` was tried and rejected - it silently dropped 9 valid rows from the real
+2026-08 file by mis-handling quoted embedded newlines; the pinned dialect + materialised
+store_rejects works without it.)
+
+**(2) No other hand-built accounts-deadline logic.** Grep of src/ and scripts/ found only the
+already-removed 21-month rule. Everything else uses CH's own computed values: `rules.py`
+(`_accounts_overdue`/`_cs_overdue`) consumes the CH-computed `accounts_overdue`/
+`confirmation_statement_overdue` booleans; `derive_profile` reads `next_accounts.overdue`/`due_on`
+and `confirmation_statement.overdue`/`next_due` directly from the API. `ard_day`/`ard_month`/
+`next_accounts_period_end` are captured (derive.py comment "phase-1.2 deadline reconstruction")
+but that reconstruction is NOT implemented - flagged for whoever builds it to use CH's computed
+deadline (or mark it inferred). No change made.
+
+**(3) 2026-10 feature table built; 2026-08 kept.** Built both tiers for 2026-10 (2026-10-01):
+5,704,711 companies each, 0 malformed, 1 blank. 2026-08 rebuilt under the final code (5,695,465
+each, 0 malformed, 1 blank) and retained for the API-cache parity. Governed tiers carry no
+exact-address column; ungoverned add it.
+
+Tests: a mixed-line-ending bug in the synthetic-snapshot test helper (csv.DictWriter's default
+\r\n vs appended \n) had been defeating DuckDB's newline sniffer; fixed by forcing \n. 10 snapshot
+tests (incl. malformed-quarantine and threshold) + 244 total pass; ruff clean. docs/snapshot-
+features.md updated. `data/` outputs gitignored.

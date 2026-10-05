@@ -35,3 +35,10 @@ psc:
   output_dir: "data/psc/{date}/{mode}"
   data_governance: true
   duckdb_memory_gb: 8
+snapshot:
+  downloads_dir: data/snapshot
+  manifest_path: "data/snapshot/{month}/manifest.json"
+  parts_glob: "data/snapshot/{month}/BasicCompanyData-{month}-01-part*_*.zip"
+  output_dir: "data/snapshot/{month}/{mode}"
+  data_governance: true
+  duckdb_memory_gb: 8
