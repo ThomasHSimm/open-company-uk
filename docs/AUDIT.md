@@ -2679,3 +2679,146 @@ no company numbers, no HMAC keys, no personal fields, and zero un-suppressed sub
   be misleading) and runs the script via subprocess only when `SAMPLE = False`.
 
 No source changed (notebook + AUDIT only); data outputs gitignored. Not pushed.
+
+## Handoff 02 Stage A — accounts features design (2026-10-05)
+
+Design-only (no code): wrote `docs/design-accounts-features.md` specifying a per-company accounts
+feature table for a reference date T, grounded in measurements over the local corpus (WIDE
+`as_first_reported`, 33,513,017 rows, archive 2014-01…2026-08; register one-file 2026-09-01) at
+T = 2026-08. Branch `feature/accounts-features`.
+
+Key measured findings: (1) the archive month is recoverable for every WIDE cell — 195,937,522
+provenance cells, 0 null `source_year`/`source_month`, 0 null `made_up_to_date`; `row_available_yyyymm`
+(= max cell archive month) is the point-in-time key, used as `row_available_yyyymm <= T` on
+`as_first_reported`. (2) Lag period-end→archive month is a median 9 months (the filing deadline),
+p90 10–12, uniform across years and accounts categories; ~1,642 corrupt period-end rows (years
+0001/3020) to filter. (3) Reconciliation vs the register's `Accounts.LastMadeUpDate`: among the
+4,003,942 companies in both, **97.79% exact** match on latest period end (overall buckets: exact
+68.8%, both-absent 25.6% = NO ACCOUNTS FILED, no-WIDE-row 4.0% = XML/PDF/pre-2014, register-newer
+1.6%). (4) Coverage of live companies 70.08%; micro 99.3% / abridged 98.7% / total-exemption-full
+96.4% / dormant 94.6% (balance-sheet filers, as expected), FULL 34.3%, non-iXBRL types (LP, CIO,
+overseas, registered society) 0%.
+
+Candidate features (attributes only): negative-equity, net-current-liabilities, current ratio
+(denominator = creditors within one year; 0/missing → null, no infinities), cash, employee band,
+periods-available, months-since-latest-period-end, period-over-period deltas (equity / net current
+assets / cash), and accounts_category sourced from the register (WIDE has none). Pitfalls mapped per
+feature (dash=nil=0, creditors maturity buckets not the total, `employees_unit_anomaly` diagnostic
+only, scale/sign). **No feature is person-derived**, so governed and ungoverned tiers are identical;
+the `data_governance` switch is kept for symmetry (governed default). Nine open decisions listed
+(row- vs cell-level availability, current-ratio zero handling, employee-band cut-points, etc.).
+
+Amended/replacement filings: in `as_first_reported` the earliest cell wins (amendments ignored), in
+`latest` the amendment wins; the ~9.36% restatement gap is that signal. Multi-filing within a period
+in `as_first_reported` is 0.0% (1,254 rows). "M received by M": CH monthly accounts-data product;
+exact within-month cut-off flagged to confirm against CH docs before build.
+
+**STOP for review.** Stage B (build the features + tests + real reconciliation run) only after
+approval. Design doc + this AUDIT entry committed locally; not pushed. Exploratory queries were
+ad-hoc (scratchpad), nothing else changed.
+
+## Handoff 02 Stage B — accounts features build (2026-10-05)
+
+Built `ukcompany.accounts.features.build_accounts_features` (new module `src/ukcompany/accounts/
+features.py`), implementing the Stage-A design with the maintainer's approved changes. One row per
+company with any accounts filing available by T; 20 columns; reads WIDE `as_first_reported` +
+`row_available_yyyymm` only; `accounts_category` from the register snapshot ≤ T. Branch
+`feature/accounts-features`.
+
+**PIT-granularity gate (maintainer's pre-condition).** Measured the share of WIDE rows whose cells
+span more than one archive month directly on the provenance parquet: **1,211 / 33,513,017 = 0.0036%**
+(gap p50=12, p90=14, max=29 months). Far below the 1–2% threshold, so **row-level** point-in-time
+(`row_available_yyyymm <= T`) is used, not cell-level. (The Stage-A draft's "1,254 / 0.0%" was the
+same phenomenon, less precisely counted.)
+
+**Approved design changes, all implemented.** (1) `current_ratio` = `CurrentAssets /
+creditors_within_one_year`, **null on a zero or missing denominator** (never ±∞); the raw
+`current_assets`, `creditors_within_one_year`, `equity`, `net_current_assets` now ship as columns.
+(2) `employee_band` uses the **Companies Act thresholds 0 / 1–10 / 11–50 / 51–250 / 251+** (revised
+from the first draft); the 2020–21 employee-reporting break is flagged in FIELD_DOCS. (3)
+`accounts_category` from the latest register snapshot **dated ≤ T** (revised from "nearest"). (4) The
+`data_governance` switch is kept; no feature is person-derived, so governed == ungoverned
+(`GOVERNED_FEATURE_DROPPED` is empty and the written-schema assertion is trivially satisfied).
+
+**Reconciliation [this paragraph's framing SUPERSEDED — see the 2026-10-05 correction entry
+below].** First pass paired WIDE `<= 2026-08` against the register `2026-08-01` snapshot and got
+**92.22% exact** among both-present with a **3.94% WIDE-newer** bucket, which I wrongly reported as a
+timing-lag *finding*. That pairing was mis-aligned (the `2026-08-01` snapshot reflects end-of-July,
+so WIDE `<= 2026-08` was a month ahead). Re-run with the correct end-of-month pairing, the 3.94% is
+an **alignment artefact, not a finding** — see the correction entry for the 97.74% aligned result.
+
+**Coverage (live register companies, register ≤ T): 71.01%** (3,962,186 / 5,579,415) — **strongly
+size-skewed**, now the headline caveat in §5 of the design doc and prominent in FIELD_DOCS
+(`latest_period_end`, `equity`): micro 99.3% / abridged 98.7% / total-exemption-full 96.5% / dormant
+94.9%, vs FULL 34.3% / GROUP 49.5% / subsidiary 35.6%, and non-iXBRL forms (LP, CIO, overseas) ~0%.
+Absence of an accounts row is a data-availability artefact, not absence of the company.
+
+**Tests** — `tests/test_accounts_features.py`, 9 synthetic cases (polars fixtures, so `None` becomes
+a true parquet null rather than a NaN — essential for the missing-denominator → null test). Covers:
+point-in-time exclusion (an archive month after T never affects features at T), zero **and** missing
+denominator → null ratio, dash=nil (0 not null, 0 not negative), creditors maturity bucket vs the
+bare total, `employees_unit_anomaly` carried not dropped, sign respected, the >18-month-gap null
+rule, and governed==ungoverned schema equality. Full suite **253 passed, ruff clean**.
+
+**Documentation.** 18 new FIELD_DOCS entries in `derive.py` (tier 2 — filed-but-constrained; the
+existing tier-1 `accounts_category`/`company_number` entries were reused, not duplicated);
+`docs/data-dictionary.md` regenerated via `ukcompany data-dict` (not hand-edited); design doc updated
+(status → built, PIT decision, 92.22% reconciliation with the timing-lag explanation, prominent
+size-skew, decisions marked resolved).
+
+**Real run — full-run warning given before execution, per CLAUDE.md.** Scanned WIDE (671 MB / 33.5M
+rows) + the register snapshot ≤ T (2.7 GB / 7 CSV parts); both tiers built **6,830,797 companies**
+each in ~32 s wall-clock, peak memory well under the 10 GB DuckDB limit (spilled to scratchpad).
+Outputs under `data/accounts/features/{governed,ungoverned}/` (gitignored, not committed).
+
+**Assumptions to verify live.** (a) The "month-M file contains acceptances during M, so end-of-M is
+the availability bound" claim still rests on the CH product-doc cut-off flagged in Stage A. [The
+earlier sentence here claiming the 3.94% WIDE-newer bucket was "consistent with" that cut-off has been
+**retracted** — that bucket was an alignment artefact; see the correction entry.] (b)
+`accounts_category` is the register's *then-current* label at T, not the
+category at the filing being measured. Used WIDE `data/accounts/accounts-wide-as_first_reported.parquet`
+(33,513,017 rows), not the newer `v2/` build (33,733,097 rows), for consistency with the Stage-A
+measurements.
+
+## Handoff 02 Stage B — correction: end-of-month T and register pairing (2026-10-05)
+
+Maintainer flagged the alignment. **T is defined as end-of-calendar-month T, applied identically to
+all three tables.** The register/PSC `BasicCompanyData` snapshots are published dated `YYYY-MM-01` and
+reflect the register at the *start* of that month (≈ end of the previous month) — confirmed from each
+snapshot's `manifest.json` (the `2026-08-01` snapshot's files are `BasicCompanyData-2026-08-01-*`,
+`downloaded_at` 2026-08-06; `snapshot_month` 2026-08). So the snapshot aligned to **T = end of
+archive month M** is the one dated **`(M+1)-01`** — the latest snapshot dated ≤ the first day of T+1.
+My first Stage-B pass paired WIDE `<= 2026-08` with register `2026-08-01`, which is **one month
+mis-aligned** (register reflects end-of-July, WIDE reflects end-of-August).
+
+**Reconciliation re-run both ways (as instructed):**
+
+| WIDE cutoff | register snapshot | exact (both-present) | WIDE-newer |
+|---|---|---:|---:|
+| `<= 2026-07` | 2026-08-01 (**aligned**, both ≈ end-of-July) | **97.74%** | **0.00%** (102 cos) |
+| `<= 2026-08` | 2026-08-01 (register one month behind) | 92.22% | 5.60% (224,442 cos) |
+
+The second instructed pairing (WIDE `<= 2026-08` vs register **`2026-09-01`**) **could not be run**:
+no `2026-09-01` snapshot exists locally (only `2026-08-01` and `2026-10-01`; WIDE archive also maxes
+at `2026-08`). The aligned run is decisive on its own: exact returns to **97.74%** and the WIDE-newer
+bucket collapses from 224,442 companies (5.60%) to **102 (0.00%)**. **Per instruction, the 3.94%
+WIDE-newer is recorded as an alignment artefact, not a finding**, and the earlier "consistent with the
+monthly-cut-off assumption" claim is **retracted** (annotated in the prior entry above). The §1.2
+cut-off question is left open and independent of this reconciliation.
+
+**Canonical build moved to the aligned T = 2026-07 / register 2026-08-01** (the only fully-aligned,
+locally-runnable configuration; T = 2026-08 would need the absent `2026-09-01` register). Re-ran both
+tiers: **6,795,318 companies** each, ~32 s, < 10 GB. Coverage (live companies) **70.38%**
+(3,926,714 / 5,579,415), same strong size-skew (micro 99.3% / abridged 98.7% / dormant 94.9% vs FULL
+34.1% / GROUP 49.4% / subsidiary 35.6%; non-iXBRL forms ~0%); `NO ACCOUNTS FILED` is 0% at this T
+(the ~2.4% seen before came from late first filings in the excluded 2026-08 archive — itself
+consistent with the one-month shift). Outputs under `data/accounts/features/{…}/` (gitignored).
+
+**Changes.** `features.py` docstring now states T is end-of-month and documents the `(M+1)-01`
+register-pairing rule. `design-accounts-features.md`: new §0.1 (end-of-month T + pairing rule, with
+the manifest evidence), §3 rewritten (aligned 97.74%, both-ways table, artefact framing, cut-off
+claim dropped), §5 coverage at the aligned T, §6 join-spec pairing rule, header + Stage-B-delivered
+numbers. `derive.py` FIELD_DOCS: `accounts_category` caveat documents the end-of-month pairing;
+`latest_period_end` definition made explicit that T is an end-of-month boundary; `data-dictionary.md`
+regenerated via CLI. Full suite **253 passed, ruff clean**. Committed on `feature/accounts-features`;
+not pushed.
