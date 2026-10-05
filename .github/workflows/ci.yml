@@ -15,3 +15,8 @@ jobs:
       - run: ruff check src tests
       - run: pytest
         # No live API calls in CI: -m "not live" is the pytest default (pyproject).
+      - name: PSC leak check (committed aggregates)
+        # Governed PSC site assets and committed notebook outputs must be aggregates only -
+        # no company numbers, person_keys, personal fields, or un-suppressed sub-10 counts.
+        # stdlib only, so no extra install step is needed.
+        run: python scripts/psc_leak_check.py docs/site/datasets/psc-assets/*.csv docs/site/datasets/psc-assets/*.json notebooks/*.ipynb
