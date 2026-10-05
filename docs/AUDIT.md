@@ -2679,3 +2679,40 @@ no company numbers, no HMAC keys, no personal fields, and zero un-suppressed sub
   be misleading) and runs the script via subprocess only when `SAMPLE = False`.
 
 No source changed (notebook + AUDIT only); data outputs gitignored. Not pushed.
+
+## Handoff 02 Stage A — accounts features design (2026-10-05)
+
+Design-only (no code): wrote `docs/design-accounts-features.md` specifying a per-company accounts
+feature table for a reference date T, grounded in measurements over the local corpus (WIDE
+`as_first_reported`, 33,513,017 rows, archive 2014-01…2026-08; register one-file 2026-09-01) at
+T = 2026-08. Branch `feature/accounts-features`.
+
+Key measured findings: (1) the archive month is recoverable for every WIDE cell — 195,937,522
+provenance cells, 0 null `source_year`/`source_month`, 0 null `made_up_to_date`; `row_available_yyyymm`
+(= max cell archive month) is the point-in-time key, used as `row_available_yyyymm <= T` on
+`as_first_reported`. (2) Lag period-end→archive month is a median 9 months (the filing deadline),
+p90 10–12, uniform across years and accounts categories; ~1,642 corrupt period-end rows (years
+0001/3020) to filter. (3) Reconciliation vs the register's `Accounts.LastMadeUpDate`: among the
+4,003,942 companies in both, **97.79% exact** match on latest period end (overall buckets: exact
+68.8%, both-absent 25.6% = NO ACCOUNTS FILED, no-WIDE-row 4.0% = XML/PDF/pre-2014, register-newer
+1.6%). (4) Coverage of live companies 70.08%; micro 99.3% / abridged 98.7% / total-exemption-full
+96.4% / dormant 94.6% (balance-sheet filers, as expected), FULL 34.3%, non-iXBRL types (LP, CIO,
+overseas, registered society) 0%.
+
+Candidate features (attributes only): negative-equity, net-current-liabilities, current ratio
+(denominator = creditors within one year; 0/missing → null, no infinities), cash, employee band,
+periods-available, months-since-latest-period-end, period-over-period deltas (equity / net current
+assets / cash), and accounts_category sourced from the register (WIDE has none). Pitfalls mapped per
+feature (dash=nil=0, creditors maturity buckets not the total, `employees_unit_anomaly` diagnostic
+only, scale/sign). **No feature is person-derived**, so governed and ungoverned tiers are identical;
+the `data_governance` switch is kept for symmetry (governed default). Nine open decisions listed
+(row- vs cell-level availability, current-ratio zero handling, employee-band cut-points, etc.).
+
+Amended/replacement filings: in `as_first_reported` the earliest cell wins (amendments ignored), in
+`latest` the amendment wins; the ~9.36% restatement gap is that signal. Multi-filing within a period
+in `as_first_reported` is 0.0% (1,254 rows). "M received by M": CH monthly accounts-data product;
+exact within-month cut-off flagged to confirm against CH docs before build.
+
+**STOP for review.** Stage B (build the features + tests + real reconciliation run) only after
+approval. Design doc + this AUDIT entry committed locally; not pushed. Exploratory queries were
+ad-hoc (scratchpad), nothing else changed.
