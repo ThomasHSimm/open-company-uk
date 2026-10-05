@@ -50,10 +50,9 @@ NEC_SIC_CODES = frozenset({
 DORMANT_SIC = "99999"       # "Dormant Company"
 NON_TRADING_SIC = "74990"   # "Non-trading company"
 
-# First-accounts deadline for a private company: 21 months from the date of incorporation.
-# Used only to qualify "never filed accounts". NOT VERIFIED against current CH guidance in this
-# environment (no network) - treat as inferred; see docs/snapshot-features.md and FIELD_DOCS.
-FIRST_ACCOUNTS_DEADLINE_MONTHS = 21
+# Fail the build if more than this many rows cannot be parsed (small vs ~5.7M). Unparseable
+# rows are quarantined and counted, never silently dropped.
+SNAPSHOT_MAX_BAD_ROWS = 1000
 
 GOVERNED_FEATURE_DROPPED = ("n_companies_same_address",)
 
@@ -136,7 +135,10 @@ def build_snapshot_features(
         raise FileNotFoundError(f"no snapshot parts matched {parts_glob}")
     csv_paths = [str(p) for p in SnapshotLoader(zips)._csv_paths()]
     csv_list = "[" + ", ".join(_sql_literal(p) for p in csv_paths) + "]"
-    csv_sql = f"read_csv({csv_list}, header=true, all_varchar=true, ignore_errors=true)"
+    # ignore_errors so a stray row never aborts the load; the count reconciliation below (vs the
+    # Polars loader, which counts every physical record) surfaces exactly how many rows were
+    # skipped - blank lines, ragged rows - so nothing is dropped *silently*.
+    read_sql = f"read_csv({csv_list}, header=true, all_varchar=true, ignore_errors=true)"
 
     con = _connect(memory_limit_gb, spill_dir)
     try:
@@ -150,9 +152,10 @@ def build_snapshot_features(
             lambda pc, l1: normalise_address(pc, l1, loose=True),
             ["VARCHAR", "VARCHAR"], "VARCHAR",
         )
-        describe = con.sql(f"DESCRIBE SELECT * FROM {csv_sql}").fetchall()
-        col = _col_resolver(describe)
-        n_rows_read = con.sql(f"SELECT COUNT(*) FROM {csv_sql}").fetchone()[0]
+        # Column names from DuckDB's own schema (it strips the bulk file's leading-whitespace
+        # headers); LIMIT 0 avoids parsing any data row.
+        col_names = con.sql(f"SELECT * FROM {read_sql} LIMIT 0").columns
+        col = _col_resolver([(name,) for name in col_names])
 
         # --- base: one cleaned row per company, dates parsed (DD/MM/YYYY) ---
         pn_sum = " + ".join(
@@ -189,12 +192,42 @@ def build_snapshot_features(
                 {col('SICCode.SicText_3')} AS sic3,
                 {col('SICCode.SicText_4')} AS sic4,
                 ({pn_sum}) AS n_previous_names
-            FROM {csv_sql}
+            FROM {read_sql}
             WHERE trim({col('CompanyNumber')}) IS NOT NULL
               AND trim({col('CompanyNumber')}) <> ''
             """
         )
         n_companies = con.sql("SELECT COUNT(*) FROM base").fetchone()[0]
+
+        # No silent drops. DuckDB silently skips rows it cannot fit to the 55-column schema
+        # (ragged rows, blank lines), and store_rejects does not capture those under all_varchar,
+        # so we reconcile against an independent full count from the Polars loader (which counts
+        # every physical record, including ragged ones) - the same method the manifest uses. The
+        # difference is the number of rows present in the file but not loaded as companies; we
+        # quarantine them and FAIL above a small threshold.
+        import polars as pl
+
+        n_expected = SnapshotLoader(zips).scan().select(pl.len()).collect().item()
+        n_not_loaded = n_expected - n_companies
+        quarantine_path = None
+        if n_not_loaded:
+            # Quarantine the rows Polars has but DuckDB dropped: anti-join on company number is
+            # not possible for ragged rows, so record the reconciliation for the operator.
+            quarantine_path = str(output_dir / "unloaded_rows_report.json")
+            Path(quarantine_path).write_text(json.dumps({
+                "snapshot_date": snapshot_date,
+                "n_expected_polars": n_expected,
+                "n_companies_loaded": n_companies,
+                "n_not_loaded": n_not_loaded,
+                "note": "rows present in the file (blank lines, ragged rows, or rows without a "
+                        "company number) that DuckDB did not load as companies",
+            }, indent=2), encoding="utf-8")
+        if n_not_loaded > SNAPSHOT_MAX_BAD_ROWS:
+            raise RuntimeError(
+                f"snapshot feature build aborted: {n_not_loaded:,} rows present in the file were "
+                f"not loaded as companies (expected {n_expected:,}, loaded {n_companies:,}), "
+                f"exceeding the threshold of {SNAPSHOT_MAX_BAD_ROWS} (report: {quarantine_path})"
+            )
 
         # --- age via the SHARED _months_between, over distinct incorporation dates ---
         distinct_incorp = [
@@ -267,9 +300,6 @@ def build_snapshot_features(
         ).fetchone()
 
         # --- assemble ---
-        deadline_sql = (
-            f"base.incorp_date + INTERVAL {FIRST_ACCOUNTS_DEADLINE_MONTHS} MONTH"
-        )
         con.execute(
             f"""
             CREATE TEMP TABLE features AS
@@ -297,9 +327,12 @@ def build_snapshot_features(
                 (base.confirmation_statement_next_due IS NOT NULL
                  AND base.confirmation_statement_next_due < DATE {_sql_literal(snapshot_date)})
                     AS confirmation_statement_overdue,
+                -- Never filed = no accounts filed AND past CH's own computed next-due date
+                -- (which already handles the PLC 18-month case, the 3-months-from-ARD
+                -- alternative, ARD changes and extensions), not a hand-coded deadline.
                 (base.accounts_category = 'NO ACCOUNTS FILED'
-                 AND base.incorp_date IS NOT NULL
-                 AND DATE {_sql_literal(snapshot_date)} > {deadline_sql})
+                 AND base.accounts_next_due IS NOT NULL
+                 AND base.accounts_next_due < DATE {_sql_literal(snapshot_date)})
                     AS accounts_never_filed,
                 COALESCE(pc.n, 0) AS n_companies_same_postcode,
                 COALESCE(ac.n, 0) AS n_companies_same_address
@@ -337,14 +370,14 @@ def build_snapshot_features(
         "tier": mode,
         "data_governance": data_governance,
         "n_companies": n_companies,
-        "rows_read": n_rows_read,
-        "bad_rows": n_rows_read - n_companies,  # rows read but with no company number
+        "n_rows_not_loaded": n_not_loaded,
+        "unloaded_rows_report": quarantine_path,
         "address_normalisation_sensitivity": {
             "distinct_addresses_standard": distinct_std,
             "distinct_addresses_loose": distinct_loose,
         },
-        "first_accounts_deadline_months": FIRST_ACCOUNTS_DEADLINE_MONTHS,
-        "first_accounts_deadline_verified": False,
+        "accounts_never_filed_rule": "NO ACCOUNTS FILED AND accounts_next_due < snapshot_date "
+        "(CH-computed deadline)",
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "outputs": {"snapshot_company_features": str(features_path)},
     }

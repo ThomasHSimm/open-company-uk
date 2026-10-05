@@ -124,7 +124,7 @@ def cmd_features(args: argparse.Namespace) -> int:
     )
     print(f"tier: {report['tier']}  companies: {report['n_companies']:,}")
     print(f"snapshot date (reference): {report['snapshot_date']}")
-    print(f"bad rows (ignored): {report['bad_rows']}")
+    print(f"rows not loaded (blank/ragged, reconciled): {report['n_rows_not_loaded']}")
     print(f"outputs: {report['outputs']}")
     return 0
 

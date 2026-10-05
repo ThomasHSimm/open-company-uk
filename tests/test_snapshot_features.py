@@ -12,8 +12,10 @@ from datetime import date, datetime
 from types import SimpleNamespace
 
 import duckdb
+import pytest
 
 from ukcompany.derive import _months_between, derive_profile
+from ukcompany.snapshot import features as features_mod
 from ukcompany.snapshot.features import GOVERNED_FEATURE_DROPPED, build_snapshot_features
 from ukcompany.validation.labels import sic_section_from_code
 
@@ -53,25 +55,30 @@ _ROWS = [
     {"CompanyNumber": "00000004", "CompanyStatus": "Active",
      "CompanyCategory": "Private Limited Company", "IncorporationDate": "01/01/2000",
      "RegAddress.PostCode": "ZZ1 1ZZ", "RegAddress.AddressLine1": "4 Old Lane",
-     "Accounts.AccountCategory": "NO ACCOUNTS FILED",
+     "Accounts.AccountCategory": "NO ACCOUNTS FILED", "Accounts.NextDueDate": "01/01/2010",
      "SICCode.SicText_1": "82990 - Business support service activities n.e.c."},
     {"CompanyNumber": "00000005", "CompanyStatus": "Active",
      "CompanyCategory": "Private Limited Company", "IncorporationDate": "01/07/2026",
      "RegAddress.PostCode": "ZZ2 2ZZ", "RegAddress.AddressLine1": "5 New Way",
-     "Accounts.AccountCategory": "NO ACCOUNTS FILED",
+     "Accounts.AccountCategory": "NO ACCOUNTS FILED", "Accounts.NextDueDate": "01/04/2028",
      "SICCode.SicText_1": "62020 - Information technology consultancy activities"},
 ]
 
 
-def _write_snapshot(tmp_path):
-    buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=_FIELDS)
-    writer.writeheader()
+def _write_snapshot(tmp_path, extra_raw_lines=None):
+    head = io.StringIO()
+    csv.DictWriter(head, fieldnames=_FIELDS).writeheader()
+    body = io.StringIO()
+    writer = csv.DictWriter(body, fieldnames=_FIELDS)
     for row in _ROWS:
         writer.writerow({field: row.get(field, "") for field in _FIELDS})
+    # Extra raw lines are inserted mid-file (right after the header) so a blank/ragged line is
+    # not merely a trailing newline.
+    extra = "".join(raw + "\n" for raw in (extra_raw_lines or []))
+    content = head.getvalue() + extra + body.getvalue()
     zip_path = tmp_path / "BasicCompanyData-2099-01-01-part1_1.zip"
     with zipfile.ZipFile(zip_path, "w") as zf:
-        zf.writestr("BasicCompanyData-2099-01-01-part1_1.csv", buffer.getvalue())
+        zf.writestr("BasicCompanyData-2099-01-01-part1_1.csv", content)
     return str(tmp_path / "BasicCompanyData-*.zip")
 
 
@@ -111,8 +118,10 @@ def test_snapshot_feature_values(tmp_path):
     assert rows["00000002"]["confirmation_statement_overdue"]
     assert rows["00000003"]["flag_non_trading_sic"]
     assert rows["00000004"]["flag_nec_sic"]
-    assert rows["00000004"]["accounts_never_filed"]         # NO ACCOUNTS FILED + incorp 2000
-    assert not rows["00000005"]["accounts_never_filed"]     # incorporated < 21 months ago
+    # Never-filed now uses CH's computed next-due date, not a hand-coded 21-month rule.
+    assert rows["00000004"]["accounts_never_filed"]         # NO ACCOUNTS FILED + next-due 2010 (past)
+    assert not rows["00000005"]["accounts_never_filed"]     # NO ACCOUNTS FILED + next-due 2028 (future)
+    assert report["n_rows_not_loaded"] == 0                 # clean synthetic data, all loaded
 
 
 def test_snapshot_feature_tiers(tmp_path):
@@ -172,3 +181,31 @@ def test_snapshot_features_match_derive_profile(tmp_path):
     assert bool(bulk["accounts_overdue"]) == bool(api["accounts_overdue"])
     assert bool(bulk["confirmation_statement_overdue"]) == bool(
         api["confirmation_statement_overdue"])
+
+
+_EMPTY_ROW = "," * (len(_FIELDS) - 1)  # full-width row, every field empty (no company number)
+
+
+def test_snapshot_counts_dropped_rows_not_silently(tmp_path):
+    # A full-width row with no company number is filtered out by the build but counted by the
+    # Polars loader; the reconciliation must surface it (never a silent drop).
+    parts_glob = _write_snapshot(tmp_path, extra_raw_lines=[_EMPTY_ROW])
+    report = build_snapshot_features(
+        parts_glob, tmp_path / "ungov", SNAPSHOT_DATE,
+        data_governance=False, memory_limit_gb=1, spill_dir=str(tmp_path / "spill"),
+    )
+    assert report["n_companies"] == 5                 # the 5 real companies only
+    assert report["n_rows_not_loaded"] >= 1           # the empty row was counted, not silent
+    assert report["unloaded_rows_report"] is not None
+    from pathlib import Path
+    assert Path(report["unloaded_rows_report"]).exists()
+
+
+def test_snapshot_fails_above_bad_row_threshold(tmp_path, monkeypatch):
+    monkeypatch.setattr(features_mod, "SNAPSHOT_MAX_BAD_ROWS", 0)  # any unloaded row now fails
+    parts_glob = _write_snapshot(tmp_path, extra_raw_lines=[_EMPTY_ROW])
+    with pytest.raises(RuntimeError, match="not loaded as companies"):
+        build_snapshot_features(
+            parts_glob, tmp_path / "ungov", SNAPSHOT_DATE,
+            data_governance=False, memory_limit_gb=1, spill_dir=str(tmp_path / "spill"),
+        )

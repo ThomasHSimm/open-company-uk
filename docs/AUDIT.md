@@ -2381,3 +2381,42 @@ and the feature doc.
 
 **No judgement-layer change.** No rules, severities, SOLVENT_CASE_TYPES, EXCLUDED_STATUSES or
 composite score added. Attributes only.
+
+## Handoff 08 follow-up — bad-line handling, CH-deadline never-filed, latest refresh (2026-10-05)
+
+Three maintainer-requested fixes on `feature/snapshot-features`.
+
+**(1) The "dropped malformed line" — identified; no real company lost; no silent drops.** DuckDB's
+strict parse of the 2026-08 snapshot yields 5,695,465 records with **zero** parse rejects; the
+1-row gap vs the manifest's Polars count (5,695,466) is a single **blank line in part 4**
+(line 454677), confirmed against Python's `csv` reader. Company **09056746**'s
+`PreviousName_10.CompanyName` contains a quoted embedded newline that parses correctly as one
+record (not a bad line). So there is no malformed company row and no CSV option to fix. Hardened
+the feature build against *silent* drops regardless: it reads with `ignore_errors` (one stray row
+never aborts a multi-GB load) and then **reconciles** the loaded company count against an
+independent full count from the Polars loader (which counts every physical record). The difference
+(`n_rows_not_loaded`) is reported, written to `unloaded_rows_report.json`, and the build **fails**
+above `SNAPSHOT_MAX_BAD_ROWS` (1000). For 2026-08 it is 1 (the blank line). Column names are taken
+from DuckDB's own schema (`SELECT * ... LIMIT 0`), which strips the file's leading-whitespace
+headers. Synthetic tests cover the reconciliation (an empty-field row is counted, not silent) and
+the threshold (fails when exceeded).
+
+**(2) never-filed rule replaced with CH's computed deadline.** `accounts_never_filed` is now
+`AccountCategory = 'NO ACCOUNTS FILED' AND Accounts.NextDueDate < snapshot_date` — CH's own
+next-due date, which already handles the PLC 18-month deadline, the 3-months-from-ARD alternative,
+ARD changes and extensions. Old vs new on 2026-08: the inferred "incorporation + 21 months" rule
+flagged **225,955 (3.97%)**; the CH-deadline rule flags **64,981 (1.14%)** — 160,974 of the old
+hits were companies whose CH deadline had not actually passed. FIELD_DOCS updated (new source +
+definition, NOT-VERIFIED label removed); data dictionary regenerated. `FIRST_ACCOUNTS_DEADLINE_MONTHS`
+removed.
+
+**(3) August confirmed, latest snapshot refreshed.** August was chosen because all 1,013 API
+profile caches were fetched in 2026-08 (2026-08-07) and the on-disk snapshot is 2026-08-01, so the
+parity test compares like with like. Ran `ukcompany-snapshot refresh` on the latest published
+month: **2026-10** (2026-10-01), 7 parts downloaded (~2.7 GB), checksums verified, retention kept
+both 2026-08 and 2026-10 (2026-08 retained for the parity alignment), **5,704,712 rows** loaded and
+reconciled against the manifest, 49 s. The feature table remains built on 2026-08 for the API-cache
+parity; the 2026-10 refresh demonstrates the repeatable pipeline on fresh data.
+
+Both feature tiers rebuilt on 2026-08 under the new code (5,695,465 companies each; 1 row not
+loaded, surfaced). All 243 tests + ruff green. `data/` outputs gitignored.

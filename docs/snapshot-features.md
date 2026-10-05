@@ -59,12 +59,17 @@ most 10** previous names, so a count of 10 means **"10 or more"**.
 
 ### "Never filed" accounts
 
-`accounts_never_filed` = accounts category is `NO ACCOUNTS FILED` **and** the snapshot date is
-past the first-accounts deadline (incorporation + 21 months). **The 21-month private-company
-deadline is NOT VERIFIED** against current CH guidance in this build (no network) — treat it as
-inferred. It does not distinguish company types with different deadlines. 3.97% of companies
-(2026-08) qualify; many `NO ACCOUNTS FILED` companies are simply not yet past their first
-deadline.
+`accounts_never_filed` = accounts category is `NO ACCOUNTS FILED` **and** CH's own computed
+next-due date (`Accounts.NextDueDate`) is before the snapshot date. Using CH's computed deadline
+means the PLC 18-month case, the 3-months-from-ARD alternative, ARD changes and extensions are all
+handled by Companies House — there is no hand-coded deadline. A company with no next-due date yet
+(brand new) is treated as not-yet-overdue. **1.14%** of companies (2026-08) qualify.
+
+> This replaced an earlier inferred "incorporation + 21 months" rule, which over-counted: on the
+> 2026-08 data it flagged 225,955 companies (3.97%) vs 64,981 (1.14%) under the CH-deadline rule —
+> 160,974 of its hits were companies whose CH-computed deadline had not in fact passed (ARD
+> changes, extensions, non-private deadlines). The not-verified caveat is gone with the inferred
+> rule.
 
 ### Registered-office concentration and address normalisation
 
@@ -91,11 +96,21 @@ formation agents / virtual offices (the largest postcode alone is ~1.5% of all c
   `docs/snapshot-distributions-2026-08.md`: fill rates, concentration percentiles + banded
   company counts, and SIC/accounts flag shares.
 
+## No silent drops
+
+The feature build reads with `ignore_errors` (so one stray row never aborts a multi-GB load) and
+then **reconciles** its loaded company count against an independent full count from the Polars
+loader (which counts every physical record). The difference — rows present in the file but not
+loaded as companies (blank lines, ragged rows, rows with no company number) — is written to
+`unloaded_rows_report.json`, reported as `n_rows_not_loaded`, and the build **fails** if it exceeds
+`SNAPSHOT_MAX_BAD_ROWS` (1000). For 2026-08 this difference is **1**: a single blank line in part 4
+(verified against Python's `csv` reader — company 09056746's quoted previous-name field containing
+a newline parses correctly as one record; the blank line is the only non-company physical row).
+DuckDB's **5,695,465** is the true company count; the manifest's Polars `total_rows` (5,695,466)
+counts that blank line, which is the whole of the 1-row difference. There is no dropped company.
+
 ## Caveats
 
-- One row is dropped by the DuckDB reader's `ignore_errors` (a malformed line); the manifest /
-  `refresh` row-count uses the same Polars method as the manifest and reconciles exactly
-  (5,695,466 for 2026-08).
 - `company_status`/`company_type` vocabularies differ from the API (register category text vs
   API slug); the snapshot carries the register's text verbatim.
 - The snapshot excludes dissolved companies (they are off the register), so this is a live-company

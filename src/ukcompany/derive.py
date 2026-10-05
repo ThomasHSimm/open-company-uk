@@ -1050,12 +1050,13 @@ FIELD_DOCS: list[dict[str, str | int]] = [
     {
         "field": "accounts_never_filed",
         "tier": 1,
-        "source": "snapshot:Accounts.AccountCategory + IncorporationDate",
-        "definition": "Accounts category is 'NO ACCOUNTS FILED' AND the snapshot date is past "
-        "the first-accounts deadline (incorporation + 21 months).",
-        "caveats": "The 21-month private-company first-accounts deadline is NOT VERIFIED against "
-        "current CH guidance in this build - treat as inferred (see docs/snapshot-features.md). "
-        "Does not distinguish company types with different deadlines.",
+        "source": "snapshot:Accounts.AccountCategory + Accounts.NextDueDate",
+        "definition": "Accounts category is 'NO ACCOUNTS FILED' AND CH's computed next-due date "
+        "(Accounts.NextDueDate) is before the snapshot date.",
+        "caveats": "Uses CH's own computed accounts deadline, which already handles the PLC "
+        "18-month case, the 3-months-from-ARD alternative, ARD changes and extensions - no "
+        "hand-coded deadline. A null next-due date (a very new company whose deadline is not yet "
+        "computed) is treated as not-yet-overdue.",
     },
     {
         "field": "n_companies_same_postcode",
