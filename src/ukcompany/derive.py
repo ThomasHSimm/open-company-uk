@@ -1037,7 +1037,10 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "definition": "The accounts category of the last accounts filed (e.g. MICRO ENTITY, "
         "DORMANT, NO ACCOUNTS FILED), upper-cased.",
         "caveats": "Registrar-assigned from the filing; 'NO ACCOUNTS FILED' includes companies "
-        "not yet past their first deadline (see accounts_never_filed).",
+        "not yet past their first deadline (see accounts_never_filed). In the accounts-feature "
+        "table this is paired to a reference T by the end-of-month rule: the register snapshot "
+        "(dated YYYY-MM-01, reflecting the start of that month) taken is the latest one dated <= the "
+        "first day of T+1, i.e. the (month-after-T)-01 snapshot - NOT a same-numbered-month one.",
     },
     {
         "field": "confirmation_statement_overdue",
@@ -1086,8 +1089,8 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "field": "latest_period_end",
         "tier": 2,
         "source": "accounts WIDE:period_end (as_first_reported, available by T)",
-        "definition": "Balance-sheet date of the most recent accounts available by the reference "
-        "month T (point-in-time: only rows whose archive month is <= T).",
+        "definition": "Balance-sheet date of the most recent accounts available by end-of-month T "
+        "(point-in-time: only rows whose archive month is <= T; T is an end-of-month boundary).",
         "caveats": "COVERAGE IS STRONGLY SIZE-SKEWED: iXBRL accounts data is far more complete for "
         "larger entities; the smallest micro-entities and dormant companies are heavily "
         "under-represented, so the absence of a row is NOT the absence of the company. Row-level "

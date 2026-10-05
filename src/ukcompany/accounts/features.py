@@ -1,9 +1,14 @@
 """Per-company accounts features for a reference date T (Handoff 02, Stage B).
 
-One row per company that has any accounts filing available by T, built from the WIDE
-`as_first_reported` table and its point-in-time key `row_available_yyyymm` (the archive month by
-which the whole row was known; see docs/design-accounts-features.md). `accounts_category` is the
-only column that comes from elsewhere - the latest register snapshot dated <= T.
+T is an **end-of-month** boundary (a `YYYYMM` archive month). One row per company that has any
+accounts filing available by T, built from the WIDE `as_first_reported` table and its point-in-time
+key `row_available_yyyymm` (the archive month by which the whole row was known; see
+docs/design-accounts-features.md). `accounts_category` is the only column that comes from elsewhere -
+the register snapshot that the caller pairs to T. **Pairing rule:** the CH `BasicCompanyData`
+snapshot is published dated `YYYY-MM-01` and reflects the register state at the *start* of that month
+(i.e. end of the previous month), so the snapshot aligned to T (end of archive month M) is the one
+dated `(M+1)-01` - the latest snapshot dated <= the first day of T+1. For T = 2026-07 that is the
+2026-08-01 snapshot; pass its CSV parts as `register_glob`.
 
 Design decisions (approved, Handoff 02): **row-level** point-in-time (only 0.0036% of rows have
 cells spanning more than one archive month, well under the 1-2% threshold); `current_ratio` is

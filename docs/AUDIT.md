@@ -2740,16 +2740,12 @@ from the first draft); the 2020–21 employee-reporting break is flagged in FIEL
 `data_governance` switch is kept; no feature is person-derived, so governed == ungoverned
 (`GOVERNED_FEATURE_DROPPED` is empty and the written-schema assertion is trivially satisfied).
 
-**Reconciliation re-run with the aligned register ≤ T (2026-08-01, not the nearest-after
-2026-09-01).** Among the 4,006,474 companies present in both, **92.22% exact** on latest period end
-(buckets over 5,695,465 register companies: exact 64.87%, both-absent 25.05%, no-WIDE-row 4.01%,
-**WIDE-newer 3.94%**, register-newer 1.53%, no-register-LastMadeUpDate 0.60%). The headline is lower
-than Stage A's 97.79% **because the register is now aligned ≤ T**, and that is the finding: the
-WIDE-newer bucket jumps from ~0% to 3.94% — the **archive-vs-register timing lag**. WIDE's 2026-08
-archive holds accounts accepted *during* August; the start-of-August register (2026-08-01) has not
-caught up, so WIDE legitimately shows a newer period. The nearest-*after* snapshot hid this by giving
-the register a one-month head start it would not have at a true T. Aligning ≤ T is the correct
-point-in-time choice and exposes the lag honestly.
+**Reconciliation [this paragraph's framing SUPERSEDED — see the 2026-10-05 correction entry
+below].** First pass paired WIDE `<= 2026-08` against the register `2026-08-01` snapshot and got
+**92.22% exact** among both-present with a **3.94% WIDE-newer** bucket, which I wrongly reported as a
+timing-lag *finding*. That pairing was mis-aligned (the `2026-08-01` snapshot reflects end-of-July,
+so WIDE `<= 2026-08` was a month ahead). Re-run with the correct end-of-month pairing, the 3.94% is
+an **alignment artefact, not a finding** — see the correction entry for the 97.74% aligned result.
 
 **Coverage (live register companies, register ≤ T): 71.01%** (3,962,186 / 5,579,415) — **strongly
 size-skewed**, now the headline caveat in §5 of the design doc and prominent in FIELD_DOCS
@@ -2776,9 +2772,53 @@ each in ~32 s wall-clock, peak memory well under the 10 GB DuckDB limit (spilled
 Outputs under `data/accounts/features/{governed,ungoverned}/` (gitignored, not committed).
 
 **Assumptions to verify live.** (a) The "month-M file contains acceptances during M, so end-of-M is
-the availability bound" claim still rests on the CH product-doc cut-off flagged in Stage A — but the
-newly-visible 3.94% WIDE-newer bucket is consistent with it (start-of-month register lagging a
-through-month archive). (b) `accounts_category` is the register's *then-current* label at T, not the
+the availability bound" claim still rests on the CH product-doc cut-off flagged in Stage A. [The
+earlier sentence here claiming the 3.94% WIDE-newer bucket was "consistent with" that cut-off has been
+**retracted** — that bucket was an alignment artefact; see the correction entry.] (b)
+`accounts_category` is the register's *then-current* label at T, not the
 category at the filing being measured. Used WIDE `data/accounts/accounts-wide-as_first_reported.parquet`
 (33,513,017 rows), not the newer `v2/` build (33,733,097 rows), for consistency with the Stage-A
 measurements.
+
+## Handoff 02 Stage B — correction: end-of-month T and register pairing (2026-10-05)
+
+Maintainer flagged the alignment. **T is defined as end-of-calendar-month T, applied identically to
+all three tables.** The register/PSC `BasicCompanyData` snapshots are published dated `YYYY-MM-01` and
+reflect the register at the *start* of that month (≈ end of the previous month) — confirmed from each
+snapshot's `manifest.json` (the `2026-08-01` snapshot's files are `BasicCompanyData-2026-08-01-*`,
+`downloaded_at` 2026-08-06; `snapshot_month` 2026-08). So the snapshot aligned to **T = end of
+archive month M** is the one dated **`(M+1)-01`** — the latest snapshot dated ≤ the first day of T+1.
+My first Stage-B pass paired WIDE `<= 2026-08` with register `2026-08-01`, which is **one month
+mis-aligned** (register reflects end-of-July, WIDE reflects end-of-August).
+
+**Reconciliation re-run both ways (as instructed):**
+
+| WIDE cutoff | register snapshot | exact (both-present) | WIDE-newer |
+|---|---|---:|---:|
+| `<= 2026-07` | 2026-08-01 (**aligned**, both ≈ end-of-July) | **97.74%** | **0.00%** (102 cos) |
+| `<= 2026-08` | 2026-08-01 (register one month behind) | 92.22% | 5.60% (224,442 cos) |
+
+The second instructed pairing (WIDE `<= 2026-08` vs register **`2026-09-01`**) **could not be run**:
+no `2026-09-01` snapshot exists locally (only `2026-08-01` and `2026-10-01`; WIDE archive also maxes
+at `2026-08`). The aligned run is decisive on its own: exact returns to **97.74%** and the WIDE-newer
+bucket collapses from 224,442 companies (5.60%) to **102 (0.00%)**. **Per instruction, the 3.94%
+WIDE-newer is recorded as an alignment artefact, not a finding**, and the earlier "consistent with the
+monthly-cut-off assumption" claim is **retracted** (annotated in the prior entry above). The §1.2
+cut-off question is left open and independent of this reconciliation.
+
+**Canonical build moved to the aligned T = 2026-07 / register 2026-08-01** (the only fully-aligned,
+locally-runnable configuration; T = 2026-08 would need the absent `2026-09-01` register). Re-ran both
+tiers: **6,795,318 companies** each, ~32 s, < 10 GB. Coverage (live companies) **70.38%**
+(3,926,714 / 5,579,415), same strong size-skew (micro 99.3% / abridged 98.7% / dormant 94.9% vs FULL
+34.1% / GROUP 49.4% / subsidiary 35.6%; non-iXBRL forms ~0%); `NO ACCOUNTS FILED` is 0% at this T
+(the ~2.4% seen before came from late first filings in the excluded 2026-08 archive — itself
+consistent with the one-month shift). Outputs under `data/accounts/features/{…}/` (gitignored).
+
+**Changes.** `features.py` docstring now states T is end-of-month and documents the `(M+1)-01`
+register-pairing rule. `design-accounts-features.md`: new §0.1 (end-of-month T + pairing rule, with
+the manifest evidence), §3 rewritten (aligned 97.74%, both-ways table, artefact framing, cut-off
+claim dropped), §5 coverage at the aligned T, §6 join-spec pairing rule, header + Stage-B-delivered
+numbers. `derive.py` FIELD_DOCS: `accounts_category` caveat documents the end-of-month pairing;
+`latest_period_end` definition made explicit that T is an end-of-month boundary; `data-dictionary.md`
+regenerated via CLI. Full suite **253 passed, ruff clean**. Committed on `feature/accounts-features`;
+not pushed.

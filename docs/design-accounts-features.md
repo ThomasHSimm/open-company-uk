@@ -3,21 +3,23 @@
 **Status: Stage A approved; Stage B built.** This specifies (and now implements, in
 `ukcompany.accounts.features`) a per-company **accounts feature table for a reference date T**, built
 from the published WIDE accounts dataset and its provenance, so it joins to the register features
-(Handoff 08) and the PSC features (Handoff 07) on the normalised company number. Numbers below are
+(Handoff 08) and the PSC features (Handoff 07) on the normalised company number. **T is an
+end-of-month boundary, applied consistently across all three tables** (see §0). Numbers below are
 measured on the local corpus (WIDE `as_first_reported`, 33,513,017 rows over archive months
-2014-01 … 2026-08) at **T = 2026-08** (the latest archive month), reconciled against the register
-snapshot **at or before T (2026-08-01)** — the aligned snapshot, not the nearest-after one.
-Attributes only — no rules, no composite score.
+2014-01 … 2026-08) at the **aligned reference T = 2026-07** (end of July), paired with the register
+snapshot **dated 2026-08-01** (published on the 1st, reflecting the register at end of July — the
+correct pairing; see §0 and §6). Attributes only — no rules, no composite score.
 
 > **Stage B decisions (approved).** Point-in-time is **row-level** (`row_available_yyyymm <= T`):
 > only **0.0036%** of WIDE rows (1,211 / 33,513,017) draw cells from more than one archive month —
 > far below the 1–2% threshold for switching to cell-level. `current_ratio` is **null** on a zero or
 > missing denominator (never ±∞) and `current_assets`, `creditors_within_one_year`, `equity`,
 > `net_current_assets` ship as columns. Employee bands use the **Companies Act** thresholds
-> (0 / 1–10 / 11–50 / 51–250 / 251+). `accounts_category` comes from the **latest register snapshot
-> dated ≤ T**. The `data_governance` switch is kept (governed == ungoverned here; nothing is
-> person-derived). **Coverage is strongly size-skewed — see §5; this is the single most important
-> caveat on the whole table.**
+> (0 / 1–10 / 11–50 / 51–250 / 251+). `accounts_category` comes from the register snapshot paired to
+> T by the **end-of-month rule** (the snapshot dated ≤ the first day of T+1; see §0/§6), **not** a
+> same-numbered-month snapshot. The `data_governance` switch is kept (governed == ungoverned here;
+> nothing is person-derived). **Coverage is strongly size-skewed — see §5; this is the single most
+> important caveat on the whole table.**
 
 ## 0. What "a reference date T" means here
 
@@ -32,6 +34,25 @@ source_month)` over the row's cells (`pivot.py:211`), i.e. the archive month by 
 *earliest* archive that reported it, so a row carries no look-ahead, and filtering
 `row_available_yyyymm <= T` keeps only rows fully available by T. **`latest`** mode folds in later
 restatements and is descriptive-only — never used for point-in-time features.
+
+### 0.1 T is end-of-month, and the register/PSC snapshot must be paired to that — not by month number
+
+**T means the state as at the *end* of calendar month T, used identically for all three tables.**
+This matters for pairing because the three products are dated on different conventions:
+
+- **WIDE accounts**: `row_available_yyyymm` is the archive month a filing appeared in. Archive month
+  M = filings accepted *during* M = available by **end of M**. So `row_available_yyyymm <= T` already
+  means "available by end of T".
+- **Register / PSC `BasicCompanyData`**: Companies House publishes the snapshot dated **`YYYY-MM-01`**
+  (confirmed from each snapshot's `manifest.json`: the `2026-08-01` snapshot's files are
+  `BasicCompanyData-2026-08-01-*`, `downloaded_at` 2026-08-06). A snapshot dated the **1st of a
+  month** reflects the register at the *start* of that month, i.e. **end of the previous month**.
+
+So the snapshot aligned to **T = end of archive month M** is the one dated **`(M+1)-01`** — formally,
+**the latest snapshot dated ≤ the first day of T+1**. For T = 2026-07 (end of July) that is the
+**2026-08-01** snapshot. Pairing a same-numbered-month snapshot (register `2026-08-01` with WIDE
+`<= 2026-08`) puts WIDE a full month ahead of the register and manufactures a spurious "WIDE-newer"
+gap — see §3.
 
 ## 1. Availability
 
@@ -122,36 +143,45 @@ Edge cases:
 
 For each company, the latest available period end at T (WIDE, `as_first_reported`,
 `row_available <= T`) vs the register's **`Accounts.LastMadeUpDate`**, taken from the register
-snapshot **at or before T (2026-08-01, aligned to WIDE's end archive month 2026-08)** — *not* the
-nearest-after 2026-09-01 snapshot used in the first Stage-A draft. Of the 5,695,465 register
-companies:
+snapshot **paired to T by the end-of-month rule (§0.1)**. At the aligned **T = 2026-07** that is the
+**2026-08-01** snapshot. Of the 5,695,465 register companies:
 
 | bucket | n | % |
 |---|---:|---:|
-| exact match (WIDE latest period end = register LastMadeUpDate) | 3,694,649 | 64.87% |
-| both absent (no WIDE row and no register LastMadeUpDate) | 1,426,584 | 25.05% |
-| no WIDE row, but register has a LastMadeUpDate | 228,214 | 4.01% |
-| WIDE newer than register | 224,442 | 3.94% |
-| register newer than WIDE latest | 87,383 | 1.53% |
-| WIDE row present, but register has no LastMadeUpDate | 34,193 | 0.60% |
+| exact match (WIDE latest period end = register LastMadeUpDate) | 3,914,598 | 68.73% |
+| both absent (no WIDE row and no register LastMadeUpDate) | 1,460,748 | 25.65% |
+| no WIDE row, but register has a LastMadeUpDate | 229,527 | 4.03% |
+| register newer than WIDE latest | 90,461 | 1.59% |
+| WIDE newer than register | 102 | 0.00% |
+| WIDE row present, but register has no LastMadeUpDate | 29 | 0.00% |
 
-**Among the 4,006,474 companies present in both, 92.22% match exactly.** This is the accounts
-equivalent of the 07/08 parity tests. The headline number is lower than the first draft's 97.79%
-*because the register is now aligned to ≤ T* — and that drop is itself the finding:
+**Among the 4,005,161 companies present in both, 97.74% match exactly** — the accounts equivalent of
+the 07/08 parity tests. The remaining ~2% is almost entirely *register-newer* (a latest filing that
+is XML/PDF-only while WIDE holds an earlier iXBRL one) plus *no-WIDE-row* companies.
 
-- **WIDE newer (3.94%, up from ~0.0%)** — this is the **archive-vs-register timing lag**, now
-  visible. WIDE's 2026-08 archive is the accounts *accepted during August*; the **start-of-August**
-  register snapshot (2026-08-01) predates them, so for these companies WIDE legitimately shows a
-  newer period than the register has caught up to. Using the nearest-*after* snapshot (2026-09-01)
-  hid this by giving the register a one-month head start it would not have at a true T. Aligning
-  ≤ T is the correct point-in-time choice and exposes the lag honestly.
-- **no WIDE row (4.01%)** — the register shows a last-made-up date but WIDE has nothing: an XML- or
+**Pairing matters — ran it both ways to prove the alignment, not the data, drives the gap:**
+
+| WIDE cutoff | register snapshot | exact (both-present) | WIDE-newer |
+|---|---|---:|---:|
+| `<= 2026-07` | 2026-08-01 (aligned, end-of-July both sides) | **97.74%** | **0.00%** (102 cos) |
+| `<= 2026-08` | 2026-08-01 (register one month behind WIDE) | 92.22% | 5.60% (224,442 cos) |
+
+The **3.94% "WIDE-newer" reported in the first Stage-B pass was an alignment artefact, not a
+finding**: pairing WIDE `<= 2026-08` (end of August) against the `2026-08-01` register (end of July)
+made WIDE a month ahead, so August filers showed a "newer" period the register simply had not been
+sampled late enough to show. Aligning per §0.1 collapses it to 102 companies (0.00%) and restores the
+~97–98% exact match. (The complementary aligned check, WIDE `<= 2026-08` vs register `2026-09-01`,
+could not be run: no `2026-09-01` snapshot is present locally — only `2026-08-01` and `2026-10-01`.)
+No claim is made that the residual bucket is "consistent with the monthly-cut-off assumption"; the
+cut-off question (§1.2) is left open and independent of this reconciliation.
+
+Mismatch categories at the aligned T:
+
+- **no WIDE row (4.03%)** — the register shows a last-made-up date but WIDE has nothing: an XML- or
   PDF-only filing (not iXBRL), a pre-2014 period, or a company type outside the iXBRL product.
-- **register newer (1.53%)** — the register's latest period post-dates WIDE's: a latest filing that
+- **register newer (1.59%)** — the register's latest period post-dates WIDE's: a latest filing that
   is XML/PDF-only while an earlier iXBRL one is in WIDE (a format difference, not an error).
-- **no register LastMadeUpDate but WIDE row (0.60%)** — a filing is in WIDE but the register row
-  carries no `Accounts.LastMadeUpDate` (e.g. the field not yet populated for that company).
-- **both absent (25.05%)** — overwhelmingly `NO ACCOUNTS FILED` companies (newly incorporated or
+- **both absent (25.65%)** — overwhelmingly `NO ACCOUNTS FILED` companies (newly incorporated or
   dormant-never-filed); nothing to reconcile.
 
 ## 4. Candidate features
@@ -194,26 +224,26 @@ as the handoff requests.
 > will mistake a **data-availability artefact** for a real difference.
 
 Share of **live (Active) register companies with any accounts feature at T** (any WIDE period with
-`row_available <= T`), register snapshot ≤ T (2026-08-01): **71.01%** (3,962,186 / 5,579,415). By
-type and category:
+`row_available <= T`), at the aligned T = 2026-07 vs register 2026-08-01: **70.38%**
+(3,926,714 / 5,579,415). By type and category:
 
 | CompanyCategory | covered % |   | AccountCategory | n | covered % |
 |---|---:|---|---|---:|---:|
-| Private Limited Company | 73.7 |   | MICRO ENTITY | 1,823,934 | 99.3 |
-| PRI/LTD BY GUAR/NSC | 79.7 |   | UNAUDITED ABRIDGED | 159,887 | 98.7 |
-| PRI/LBG/NSC | 61.4 |   | TOTAL EXEMPTION FULL | 1,299,198 | 96.5 |
-| Limited Liability Partnership | 59.0 |   | DORMANT | 635,200 | 94.9 |
-| Community Interest Company | 33.6 |   | MEDIUM | 6,180 | 88.4 |
-| Limited Partnership | 0.0 |   | SMALL | 63,611 | 67.0 |
-| Charitable Incorporated Organisation | 0.0 |   | GROUP | 27,116 | 49.5 |
-| Overseas Entity | 0.0 |   | AUDIT EXEMPTION SUBSIDIARY / FULL | 33,327 / 79,773 | 35.6 / 34.3 |
-| | |   | NO ACCOUNTS FILED | 1,446,381 | 2.4 |
+| Private Limited Company | 73.1 |   | MICRO ENTITY | 1,823,934 | 99.3 |
+| PRI/LTD BY GUAR/NSC | 79.2 |   | UNAUDITED ABRIDGED | 159,887 | 98.7 |
+| PRI/LBG/NSC | 61.1 |   | TOTAL EXEMPTION FULL | 1,299,198 | 96.4 |
+| Limited Liability Partnership | 58.5 |   | DORMANT | 635,200 | 94.9 |
+| Community Interest Company | 32.8 |   | MEDIUM | 6,180 | 88.2 |
+| Limited Partnership | 0.0 |   | SMALL | 63,611 | 66.8 |
+| Charitable Incorporated Organisation | 0.0 |   | GROUP | 27,116 | 49.4 |
+| Overseas Entity | 0.0 |   | AUDIT EXEMPTION SUBSIDIARY / FULL | 33,327 / 79,773 | 35.6 / 34.1 |
+| | |   | NO ACCOUNTS FILED | 1,446,381 | 0.0 |
 
 This is the expected shape: **micro-entity, filleted (total-exemption / abridged) and dormant filers
 — the balance-sheet-only majority — are 95–99% covered**, while full/group/subsidiary accounts
 (often PDF or richer filings) sit at 34–50%, and **non-iXBRL legal forms (LP, CIO, overseas
-entities) are ~0%**. "No accounts filed" is ~2% (a residue of late-arriving first filings). The
-size-skew is restated prominently in FIELD_DOCS on `latest_period_end` and `equity`.
+entities) are ~0%**. "No accounts filed" is 0% by construction. The size-skew is restated prominently
+in FIELD_DOCS on `latest_period_end` and `equity`.
 
 ## 6. The joins
 
@@ -225,12 +255,16 @@ register_features (T_reg)  ⟕  accounts_features (T)  ⟕  psc_features (T_psc)
 ```
 
 - **Register** is the spine (it defines "live companies"); accounts and PSC **left-join** onto it.
-- **Snapshot-date alignment.** The register is monthly (`BasicCompanyData`/`YYYY-MM-01`); PSC is in
-  practice monthly (the snapshot we load); accounts availability is by **archive month**. Pick a
-  reference month and take each table's nearest snapshot **at or before** the common T, recording
-  the three source dates on the joined output (they will differ by days–weeks). For the measured T
-  here: accounts archive 2026-08, register 2026-08-01 (aligned ≤ T; `accounts_category` and the §3
-  reconciliation both use this snapshot, not the nearest-after one), PSC the ≤ T snapshot.
+- **Snapshot-date alignment (end-of-month rule, §0.1).** T is the **end of calendar month T** for
+  all three tables. Accounts use `row_available_yyyymm <= T` directly. The register and PSC
+  `BasicCompanyData`/snapshot files are dated `YYYY-MM-01` and reflect the *start* of that month
+  (≈ end of the previous month), so each is paired by taking the **latest snapshot dated ≤ the first
+  day of T+1** — i.e. the snapshot dated `(month-after-T)-01`. Verify each snapshot's as-of date from
+  its `manifest.json` before pairing. Record the three source dates on the joined output. For the
+  aligned measured T here: accounts archive end-2026-07, register **2026-08-01**
+  (`accounts_category` and the §3 reconciliation both use this snapshot), PSC the correspondingly
+  paired ≤-first-of-T+1 snapshot. Pairing a same-numbered-month register (e.g. `2026-08-01` with WIDE
+  `<= 2026-08`) is **wrong** — it puts WIDE a month ahead and fabricates a WIDE-newer gap (§3).
 - **"Missing" means different things:**
   - *accounts missing* = no filing available by T (not yet filed, PDF/XML-only, pre-2014, or a
     non-iXBRL type) — **not** "zero".
@@ -271,6 +305,7 @@ register_features (T_reg)  ⟕  accounts_features (T)  ⟕  psc_features (T_psc)
   denominator → `null` current ratio (no ±∞); one case per pitfall — dash=nil (0 not null, 0 not
   negative-equity), creditors maturity bucket vs the bare total, `employees_unit_anomaly` carried not
   dropped, sign respected; the >18-month-gap null rule; and governed==ungoverned schema equality.
-- **Real run (T = 2026-08).** Both tiers built: **6,830,797 companies** each, ~32 s wall-clock, peak
-  well under the 10 GB limit. Reconciliation and coverage as reported in §3 and §5 (register ≤ T,
-  2026-08-01). Outputs written under `data/accounts/features/{governed,ungoverned}/` (gitignored).
+- **Real run (aligned T = 2026-07, register 2026-08-01).** Both tiers built: **6,795,318 companies**
+  each, ~32 s wall-clock, peak well under the 10 GB limit. Reconciliation **97.74%** exact among
+  both-present and coverage **70.38%** as reported in §3 and §5. Outputs written under
+  `data/accounts/features/{governed,ungoverned}/` (gitignored).
