@@ -1078,6 +1078,159 @@ FIELD_DOCS: list[dict[str, str | int]] = [
         "ukcompany.snapshot.features.normalise_address; counts are insensitive to it (<0.1% of "
         "distinct addresses shift under strict vs loose).",
     },
+    # --- Accounts (iXBRL WIDE) features, point-in-time at reference month T (Handoff 02) -------
+    # Built from the WIDE `as_first_reported` table + its `row_available_yyyymm` key. Tier 2:
+    # figures are filed by the company within accounting standards, and iXBRL tagging quality
+    # varies. COVERAGE IS STRONGLY SIZE-SKEWED - see latest_period_end / equity caveats.
+    {
+        "field": "latest_period_end",
+        "tier": 2,
+        "source": "accounts WIDE:period_end (as_first_reported, available by T)",
+        "definition": "Balance-sheet date of the most recent accounts available by the reference "
+        "month T (point-in-time: only rows whose archive month is <= T).",
+        "caveats": "COVERAGE IS STRONGLY SIZE-SKEWED: iXBRL accounts data is far more complete for "
+        "larger entities; the smallest micro-entities and dormant companies are heavily "
+        "under-represented, so the absence of a row is NOT the absence of the company. Row-level "
+        "point-in-time (only ~0.0036% of WIDE rows span more than one archive month).",
+    },
+    {
+        "field": "prior_period_end",
+        "tier": 2,
+        "source": "accounts WIDE:period_end (second-newest available by T)",
+        "definition": "Balance-sheet date of the second-most-recent accounts available by T.",
+        "caveats": "Null when only one period is available by T.",
+    },
+    {
+        "field": "n_periods_available",
+        "tier": 2,
+        "source": "accounts WIDE (derived count available by T)",
+        "definition": "Count of distinct accounts periods for the company available by T.",
+        "caveats": "Point-in-time count; filings whose archive month is after T are excluded.",
+    },
+    {
+        "field": "months_since_latest_period_end",
+        "tier": 2,
+        "source": "derived",
+        "definition": "(T.year - latest_period_end.year)*12 + (T.month - latest_period_end.month).",
+        "caveats": "Staleness proxy: months between the reference month and the latest available "
+        "period end, not filing lag.",
+    },
+    {
+        "field": "prior_gap_months",
+        "tier": 2,
+        "source": "derived",
+        "definition": "Months between the prior and the latest available period end.",
+        "caveats": "Null with no prior period. A value far from 12 indicates a shortened/extended "
+        "accounting period or a gap in available filings; change features are suppressed above 18 "
+        "months.",
+    },
+    {
+        "field": "equity",
+        "tier": 2,
+        "source": "accounts WIDE:Equity (as_first_reported)",
+        "definition": "Total equity (net assets) from the latest available accounts; scale and "
+        "sign are normalised during extraction.",
+        "caveats": "COVERAGE IS STRONGLY SIZE-SKEWED toward larger entities (as for all accounts "
+        "figures). A tagged dash is a declared nil (0), distinct from a missing (null) tag.",
+    },
+    {
+        "field": "current_assets",
+        "tier": 2,
+        "source": "accounts WIDE:CurrentAssets (as_first_reported)",
+        "definition": "Current assets from the latest available accounts.",
+        "caveats": "dash = declared nil (0), distinct from a missing (null) tag. Size-skewed "
+        "coverage (see equity).",
+    },
+    {
+        "field": "creditors_within_one_year",
+        "tier": 2,
+        "source": "accounts WIDE:creditors_within_one_year (the <1yr maturity bucket)",
+        "definition": "Creditors falling due within one year, from the latest available accounts.",
+        "caveats": "Uses the <1-year maturity bucket, NOT the bare Creditors total (which is only "
+        "~3.8% populated). dash = declared nil (0). Size-skewed coverage (see equity).",
+    },
+    {
+        "field": "net_current_assets",
+        "tier": 2,
+        "source": "accounts WIDE:NetCurrentAssetsLiabilities (as_first_reported)",
+        "definition": "Net current assets (liabilities) from the latest available accounts; a "
+        "negative value is net current liabilities.",
+        "caveats": "Sign as filed; dash = declared nil (0). Size-skewed coverage (see equity).",
+    },
+    {
+        "field": "cash",
+        "tier": 2,
+        "source": "accounts WIDE:CashBankOnHand (as_first_reported)",
+        "definition": "Cash at bank and in hand from the latest available accounts.",
+        "caveats": "dash = declared nil (0), distinct from a missing (null) tag. Size-skewed "
+        "coverage (see equity).",
+    },
+    {
+        "field": "negative_equity",
+        "tier": 2,
+        "source": "derived (equity < 0)",
+        "definition": "True when the latest available total equity is negative.",
+        "caveats": "Null when equity is not tagged (missing is not false). A declared nil (0) is "
+        "not negative.",
+    },
+    {
+        "field": "net_current_liabilities",
+        "tier": 2,
+        "source": "derived (net_current_assets < 0)",
+        "definition": "True when the latest available net current assets are negative (a "
+        "working-capital deficit).",
+        "caveats": "Null when the figure is not tagged (missing is not false).",
+    },
+    {
+        "field": "current_ratio",
+        "tier": 2,
+        "source": "derived (current_assets / creditors_within_one_year)",
+        "definition": "Current assets divided by creditors due within one year, latest available "
+        "accounts.",
+        "caveats": "NULL (never +/-inf) when the denominator is zero or missing. Uses the <1-year "
+        "maturity bucket, not the bare Creditors total.",
+    },
+    {
+        "field": "employee_band",
+        "tier": 2,
+        "source": "accounts WIDE:AverageNumberEmployeesDuringPeriod (banded)",
+        "definition": "Average employees during the latest available period, banded to Companies "
+        "Act size thresholds: 0 / 1-10 / 11-50 / 51-250 / 251+.",
+        "caveats": "BREAK AROUND 2020-21: employee-number tagging for micro/small entities changed, "
+        "so band distributions are NOT comparable across that break. Null when untagged. See "
+        "employees_unit_anomaly.",
+    },
+    {
+        "field": "employees_unit_anomaly",
+        "tier": 2,
+        "source": "accounts WIDE:employees_unit_anomaly",
+        "definition": "Diagnostic flag: the employee count was tagged with a monetary unit (e.g. "
+        "GBP), suggesting a mis-tag.",
+        "caveats": "DIAGNOSTIC ONLY - never alters the reported value or the band; carried through, "
+        "not used to drop a value or as a cut-off.",
+    },
+    {
+        "field": "d_equity",
+        "tier": 2,
+        "source": "derived (latest equity - prior equity)",
+        "definition": "Change in total equity from the prior to the latest available period.",
+        "caveats": "Null with no prior period or a gap > 18 months. as_first_reported figures are "
+        "differenced, so this is not a restatement.",
+    },
+    {
+        "field": "d_net_current_assets",
+        "tier": 2,
+        "source": "derived (latest net_current_assets - prior)",
+        "definition": "Change in net current assets from the prior to the latest available period.",
+        "caveats": "Null with no prior period or a gap > 18 months.",
+    },
+    {
+        "field": "d_cash",
+        "tier": 2,
+        "source": "derived (latest cash - prior cash)",
+        "definition": "Change in cash from the prior to the latest available period.",
+        "caveats": "Null with no prior period or a gap > 18 months.",
+    },
 ]
 
 

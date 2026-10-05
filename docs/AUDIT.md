@@ -2716,3 +2716,69 @@ exact within-month cut-off flagged to confirm against CH docs before build.
 **STOP for review.** Stage B (build the features + tests + real reconciliation run) only after
 approval. Design doc + this AUDIT entry committed locally; not pushed. Exploratory queries were
 ad-hoc (scratchpad), nothing else changed.
+
+## Handoff 02 Stage B — accounts features build (2026-10-05)
+
+Built `ukcompany.accounts.features.build_accounts_features` (new module `src/ukcompany/accounts/
+features.py`), implementing the Stage-A design with the maintainer's approved changes. One row per
+company with any accounts filing available by T; 20 columns; reads WIDE `as_first_reported` +
+`row_available_yyyymm` only; `accounts_category` from the register snapshot ≤ T. Branch
+`feature/accounts-features`.
+
+**PIT-granularity gate (maintainer's pre-condition).** Measured the share of WIDE rows whose cells
+span more than one archive month directly on the provenance parquet: **1,211 / 33,513,017 = 0.0036%**
+(gap p50=12, p90=14, max=29 months). Far below the 1–2% threshold, so **row-level** point-in-time
+(`row_available_yyyymm <= T`) is used, not cell-level. (The Stage-A draft's "1,254 / 0.0%" was the
+same phenomenon, less precisely counted.)
+
+**Approved design changes, all implemented.** (1) `current_ratio` = `CurrentAssets /
+creditors_within_one_year`, **null on a zero or missing denominator** (never ±∞); the raw
+`current_assets`, `creditors_within_one_year`, `equity`, `net_current_assets` now ship as columns.
+(2) `employee_band` uses the **Companies Act thresholds 0 / 1–10 / 11–50 / 51–250 / 251+** (revised
+from the first draft); the 2020–21 employee-reporting break is flagged in FIELD_DOCS. (3)
+`accounts_category` from the latest register snapshot **dated ≤ T** (revised from "nearest"). (4) The
+`data_governance` switch is kept; no feature is person-derived, so governed == ungoverned
+(`GOVERNED_FEATURE_DROPPED` is empty and the written-schema assertion is trivially satisfied).
+
+**Reconciliation re-run with the aligned register ≤ T (2026-08-01, not the nearest-after
+2026-09-01).** Among the 4,006,474 companies present in both, **92.22% exact** on latest period end
+(buckets over 5,695,465 register companies: exact 64.87%, both-absent 25.05%, no-WIDE-row 4.01%,
+**WIDE-newer 3.94%**, register-newer 1.53%, no-register-LastMadeUpDate 0.60%). The headline is lower
+than Stage A's 97.79% **because the register is now aligned ≤ T**, and that is the finding: the
+WIDE-newer bucket jumps from ~0% to 3.94% — the **archive-vs-register timing lag**. WIDE's 2026-08
+archive holds accounts accepted *during* August; the start-of-August register (2026-08-01) has not
+caught up, so WIDE legitimately shows a newer period. The nearest-*after* snapshot hid this by giving
+the register a one-month head start it would not have at a true T. Aligning ≤ T is the correct
+point-in-time choice and exposes the lag honestly.
+
+**Coverage (live register companies, register ≤ T): 71.01%** (3,962,186 / 5,579,415) — **strongly
+size-skewed**, now the headline caveat in §5 of the design doc and prominent in FIELD_DOCS
+(`latest_period_end`, `equity`): micro 99.3% / abridged 98.7% / total-exemption-full 96.5% / dormant
+94.9%, vs FULL 34.3% / GROUP 49.5% / subsidiary 35.6%, and non-iXBRL forms (LP, CIO, overseas) ~0%.
+Absence of an accounts row is a data-availability artefact, not absence of the company.
+
+**Tests** — `tests/test_accounts_features.py`, 9 synthetic cases (polars fixtures, so `None` becomes
+a true parquet null rather than a NaN — essential for the missing-denominator → null test). Covers:
+point-in-time exclusion (an archive month after T never affects features at T), zero **and** missing
+denominator → null ratio, dash=nil (0 not null, 0 not negative), creditors maturity bucket vs the
+bare total, `employees_unit_anomaly` carried not dropped, sign respected, the >18-month-gap null
+rule, and governed==ungoverned schema equality. Full suite **253 passed, ruff clean**.
+
+**Documentation.** 18 new FIELD_DOCS entries in `derive.py` (tier 2 — filed-but-constrained; the
+existing tier-1 `accounts_category`/`company_number` entries were reused, not duplicated);
+`docs/data-dictionary.md` regenerated via `ukcompany data-dict` (not hand-edited); design doc updated
+(status → built, PIT decision, 92.22% reconciliation with the timing-lag explanation, prominent
+size-skew, decisions marked resolved).
+
+**Real run — full-run warning given before execution, per CLAUDE.md.** Scanned WIDE (671 MB / 33.5M
+rows) + the register snapshot ≤ T (2.7 GB / 7 CSV parts); both tiers built **6,830,797 companies**
+each in ~32 s wall-clock, peak memory well under the 10 GB DuckDB limit (spilled to scratchpad).
+Outputs under `data/accounts/features/{governed,ungoverned}/` (gitignored, not committed).
+
+**Assumptions to verify live.** (a) The "month-M file contains acceptances during M, so end-of-M is
+the availability bound" claim still rests on the CH product-doc cut-off flagged in Stage A — but the
+newly-visible 3.94% WIDE-newer bucket is consistent with it (start-of-month register lagging a
+through-month archive). (b) `accounts_category` is the register's *then-current* label at T, not the
+category at the filing being measured. Used WIDE `data/accounts/accounts-wide-as_first_reported.parquet`
+(33,513,017 rows), not the newer `v2/` build (33,733,097 rows), for consistency with the Stage-A
+measurements.
