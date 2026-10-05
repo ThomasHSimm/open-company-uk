@@ -2638,3 +2638,44 @@ Tests: a mixed-line-ending bug in the synthetic-snapshot test helper (csv.DictWr
 \r\n vs appended \n) had been defeating DuckDB's newline sniffer; fixed by forcing \n. 10 snapshot
 tests (incl. malformed-quarantine and threshold) + 244 total pass; ruff clean. docs/snapshot-
 features.md updated. `data/` outputs gitignored.
+
+## Handoff 09 — PSC walkthrough notebook (2026-10-05)
+
+Wrote `notebooks/psc-walkthrough.ipynb`: a governed-only, broad tour from the PSC bulk file to
+per-company features, calling the project's own code at every step (no PSC logic reimplemented).
+Branch `feature/psc-walkthrough-notebook` off main. Confirmed first that no notebook existed
+(`git ls-files '*.ipynb'` empty, no `notebooks/` dir).
+
+**Structure.** Nine sections (what PSC is; setup; get-the-snapshot checksum; load into tables with
+the load report; a synthetic record decomposed with `psc_natures`; build governed features with
+each column's FIELD_DOCS description; broad aggregates; register coverage; what you can't do).
+Authored via nbformat (builder kept in scratchpad); executed with nbclient.
+
+**Run.** `SAMPLE = True` loads one of the 32 parts and ran end-to-end in **~26-30 s** (~2.7 GB
+RSS). A top-of-notebook switch flips to `SAMPLE = False` for the full snapshot, gated behind a
+markdown warning of the last measured cost (~11 min, ~10 GB). Every SAMPLE figure is labelled
+"PARTIAL SAMPLE (1/32 parts)".
+
+**Governance.** Governed mode only; the HMAC secret is read from the environment and only its
+presence is printed, never its value, with an explanation of why the governed loader needs it
+(it computes the pseudonymous `person_key`). Committed outputs are aggregates only: no company
+numbers, no `head()` of real rows (the "what a record looks like" section uses a synthetic invented
+record), counts below 10 shown as `<10` including the section-4 kind counts (`bo_legal` → `<10`).
+
+**Leak check.** Ran a focused leak check over the saved notebook outputs (scratchpad script):
+no company numbers, no HMAC keys, no personal fields, and zero un-suppressed sub-10 counts -
+**PASS**.
+
+**Gaps (package did not expose needed logic).**
+- `scripts/psc_site_summaries.py` (the site summary helpers, incl. the `<10` `disp()` helper) is on
+  the unmerged `feature/psc-site-page`, not on main, so it could not be called. The notebook derives
+  the same aggregates from the load report + the feature table via DuckDB group-bys and applies the
+  `<10` rule inline (one line, noted in the notebook).
+- There is no reusable PSC-site leak-check script on main; the site's leak check also lives on
+  `feature/psc-site-page`. A focused equivalent was run from scratchpad and reported above; it is
+  not committed (scope: the deliverable is the notebook).
+- `scripts/psc_coverage_check.py` is a CLI/argparse script, not a library, so section 8 shows the
+  committed `docs/psc-coverage-2026-09-25.md` summary in SAMPLE mode (a 1/32 coverage number would
+  be misleading) and runs the script via subprocess only when `SAMPLE = False`.
+
+No source changed (notebook + AUDIT only); data outputs gitignored. Not pushed.
