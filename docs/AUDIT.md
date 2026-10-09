@@ -2822,3 +2822,32 @@ numbers. `derive.py` FIELD_DOCS: `accounts_category` caveat documents the end-of
 `latest_period_end` definition made explicit that T is an end-of-month boundary; `data-dictionary.md`
 regenerated via CLI. Full suite **253 passed, ruff clean**. Committed on `feature/accounts-features`;
 not pushed.
+
+## Handoff 09 review fixes — PSC walkthrough fail-closed inputs (2026-10-09)
+
+Reviewed `notebooks/psc-walkthrough.ipynb` against commit `5c4cbe3` without running real bulk data.
+The notebook now requires the exact 32-part manifest/archive, raises on ZIP checksum problems,
+hashes each consumed extracted TXT against its verified ZIP member, and blocks full-mode feature
+construction unless the loader's totals reconciliation occurred and every check passed. Sample and
+full outputs use separate repository-rooted paths; coverage subprocesses use `sys.executable`, an
+explicit repository working directory and checked failure propagation.
+
+Moved count display to a shared `<10` helper used by the notebook and PSC site summaries; all
+notebook outputs, execution counts and timing metadata are cleared. Corrected the governed-data
+explanation in the notebook and PSC docs: governed per-record tables remain linkable and retain
+company/PSC identifiers, country of residence, birth bands, postcode districts and both person
+keys, while the governed per-company feature table is separate and still excludes both
+companies-per-person bands. The historical coverage section is labelled PSC 2026-09-25 versus
+register 2026-09-01, not as an aligned Handoff 10 join.
+
+Synthetic validation: notebook schema/AST validation; checksum, incomplete-full-input, extracted-
+TXT mismatch and missing-reconciliation failures; suppression; subprocess failure propagation; and
+root resolution from both supported working directories. Focused PSC tests: 36 passed. Full
+non-live suite: 253 passed, 1 deselected. Ruff and `git diff --check` passed. No real snapshot was
+loaded, no notebook output or secret was committed, and Handoff 10 remains paused.
+
+Branch reconciliation confirmed remote `5c4cbe3` and local `3e04e0b` have the same stable patch ID
+and add the identical notebook blob. The remote line was merged normally, then current `origin/main`
+was merged into the feature branch so its later PSC leak-check/CI gate and accounts-feature work
+remain intact. The reviewed notebook supersedes the duplicate initial addition and uses the PSC
+loader's configured DuckDB connection for aggregate queries.
