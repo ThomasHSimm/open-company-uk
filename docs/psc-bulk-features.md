@@ -15,18 +15,22 @@ ukcompany-psc features --snapshot-date YYYY-MM-DD    # governed tier (default)
 ukcompany-psc features --snapshot-date YYYY-MM-DD --no-data-governance   # private tier
 ```
 
-Features are built from the **governed load** (`psc_records.parquet` + `psc_noc.parquet`),
-which carries the pseudonymous `person_key` plus every non-PII feature input. The heavy
-grouping runs in DuckDB; the `psc_natures` functions are applied in Python over the small
-*distinct* vocabularies (the ~13k distinct nature code-sets, the ~10 kinds, the distinct
-corporate registration numbers) and joined back by key, so the result is identical to calling
-the function per company without iterating ~11M rows.
+Features are built from the **governed per-record load** (`psc_records.parquet` +
+`psc_noc.parquet`). That source is transformed but still sensitive: it retains company and PSC
+identifiers, country of residence, 5-year birth bands, postcode districts, and both HMAC person
+keys. Removing direct names, exact birth dates and full addresses does not eliminate linkage or
+re-identification risk. The resulting **governed per-company feature table** is a separate aggregate
+product and carries none of those record-level identifiers or transformed demographic/location
+fields. The heavy grouping runs in DuckDB; the `psc_natures` functions are applied in Python over
+the small *distinct* vocabularies (the ~13k distinct nature code-sets, the ~10 kinds, the distinct
+corporate registration numbers) and joined back by key, so the result is identical to calling the
+function per company without iterating ~11M rows.
 
 ## Two tiers
 
 | Tier | Flag | Contents |
 |---|---|---|
-| **governed** (default) | `--data-governance` | every feature below **except** the companies-per-person bands — no person-derived linkage. The written schema is asserted to not contain either band column. |
+| **governed** (default) | `--data-governance` | every feature below **except** the companies-per-person bands. The written feature schema is asserted to contain neither band; this does not make the upstream governed per-record tables anonymous. |
 | **private** | `--no-data-governance` | adds `companies_per_person_band_ever` and `companies_per_person_band_active` (person linkage). |
 
 ## Columns

@@ -2679,3 +2679,26 @@ no company numbers, no HMAC keys, no personal fields, and zero un-suppressed sub
   be misleading) and runs the script via subprocess only when `SAMPLE = False`.
 
 No source changed (notebook + AUDIT only); data outputs gitignored. Not pushed.
+
+## Handoff 09 review fixes — PSC walkthrough fail-closed inputs (2026-10-09)
+
+Reviewed `notebooks/psc-walkthrough.ipynb` against commit `5c4cbe3` without running real bulk data.
+The notebook now requires the exact 32-part manifest/archive, raises on ZIP checksum problems,
+hashes each consumed extracted TXT against its verified ZIP member, and blocks full-mode feature
+construction unless the loader's totals reconciliation occurred and every check passed. Sample and
+full outputs use separate repository-rooted paths; coverage subprocesses use `sys.executable`, an
+explicit repository working directory and checked failure propagation.
+
+Moved count display to a shared `<10` helper used by the notebook and PSC site summaries; all
+notebook outputs, execution counts and timing metadata are cleared. Corrected the governed-data
+explanation in the notebook and PSC docs: governed per-record tables remain linkable and retain
+company/PSC identifiers, country of residence, birth bands, postcode districts and both person
+keys, while the governed per-company feature table is separate and still excludes both
+companies-per-person bands. The historical coverage section is labelled PSC 2026-09-25 versus
+register 2026-09-01, not as an aligned Handoff 10 join.
+
+Synthetic validation: notebook schema/AST validation; checksum, incomplete-full-input, extracted-
+TXT mismatch and missing-reconciliation failures; suppression; subprocess failure propagation; and
+root resolution from both supported working directories. Focused PSC tests: 36 passed. Full
+non-live suite: 253 passed, 1 deselected. Ruff and `git diff --check` passed. No real snapshot was
+loaded, no notebook output or secret was committed, and Handoff 10 remains paused.

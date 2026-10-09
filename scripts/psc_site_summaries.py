@@ -31,6 +31,8 @@ from pathlib import Path
 import duckdb
 import matplotlib
 
+from ukcompany.psc.walkthrough import display_count
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
@@ -59,7 +61,7 @@ def con():
 
 
 def disp(n) -> str:
-    return "<10" if 0 < int(n) < SUPPRESS else str(int(n))
+    return display_count(int(n), threshold=SUPPRESS)
 
 
 def write_csv(name: str, header: list[str], rows: list[tuple]):

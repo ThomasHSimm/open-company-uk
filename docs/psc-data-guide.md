@@ -302,9 +302,15 @@ users know what they are handling.
   - Under UK GDPR, anyone storing or analysing it needs a lawful basis and a sensible retention
     period.
 - **Nationality and age are sensitive.** This project does not use nationality as a feature,
-  because it risks discriminatory outcomes (Equality Act principles). Age is kept only as 5-year
-  bands in private tables and is never an indicator. Users building their own features should
+  because it risks discriminatory outcomes (Equality Act principles). The governed per-record
+  table drops nationality and replaces exact birth year/month with a 5-year birth band; the
+  governed per-company feature table carries neither. Users building their own features should
   think hard before doing otherwise.
+- **Governed does not mean anonymous.** The governed per-record table still retains company and
+  PSC identifiers, country of residence, 5-year birth bands, postcode districts, and both HMAC
+  person keys. Those fields remain linkable and can create re-identification risk in combination.
+  The governed per-company feature table is a separate aggregate product: it carries none of those
+  record-level identifiers or demographic/location fields and excludes companies-per-person bands.
 - **Aggregates can identify people.** "The controller of this company also controls 40 others"
   points at a named person when the company has a single PSC. The same applies to small counts in
   a breakdown, such as 3 PSCs resident in a given country in a given sector.
