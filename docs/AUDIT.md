@@ -2902,3 +2902,35 @@ columns / 3.60s, ungoverned 206,304,904 bytes / 66 columns / 3.77s. Full input/o
 category breakdowns and availability semantics are in the manifests and
 `docs/join-internal-202609-stage2.md`. Tests use synthetic fixtures only. Kaggle, staging, accounts
 extraction/WIDE and published-v2 descriptions were untouched. Nothing pushed or published.
+
+## Handoff 03 revised — validation feasibility and evaluation design (2026-10-10)
+
+Design-only review from `main` after Handoff 10 merged. Reconciled the existing validation rather
+than claiming none occurred: the corrected run measured current-state agreement/detection on 500
+labelled positives (298 current-status exclusions, 202 adverse detections, zero screenable misses),
+not pre-event prediction. Local gitignored evidence also contains a 499-row control draw; one invalid
+number leaves 498 assessed and 3 current high-severity firings. That remains a control flag rate,
+not a false-positive rate.
+
+Found a checked semantic flaw in the old control matching: the label's `month_registered` is the
+2012-01–2024-04 insolvency-registration month, but `stratify_targets()` treated it as company
+incorporation month for age bands. The control was SIC-stratified but not validly age matched and was
+drawn from the 2026-08 active register, not historical risk sets.
+
+Historical availability audit: only accounts overlap the outcome window (153 complete monthly
+archives, 2014-01–2026-09, with cell-level source-month provenance). Register state exists locally
+only at 2026-08-01 and 2026-10-01; PSC only in September 2026; the 1,013-company API cache was fetched
+in August 2026 and has no response history; filing history is not implemented; charge history is not
+present. Current records carrying old effective dates were not back-cast. Accounts row-level
+availability is conservative but can move later when a later filing fills a previously absent cell,
+so historical work must use exact cell cutoffs or a predeclared sensitivity.
+
+The current label file has 220,260 supported adverse labels; 165,292 lie in 2015-01–2024-04 and can
+in principle receive a 12-month-prior accounts cutoff. This supports an accounts-only case lead-time
+description, not existing-rule recall or a population comparison. Historical matched risk sets are
+blocked by absent register/status history and survival selection. Recommended first actual rule
+evaluation is prospective from the frozen governed Handoff 10 baseline, with 12 months of updated,
+versioned outcomes and prospective register follow-up. Full evidence, gates, unavailable-rule
+treatment, uncertainty and required approvals are in `docs/validation-feasibility.md` and
+`docs/validation-run-plan.md`. No data was downloaded, no full bulk table was scanned, no rules were
+changed or tuned, and no evaluation was run.

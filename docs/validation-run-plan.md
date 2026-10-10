@@ -1,0 +1,225 @@
+# Proposed validation run plan
+
+**Approval gate:** this plan must be reviewed and committed before implementation. This document is
+the committed design; no evaluation has been run under it.
+
+## Recommendation
+
+Run a **12-month prospective, nested risk-set evaluation** from a frozen governed bulk baseline.
+This is the smallest study that can validly report existing-rule firing rates, prospective recall
+and a comparison-cohort flag rate without pretending that 2026 data existed before 2012–2024
+events.
+
+The already-completed 500-positive run remains a current-state detection/agreement check. An
+accounts-only case lead-time analysis may be run separately as descriptive feasibility, but it is
+not a substitute for this evaluation because no existing rule uses the historical financial
+attributes and no historical controls can currently be identified
+([`validation-feasibility.md`](validation-feasibility.md)).
+
+## 1. Frozen baseline and eligible population
+
+### Baseline
+
+- **Baseline artifact:** governed `data/join/v1-internal-202609/governed/` built on 2026-10-10.
+- **Source states:** register 2026-10-01, PSC 2026-09-25, accounts registration month <=202609.
+- **Operational availability:** treat the baseline as known on 2026-10-10, not at September
+  month-end. The September ZIP was published after month-end
+  ([`accounts-internal-202609-stage1.md`](accounts-internal-202609-stage1.md)).
+- **Freeze:** copy the existing manifest hashes, code commit and complete output schema into the run
+  manifest before outcomes are obtained. Never rebuild baseline values after seeing outcomes.
+
+### Risk set
+
+Include one row per normalised company number that:
+
+1. is present in the frozen 2026-10-01 register base;
+2. has `reg_company_status = active` at baseline;
+3. has no supported adverse insolvency label registered before 2026-11;
+4. is not already in an insolvency-type or excluded/closed state at baseline; and
+5. has a valid unique key.
+
+Do not require `has_psc` or `has_accounts`; those flags define source coverage. Do not remove a
+company later because it dissolves. Later dissolution/removal is a follow-up state, not a baseline
+eligibility rewrite.
+
+**Checked population bound:** the register baseline contains 5,704,711 rows. The exact active,
+event-free risk-set count has not been scanned in this design handoff and must be the first aggregate
+reported by implementation (`data/join/v1-internal-202609/governed/join_manifest.json`).
+
+## 2. Outcome and follow-up
+
+- **Primary outcome:** first registration of one of the four supported adverse groups: Creditors
+  Voluntary Liquidation, Compulsory Liquidation, In Administration, or Corporate Voluntary
+  Arrangement. Apply the existing bulk and Administration-to-CVL duplicate exclusions
+  ([`validation/labels.py`](../src/ukcompany/validation/labels.py)).
+- **Follow-up window:** outcome month 2026-11 through 2027-10 inclusive (12 complete months after
+  the operational baseline month). Exclude all October 2026 outcomes because month-only timestamps
+  cannot order them around the 2026-10-10 freeze.
+- **Outcome source gate:** obtain an approved, versioned Insolvency Service release whose documented
+  coverage includes 2027-10. Record URL/source identifier, retrieval time, SHA-256, row count,
+  maximum outcome month, exclusions and duplicate counts. The current file ending 2024-04 is not
+  usable.
+- **Publication-delay gate:** do not analyse merely because calendar follow-up ended. Wait until the
+  outcome source explicitly covers 2027-10. Repeat after an additional three-month freeze as a
+  sensitivity unless source documentation establishes a shorter complete reporting lag.
+- **Censoring/competing states:** retain monthly prospective register snapshots through follow-up.
+  Record dissolution, conversion/closure and removal. If those states cannot be observed, controls
+  remain unlabelled and their statistic must be called a **control flag rate**, not a false-positive
+  rate or specificity.
+
+## 3. Rules and attributes
+
+No rule definitions, thresholds, severities or composite scores may change after baseline freeze.
+
+| existing rule | baseline treatment | reason |
+|---|---|---|
+| `ACCOUNTS_OVERDUE` | evaluate | exact baseline register feature exists |
+| `CS_OVERDUE` | evaluate | exact baseline register feature exists |
+| `PSC_UNRESOLVED` | evaluate where PSC source semantics make it applicable; retain missing-source bucket | active statement codes exist in governed PSC features |
+| `YOUNG_COMPANY` | report as informational covariate, not adverse predictor | baseline age exists; rule is severity `info` |
+| `STATUS_INSOLVENT` | use to identify prevalent event/exclusion; do not claim prospective performance | firing means insolvency already recorded |
+| `STATUS_STRIKEOFF` | unavailable | status detail is absent from the joined schema |
+| `INSOLVENCY_ADVERSE` | unavailable | insolvency case resource is absent |
+| `SOLVENT_WINDING_UP` | unavailable | case types are absent |
+| `ADDR_DISPUTE` | unavailable | dispute/undeliverable fields are absent |
+| `CHARGES_OUTSTANDING` | unavailable under its exact definition | joined table has charge counts, not the profile link trigger; do not silently substitute |
+
+Financial accounts columns (`negative_equity`, `net_current_liabilities`, ratios and changes) may be
+reported as frozen attributes and coverage strata. They are not rules and must not be thresholded or
+combined into a score in this study.
+
+## 4. Cohort sampling and size
+
+Use a nested case-control design inside the frozen risk set:
+
+1. retain **all incident supported cases** in the follow-up window;
+2. for each case, select up to four controls from companies still under observation at the start of
+   that case's outcome month;
+3. match without replacement within case month on baseline company type, accounts category, SIC
+   section and coarse age band; include `has_accounts` and `has_psc` in exact or coarsened matching
+   where support permits;
+4. use a deterministic seed and record target/achieved strata; controls can later become cases and
+   then contribute as cases at their event time.
+
+The current labels contain 22,993 supported events in 2022 and 26,221 in 2023, but these are
+historical counts without a contemporaneous denominator and are **planning context, not a forecast**
+(bounded local aggregate from `data/labels/record-level-data.csv`). Sample size is therefore governed
+by observed prospective cases:
+
+- analyse overall recall only if at least **400 incident cases** occur, giving a worst-case 95%
+  binomial half-width of about 5 percentage points;
+- report a case-type-specific estimate only with at least **100 cases** in that type (worst-case
+  half-width about 10 percentage points); otherwise pool it into overall results and show its count;
+- use all cases, even above those thresholds; select at most four controls per case because the
+  principal gain comes from cases, while larger control ratios add limited precision;
+- if fewer than 400 cases occur, extend follow-up under a newly approved amendment or stop with
+  descriptive counts. Do not alter rules or select a higher-risk cohort after seeing outcomes.
+
+## 5. Temporal and leakage checks
+
+Implementation must fail before analysis unless all checks pass:
+
+1. baseline output and every source/report hash equal the frozen join manifests;
+2. register date = 2026-10-01, PSC date = 2026-09-25 and accounts T = 202609;
+3. no accounts feature derives from `row_available_yyyymm > 202609`, and only
+   `as_first_reported` is used;
+4. no feature, status, correction or source row fetched after the baseline freeze enters baseline;
+5. no October 2026 outcome enters follow-up;
+6. all controls are in the risk set immediately before their matched case month;
+7. no current/final status is copied backward to baseline;
+8. no outcome field, post-baseline snapshot, label presence or censoring state enters matching or
+   rule firing;
+9. rule registry Git object and study code commit are recorded before unblinding outcomes; and
+10. company-number keys remain unique and cohort accounting closes exactly.
+
+## 6. Coverage gates and stop criteria
+
+Report, before any rule result:
+
+- baseline risk-set size and exclusions;
+- `has_psc` and `has_accounts` overall and by company type/accounts category;
+- each rule's observed, missing/not-applicable and firing counts;
+- prospective case counts by type/month and outcome-source completeness;
+- matched-control target/achieved counts and unmatched cases; and
+- censoring/competing-state counts.
+
+Stop or downgrade to descriptive reporting when:
+
+- outcome coverage does not explicitly include the full horizon;
+- fewer than 400 incident cases exist overall;
+- more than 5% of cases cannot obtain at least one matched control (also report the four-control
+  attainment rate);
+- any cohort stratum has differential source coverage exceeding 20 percentage points between cases
+  and controls after matching;
+- a rule input is missing for more than 20% of either cases or controls, unless missingness is the
+  documented source-applicability state and results are restricted to the applicable denominator;
+- register follow-up cannot distinguish event-free observation from dissolution/removal; or
+- any hash, date, uniqueness, temporal or leakage assertion fails.
+
+Thresholds are design gates, not tuning targets. They may be changed only in a reviewed amendment
+written before outcome analysis.
+
+## 7. Estimands and uncertainty
+
+For each evaluable rule, report separately:
+
+1. **baseline firing rate** in the whole eligible risk set, with Wilson 95% interval;
+2. **prospective case recall:** cases firing at baseline / all incident cases, with Wilson 95%
+   interval;
+3. **available-input recall:** the same numerator over cases with an observed/applicable input;
+4. **missing-inclusive lower bound:** treat missing rule input as not firing, clearly labelled;
+5. **control flag rate:** matched controls firing at baseline / matched controls, with a cluster-aware
+   95% interval by matched set; and
+6. rule-specific risk difference and risk ratio between baseline fire/non-fire groups, with matched
+   or sampling weights as appropriate.
+
+Unless complete outcome ascertainment and follow-up are established, item 5 remains a **control flag
+rate**. It is not precision, specificity or a false-positive rate. Even with complete horizon
+ascertainment, “no registered event in 12 months” means horizon-specific non-event, not confirmed
+negative for all future insolvency.
+
+Do not report one aggregate “any rule” score as the primary result. If an unweighted “any existing
+evaluable rule fired” diagnostic is shown, label it descriptive and retain every per-rule result.
+
+## 8. Missing inputs and unavailable rules
+
+- `has_psc=false` and `has_accounts=false` mean no matching source row, not a null attribute.
+- A present source row with a null attribute is a separate missing-value state.
+- Missing/unavailable never becomes `false`, zero or no-risk by imputation.
+- Report denominators for all-source, source-present and attribute-observed populations.
+- Keep unavailable rules in the result table with reason and `not evaluated`; do not drop them
+  silently.
+- Do not classify unlabelled companies as confirmed negatives unless the outcome and censoring gates
+  above pass.
+
+## 9. Predeclared sensitivity analyses
+
+1. follow-up starts 2026-12 instead of 2026-11 (washout for source staleness/near-baseline events);
+2. six-month and 12-month horizons;
+3. outcome freeze at first complete release versus the additional three-month lagged release;
+4. complete-case versus missing-inclusive lower-bound rule recall;
+5. results stratified by company type, accounts category, age band, SIC section, `has_accounts` and
+   `has_psc`;
+6. unmatched full-risk-set weighted estimates versus matched nested-case-control estimates;
+7. companies censored at dissolution/removal versus treated as event-free only through censoring;
+8. PSC 2026-09-25 baseline retained as dated versus excluding November outcomes to reduce the effect
+   of its six-day pre-month-end gap; and
+9. accounts registration-month convention versus a strict operational-availability convention
+   lagged to the monthly ZIP publication.
+
+No sensitivity may introduce a new threshold, rule or composite score after outcomes are observed.
+
+## 10. Required approvals and implementation stop
+
+Before implementation, the maintainer must approve:
+
+1. use of the Handoff 10 governed join as a prospective baseline assembled on 2026-10-10;
+2. the four supported outcome types and 2026-11–2027-10 horizon;
+3. acquisition/versioning of an updated Insolvency Service outcome release;
+4. prospective register snapshots for censoring and risk-set maintenance;
+5. the 4:1 matched-control design and matching variables; and
+6. whether the optional accounts-only historical case lead-time analysis should precede the
+   prospective result.
+
+**Stop after approval and implementation planning.** Do not run the evaluation, fetch data, tune
+rules or publish results under this handoff.
