@@ -214,45 +214,54 @@ insolvency prediction.
 ### 5.1 Evaluation populations and splits
 
 Use the 5,596,381-company primary cohort for the main analysis. Assign companies to an 80% training
-partition and 20% untouched test partition by a seeded hash of normalised company number, stratified
-by outcome and broad company type. Split before any comparison sampling or preprocessing. Although
-there is one row per company, retain and assert company-level separation so later extensions cannot
-leak a company across partitions.
+partition and 20% untouched test partition reproducibly from normalised company number and a fixed
+seed, preserving the outcome allocation. Split before any comparison sampling or preprocessing.
+Although there is one row per company, retain and assert company-level separation so later
+extensions cannot leak a company across partitions.
 
-Use all 7,318 adverse-status companies. For computationally bounded model fitting, sample up to 20
-comparison companies per adverse company within split and broad company-type/age/SIC strata, with a
-documented fallback to broader strata. Twenty-to-one yields at most about 146,360 comparison rows;
-the expected test partition retains about 1,464 adverse companies, giving roughly ±2.6 percentage
-points for a test sensitivity near 50% before design effects. Record every sampling probability and
-use inverse-probability weights. If the implementation can fit all comparison rows within the
-approved resource envelope, prefer all rows and omit sampling weights.
+Use all 7,318 adverse-status companies. For computationally bounded fitting, draw a reproducible
+uniform random sample of comparison companies independently within each train/test partition,
+targeting approximately 20 comparison companies per adverse company in that partition. Every
+comparison company has the same strictly positive inclusion probability within its partition:
+`min(1, target comparison count / eligible comparison count)`. Cases have inclusion probability
+one. Record the exact eligible, target and sampled counts, seed, inclusion probabilities and inverse
+probability weights for both partitions. Apply those weights during model fitting, training-only
+validation and held-out evaluation. Twenty-to-one yields at most about 146,360 comparison rows; the
+expected test partition retains about 1,464 adverse companies, giving roughly ±2.6 percentage
+points for a test sensitivity near 50% before design effects.
 
 The untouched test set must either retain the snapshot prevalence or use inverse-probability
-weights back to the known 0.1308% primary-cohort prevalence. Unweighted precision, PR curves,
-calibration or probabilities from a case-control sample are not population quantities and must not
-be reported as such.
+weights back to the exact primary-cohort counts: 7,318 adverse and 5,589,063 comparison companies.
+The displayed 0.1308% prevalence is rounded and must never be used for reconciliation. Unweighted
+precision, PR curves, calibration or probabilities from a case-control sample are not population
+quantities and must not be reported as such.
 
 ### 5.2 Models on consistent populations
 
-Fit an L2-regularised logistic regression as the only planned classification model. Select the
-regularisation strength with training-only cross-validation; do not use the test partition for
-feature selection, transformations, hyperparameters or thresholds.
+Fit an L2-regularised logistic regression as the only planned classification model. Training-only
+selection of regularisation strength by cross-validation is expressly permitted, with preprocessing
+refitted inside each training/CV fold. Production-rule or threshold tuning remains prohibited. Do
+not use the test partition for feature selection, transformations, hyperparameters, thresholds or
+post-hoc changes to the analysis.
 
 Compare these predeclared matrices on the same full-cohort split and sampled companies:
 
 1. **Missingness only:** `has_psc`, `has_accounts` and candidate-feature observation indicators, no
    observed values.
 2. **Structural baseline:** company type, age band and SIC sections.
-3. **Register:** structural plus eligible register attributes.
-4. **Accounts:** structural plus accounts attributes and accounts missingness indicators.
-5. **PSC:** structural plus PSC attributes and PSC missingness indicators.
-6. **Combined:** all eligible structural, register, accounts and PSC attributes plus missingness
+3. **Structural + missingness:** structural attributes plus the complete missingness-only matrix.
+4. **Register:** structural plus eligible register attributes.
+5. **Accounts:** structural plus accounts attributes and accounts missingness indicators.
+6. **PSC:** structural plus PSC attributes and PSC missingness indicators.
+7. **Combined:** all eligible structural, register, accounts and PSC attributes plus missingness
    indicators.
 
-Report incremental separation over both the structural and missingness-only baselines. Also repeat
-all six matrices on the fixed complete-source intersection (4,881 adverse and 3,937,786 comparison
-companies before sampling). This secondary analysis compares content where both sources are present
-but is explicitly selection-conditioned and cannot replace the full-cohort result.
+Report incremental separation over the structural, missingness-only and structural + missingness
+baselines. Compare the combined model directly with structural + missingness on identical held-out
+companies and report paired uncertainty for that increment. Also repeat all seven matrices on the
+fixed complete-source intersection (4,881 adverse and 3,937,786 comparison companies before
+sampling). This secondary analysis compares content where both sources are present but is explicitly
+selection-conditioned and cannot replace the full-cohort result.
 
 ### 5.3 Preprocessing and reporting
 
@@ -282,24 +291,23 @@ Implementation must stop if any of these fails:
 - an outcome-defining or identifier field enters a predictor matrix;
 - train/test company overlap exists or preprocessing is fitted outside training data;
 - observed-value and missingness denominators cannot be reproduced;
-- weighted sampling prevalence does not reconcile to the 0.1308% source prevalence.
+- weighted sampling totals do not reconcile to exactly 7,318 adverse and 5,589,063 comparison
+  companies in the primary cohort.
 
 Only aggregate tables, model coefficients/metrics and provenance may be committed. Keep row-level
 samples, assignments and scores gitignored. Preserve the no-tuning, no-composite-score and
 small-count-suppression requirements.
 
-Decisions needed before implementation:
+Approved implementation decisions:
 
-1. approve the narrow adverse-status mapping and exclusion of all `Liquidation` rows;
-2. accept PSC's six-day-earlier reference state as sufficiently contemporaneous, or defer until a
-   closer dated PSC snapshot exists;
-3. approve `Active - Proposal to Strike off` in the primary “without recorded adverse insolvency”
-   group with the active-only sensitivity;
-4. approve the full-cohort plus complete-source-intersection analysis and, if needed, the documented
-   20:1 comparison sampling design;
-5. separately approve acquisition of a point-in-time insolvency case-type source if the liquidation
-   group is to be classified. That acquisition is not required for the narrow study.
+1. use the narrow adverse-status mapping and exclude all `Liquidation` rows;
+2. accept PSC's six-day-earlier reference state as sufficiently contemporaneous and document it;
+3. include `Active - Proposal to Strike off` in the primary “without recorded adverse insolvency”
+   group, with the active-only sensitivity;
+4. run the full-cohort and complete-source-intersection analyses, the private-limited-company
+   sensitivity, and the documented uniform approximately 20:1 comparison sampling design;
+5. do not acquire additional data or classify the liquidation group in this study.
 
-Subject to decisions 1–4, the narrow contemporaneous study is feasible now with existing local
-data. Broader adverse-insolvency coverage, especially classification of liquidation, requires the
-additional point-in-time outcome evidence described above.
+The narrow contemporaneous study is approved and feasible with existing local data. Broader
+adverse-insolvency coverage, especially classification of liquidation, remains outside scope and
+requires the additional point-in-time outcome evidence described above.
