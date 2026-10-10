@@ -358,6 +358,37 @@ def cmd_snapshot_info(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_join(args: argparse.Namespace) -> int:
+    from .join import JOIN_VERSION, build_join_tiers
+
+    t_yyyymm = int(args.t)
+    tiers = ("governed", "ungoverned") if args.tier == "both" else (args.tier,)
+    output_root = Path(args.output_dir or f"data/join/{JOIN_VERSION}-{t_yyyymm}")
+    manifests = build_join_tiers(
+        args.data_root,
+        output_root,
+        t_yyyymm,
+        tiers=tiers,
+        memory_limit_gb=args.memory_limit_gb,
+        spill_dir=args.spill_dir,
+    )
+    for tier, manifest in manifests.items():
+        coverage = manifest["coverage"]
+        print(f"-- {tier} join at T={t_yyyymm} --")
+        print(
+            f"rows={manifest['output']['rows']:,}; "
+            f"has_psc={coverage['source_totals_within_register']['psc']:,}; "
+            f"has_accounts={coverage['source_totals_within_register']['accounts']:,}"
+        )
+        print(
+            f"output={manifest['output']['path']} "
+            f"({manifest['output']['bytes']:,} bytes, "
+            f"{manifest['output']['build_seconds']:.1f}s)"
+        )
+    print(f"root manifest: {output_root / 'join_manifest.json'}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -437,6 +468,17 @@ def main(argv: list[str] | None = None) -> int:
     p_snapshot_info.add_argument("--cache-dir")
     p_snapshot_info.add_argument("--settings", default="config/settings.yaml")
     p_snapshot_info.set_defaults(func=cmd_snapshot_info)
+
+    p_join = sub.add_parser("join", help="build internal point-in-time joined feature tables")
+    p_join.add_argument("--t", required=True, help="end-of-month reference YYYYMM")
+    p_join.add_argument(
+        "--tier", choices=("both", "governed", "ungoverned"), default="both"
+    )
+    p_join.add_argument("--data-root", default="data")
+    p_join.add_argument("--output-dir")
+    p_join.add_argument("--memory-limit-gb", type=int, default=8)
+    p_join.add_argument("--spill-dir", default="data/join/.duckdb-spill")
+    p_join.set_defaults(func=cmd_join)
 
     args = parser.parse_args(argv)
     return args.func(args)

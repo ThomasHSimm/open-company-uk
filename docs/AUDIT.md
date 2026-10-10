@@ -2851,3 +2851,54 @@ and add the identical notebook blob. The remote line was merged normally, then c
 was merged into the feature branch so its later PSC leak-check/CI gate and accounts-feature work
 remain intact. The reviewed notebook supersedes the duplicate initial addition and uses the PSC
 loader's configured DuckDB connection for aggregate queries.
+
+## Handoff 10 Stage 1 — internal accounts extension through 2026-09 (2026-10-10)
+
+Started from `main` at `32be69e` on `feature/handoff-10-stage1-202609`. Confirmed the parser, XML
+adapter, pivot and reviewed map are the exact Git objects from parser-v2 commit `2e0ca8a`; published
+v2's four WIDE/provenance hashes were unchanged after the run. The extension is explicitly internal
+under `data/accounts/v2-internal-202609/`; Kaggle, staging and `data/accounts/v2/` were untouched.
+
+Downloaded the 3,361,700,393-byte September archive after warning (SHA-256 `f3b281…bdf6c75`), ran a
+full CRC test (382,323 unique members, no duplicate names), and extracted **only 2026-09** through the
+existing disposable-store pipeline: 23,525,366 LONG rows, manifest-complete, 10m25s wall / 2.49 GiB
+peak. September's 382,323 members are a normal deadline peak: +39.2% vs the Apr–Aug mean but only
++1.39% vs September 2025.
+
+Rebuilt internal WIDE with provenance after warning. `as_first_reported`: 34,114,584 rows / 199,580,207
+provenance rows, 14m12s / 13.8 GB peak. `latest`: 37,326,988 / 228,321,746, 22m26s / 19.2 GB peak (a
+12 GB attempt failed cleanly; the successful retry used 16 GB). The fail-loud append-only audit
+passed: **0 previously filled first-reported cells changed, 0 became null, 0 rows disappeared**;
+381,487 rows and 2,810,148 populated cells were added, of which only 28 fill nulls on existing rows.
+`latest` added 395,866 rows and changed 178,973 non-null cells through expected restatements.
+
+Built both internal account-feature tiers at T=202609 against the aligned 2026-10-01 register:
+6,891,277 companies and identical 20-column schemas in each tier, 16.4s / 7.45 GiB peak. Register
+reconciliation: 3,932,469 exact of 4,016,905 with dates in both, **97.89798% exact**; only 105
+accounts-newer cases. All new tests are synthetic. Added reusable fail-loud WIDE-extension and
+register-reconciliation helpers plus tests. Full evidence and the resolved archive-month-versus-
+publication-time distinction are in `docs/accounts-internal-202609-stage1.md`.
+
+**STOP:** Stage 2 has not started. Nothing pushed or published.
+
+## Handoff 10 Stage 2 — internal joined table at T=202609 (2026-10-10)
+
+Started from local Stage 1 commit `9d9761e` on `feature/handoff-10-stage2-202609`. Added
+`ukcompany join --t YYYYMM`, which resolves point-in-time register/PSC/accounts inputs, rejects
+missing or duplicate normalised keys, left-joins from the register, prefixes source attributes,
+derives source-row-presence flags, and writes per-tier provenance/coverage manifests. Governed
+schema assertions exclude both PSC companies-per-person bands and exact-address concentration.
+
+Built internal governed and ungoverned joins from register 2026-10-01 (5,704,711 base rows), PSC
+2026-09-25 and accounts T=202609. Both retain exactly 5,704,711 unique register companies.
+Coverage: PSC 5,539,128; accounts 4,016,936; all three 4,014,892; register+PSC only 1,524,236;
+register+accounts only 2,044; register only 163,539. Source rows absent from the selected register:
+PSC 5,392,988 and accounts 2,874,341, with no unsupported dissolved classification. The 31-company
+difference from reconciliation's 4,016,905 both-dates-present denominator is explained and asserted:
+those rows match accounts by company number but have no register `LastMadeUpDate` and remain joined.
+
+Outputs are internal-only under `data/join/v1-internal-202609/`: governed 199,085,870 bytes / 63
+columns / 3.60s, ungoverned 206,304,904 bytes / 66 columns / 3.77s. Full input/output hashes,
+category breakdowns and availability semantics are in the manifests and
+`docs/join-internal-202609-stage2.md`. Tests use synthetic fixtures only. Kaggle, staging, accounts
+extraction/WIDE and published-v2 descriptions were untouched. Nothing pushed or published.
