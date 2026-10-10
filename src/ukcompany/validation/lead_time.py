@@ -125,19 +125,32 @@ def build_case_cohort(labels_path: str | Path) -> CaseCohort:
     if frame.height != frame["company_number"].n_unique():
         raise RuntimeError("case cohort company numbers are not unique")
     by_type = Counter(label.case_type for label in selected.values())
+    row_exclusions = (
+        labels.dropped_bulk
+        + labels.dropped_administration_to_cvl
+        + len(labels.unusable)
+        + labels.unusable_shifted
+    )
+    rows_before_deduplication = labels.input_rows - row_exclusions
     flow = {
         "input_rows": labels.input_rows,
         "dropped_bulk": labels.dropped_bulk,
         "dropped_administration_to_cvl": labels.dropped_administration_to_cvl,
         "unusable_company_number": len(labels.unusable),
         "unusable_month": labels.unusable_shifted,
-        "duplicate_rows": labels.duplicate_rows,
-        "retained_unique_companies_events": len(labels.labels),
+        "row_exclusions_before_deduplication": row_exclusions,
+        "rows_after_exclusions_before_deduplication": rows_before_deduplication,
+        "additional_company_rows_removed_by_deduplication": labels.duplicate_rows,
+        "retained_unique_companies": len(labels.labels),
+        "unique_event_count": None,
+        "unique_event_count_reason": (
+            "the source has no event identifier and the loader retains one label row per company"
+        ),
         "unsupported_retained_event_type": len(labels.labels) - len(supported),
-        "supported_unique_companies_events": len(supported),
+        "supported_unique_companies": len(supported),
         "event_before_2015_01": before,
         "event_after_2024_04": after,
-        "candidate_unique_companies_events": frame.height,
+        "candidate_companies": frame.height,
         "candidate_by_case_type": dict(sorted(by_type.items())),
     }
     accounted = (

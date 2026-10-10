@@ -2958,3 +2958,19 @@ case-only temporal/coverage evidence, not specificity, precision, predictive lif
 performance. No rules, thresholds or composite score changed; no data was downloaded; prospective
 evaluation remains on hold. Real company-level outputs were not written, and the gitignored JSON is
 aggregate-only.
+
+## Handoff 03 — cohort-accounting clarification (2026-10-10)
+
+Reconciled the completed case-only study without rerunning it. Of 237,391 publication rows, 13,578
+are excluded before deduplication: 5,740 explicit bulk, 7,102 Administration-to-CVL, 736 unusable
+company numbers and zero unusable-month rows. That leaves 223,813 rows; removing 3,352 subsequent
+rows for a company already retained leaves 220,461 unique companies with one retained label row
+each. Removing 201 unsupported retained case types and 54,968 pre-2015 labels leaves the fixed
+165,292-company cohort. Every transition now reconciles explicitly in the results report.
+
+Corrected “unique companies/events” wording: the source has no event identifier, and the loader
+deduplicates on company number, so neither the 3,352 removed rows nor the 220,461 retained companies
+is a unique-proceeding count. Signal tables continue to show observed-feature denominators and
+candidate coverage; missing values remain unavailable, never non-firing. Updated `docs/TASKS.md` to
+mark the historical accounts case-only study complete, historical matched evaluation blocked by
+data availability, and prospective evaluation on hold.

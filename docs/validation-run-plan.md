@@ -29,8 +29,10 @@ currently be identified
 - Reuse `load_labels()` exactly: apply the bulk, Administration-to-CVL, malformed-month and invalid
   company-number exclusions first; retain the first source row for each normalised company number;
   then keep the four supported adverse groups and the date window. Report every loader disposition,
-  including duplicate rows and unsupported retained case types. The analysis unit is therefore one
-  retained event row per unique company, not every insolvency proceeding for that company.
+  including subsequent rows for an already retained company and unsupported retained case types.
+  The analysis unit is therefore one retained label row per unique company, not every insolvency
+  proceeding. The source has no event identifier, so do not call the company-deduplicated count a
+  unique-event count.
 - Do not require presence in a current register and do not exclude companies dissolved today.
 - Primary cutoff T is month-end 12 months before the event-registration month; predeclared
   sensitivities use 6 and 24 months. Subtract whole calendar months from `month_registered`; for

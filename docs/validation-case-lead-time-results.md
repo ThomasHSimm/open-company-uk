@@ -39,24 +39,34 @@ DuckDB limit.
 
 ## Cohort flow
 
-The existing label loader retains the first source row per normalised company number after its
-mandatory exclusions. The analysis unit is therefore one retained company/event row, not every
-proceeding for a company.
+The existing label loader first removes ineligible source rows, then retains the first remaining row
+per normalised company number. The analysis unit is therefore one retained label row per company,
+not every proceeding for a company. The publication has no event identifier, so this pipeline does
+not establish a unique-event count.
 
-| disposition | rows / unique retained companies-events |
-|---|---:|
-| input rows | 237,391 |
-| explicit bulk rows removed | 5,740 |
-| Administration-to-CVL rows removed | 7,102 |
-| unusable company numbers removed | 736 |
-| unusable month rows removed | 0 |
-| duplicate company rows removed | 3,352 |
-| unique retained companies/events | 220,461 |
-| unsupported retained event type | 201 |
-| supported unique companies/events | 220,260 |
-| supported event before 2015-01 | 54,968 |
-| supported event after 2024-04 | 0 |
-| **fixed candidate companies/events** | **165,292** |
+| transition | removed | remaining | unit after transition |
+|---|---:|---:|---|
+| publication input | — | 237,391 | source rows |
+| remove explicit bulk rows | 5,740 | 231,651 | source rows |
+| remove Administration-to-CVL rows | 7,102 | 224,549 | source rows |
+| remove unusable company numbers | 736 | 223,813 | source rows |
+| remove unusable month rows | 0 | 223,813 | source rows |
+| retain first row per normalised company | 3,352 additional company rows | 220,461 | unique companies, one retained label row each |
+| remove unsupported retained case types | 201 companies | 220,260 | supported unique companies |
+| remove supported labels before 2015-01 | 54,968 companies | 165,292 | companies in the fixed date window |
+| remove supported labels after 2024-04 | 0 companies | **165,292** | **candidate companies** |
+
+The previously unexplained 13,578-row difference is fully accounted for before deduplication:
+
+`5,740 bulk + 7,102 Administration-to-CVL + 736 unusable numbers + 0 unusable months = 13,578`.
+
+Then `237,391 - 13,578 = 223,813` eligible source rows before company deduplication, and
+`223,813 - 3,352 = 220,461` unique retained companies. The 3,352 are subsequent rows for an already
+retained company; they are not asserted to be 3,352 unique events or exact duplicate proceedings.
+
+The supported/date transitions also reconcile:
+
+`220,461 - 201 unsupported - 54,968 before window - 0 after window = 165,292 candidates`.
 
 Candidate composition was 124,736 creditors' voluntary liquidations, 25,066 compulsory
 liquidations, 13,436 administrations and 2,054 corporate voluntary arrangements.
@@ -168,8 +178,9 @@ coverage and filing selection rather than an outcome trend:
   category, alive-at-T state and competing dissolution were not inferred from current values.
 - Outcome dates and accounts availability are month-grained. No result implies a daily filing or
   prediction timestamp. Registration month is not the monthly ZIP publication date.
-- The label loader keeps the first source row per normalised company and removes 3,352 later
-  duplicate rows. Results describe one retained event row per company, not recurrent proceedings.
+- The label loader keeps the first source row per normalised company and removes 3,352 subsequent
+  company rows. Results describe one retained label row per company; unique proceedings cannot be
+  counted because the source has no event identifier.
 - The 2015 cohort is close to the 2014 accounts archive boundary, and year coverage is therefore not
   comparable without accounting for archive maturity and iXBRL adoption.
 - Employee bands and the unit-anomaly diagnostic are secondary because tagging changed around

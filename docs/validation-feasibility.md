@@ -150,10 +150,12 @@ company type cannot be attached retrospectively without historical register data
 
 ### Label window and supported outcomes
 
-**Checked local aggregate using the existing loader.** The 24.8 MB file contains 237,391 rows and
-retains 220,461 unique labels after the documented filters: 5,740 bulk rows dropped, 7,102
-Administration-to-CVL rows dropped, 736 unusable company numbers, 3,352 duplicates and zero
-field-shifted rows. Its month range is 2012-01–2024-04 (148 months). Raw retained case types are:
+**Checked local aggregate using the existing loader.** The 24.8 MB file contains 237,391 source
+rows. Pre-deduplication exclusions are 5,740 bulk + 7,102 Administration-to-CVL + 736 unusable
+company numbers + zero field-shifted rows = 13,578, leaving 223,813 rows. The loader then removes
+3,352 subsequent rows for an already retained company, leaving 220,461 unique companies with one
+retained label row each. The source has no event identifier, so 220,461 is not asserted to be a
+unique-event count. Its month range is 2012-01–2024-04 (148 months). Raw retained case types are:
 
 | raw case type | retained labels | evaluation treatment |
 |---|---:|---|

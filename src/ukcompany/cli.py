@@ -323,7 +323,7 @@ def cmd_accounts_lead_time(args: argparse.Namespace) -> int:
     flow = report["cohort_flow"]
     print("-- accounts-only historical case lead-time study --")
     print(
-        f"candidates={flow['candidate_unique_companies_events']:,}; "
+        f"candidates={flow['candidate_companies']:,}; "
         f"aggregate-only output={output}"
     )
     for row in report["cutoff_summary"]:

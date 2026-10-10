@@ -115,13 +115,19 @@ def test_case_cohort_reuses_loader_dispositions_and_ignores_current_register(tmp
         "dropped_administration_to_cvl": 1,
         "unusable_company_number": 1,
         "unusable_month": 0,
-        "duplicate_rows": 1,
-        "retained_unique_companies_events": 4,
+        "row_exclusions_before_deduplication": 3,
+        "rows_after_exclusions_before_deduplication": 5,
+        "additional_company_rows_removed_by_deduplication": 1,
+        "retained_unique_companies": 4,
+        "unique_event_count": None,
+        "unique_event_count_reason": (
+            "the source has no event identifier and the loader retains one label row per company"
+        ),
         "unsupported_retained_event_type": 1,
-        "supported_unique_companies_events": 3,
+        "supported_unique_companies": 3,
         "event_before_2015_01": 1,
         "event_after_2024_04": 0,
-        "candidate_unique_companies_events": 2,
+        "candidate_companies": 2,
         "candidate_by_case_type": {
             "compulsory_liquidation": 1,
             "creditors_voluntary_liquidation": 1,
