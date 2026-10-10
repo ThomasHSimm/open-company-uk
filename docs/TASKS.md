@@ -20,6 +20,11 @@ The audit log remains append-only; move items between sections here as work is v
 - Snapshot infrastructure: dynamic part discovery, complete-set validation, lazy full-width
   Polars scanning, string-preserved `CompanyNumber` despite the real leading-space header,
   and a dated/hash provenance manifest.
+- **Handoff 10 complete (internal only):** extended accounts through registration month
+  2026-09 without changing published v2, rebuilt both point-in-time accounts feature tiers at
+  T=202609, and built governed/ungoverned register-base joins using register 2026-10-01 and
+  PSC 2026-09-25. Provenance, coverage and reconciliation are documented in
+  `accounts-internal-202609-stage1.md` and `join-internal-202609-stage2.md`; nothing was published.
 - Baseline Quarto methodology site under `docs/site/` (local build only).
 
 ## In progress / needs a real run
