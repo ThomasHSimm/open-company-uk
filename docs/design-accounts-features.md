@@ -64,23 +64,27 @@ gap — see §3.
 null archive month, 0 with a null `made_up_to_date`.** So the availability date of any WIDE cell is
 recoverable exactly, and the row-level `row_available_yyyymm` in WIDE is its max.
 
-### 1.2 A filing in archive month M was received in or before M
+### 1.2 Archive month M is the registration month; the monthly ZIP arrives after month-end
 
-The source is Companies House's **"Company accounts data"** bulk product
-(`http://download.companieshouse.gov.uk/en_accountsdata.html`), published as **monthly files** (and
-daily files) back to 2008 — see `docs/site/guide/sources-map.qmd` ("free daily/monthly ZIPs back to
-2008") and the accounts deck (`docs/source-material/companies-house-accounts-deck.md`, "152 monthly
-archives"). Each month's file is the aggregation of the accounts documents accepted that month, so a
-filing that appears in archive M was accepted by the end of M, and **end-of-M is a safe upper bound
-on when it became publicly available.** The pipeline records exactly that archive as
-`source_year`/`source_month`.
+The source is Companies House's **"Company accounts data"** bulk product. Its
+[monthly product page](https://download.companieshouse.gov.uk/en_monthlyaccountsdata.html) says the
+filename identifies the month/year the data relates to and that a new monthly file is added within
+five working days **after** the previous month ends. Its
+[daily product page](https://download.companieshouse.gov.uk/en_accountsdata.html) says each daily
+file contains accounts data registered on the previous day (with the Tuesday weekend exception).
+The pipeline records the monthly archive label as `source_year`/`source_month`.
+
+The cutoff question is therefore resolved in two parts. Archive M is a month-grained
+**registration-month** boundary, while the consolidated monthly ZIP is published after M ends (the
+September 2026 object observed for the internal extension was last modified on 9 October). The
+project's `row_available_yyyymm <= T` convention means “registered in or before T”, not “the monthly
+ZIP was already downloadable at T”. Exact artifact-time availability would require the daily files
+(with a next-morning edge for the final day) or a lagged monthly cutoff. See the explicitly internal
+`accounts-internal-202609-stage1.md` for the live check; published WIDE remains v2 through 2026-08.
 
 Empirical support: the lag from period end to archive month is never negative for a valid period
 end — the only negatives (1,642 rows) come from corrupt period-end dates (years 0001 / 3020; see
-§1.4), not from filings predating their period. **Open item to confirm against CH product docs:**
-whether a month-M file is published *during* M (covering M's acceptances) or at the *start* of M
-(covering M-1); if the latter, the true availability bound is end-of-M which this design already
-uses, so the conclusion is unchanged — but the exact cut-off should be cited precisely before build.
+§1.4), not from filings predating their period.
 
 ### 1.3 Lag between period end and archive month
 
