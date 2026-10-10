@@ -121,7 +121,8 @@ Therefore:
 
 - cell values from later filings do not leak into an earlier cutoff;
 - current row-level eligibility can still become more conservative after a later fill;
-- a historical evaluation should reconstruct selected cells with `source_yyyymm <= T`, or at least
+- a historical evaluation should reconstruct selected cells with
+  `source_year * 100 + source_month <= T`, or at least
   compare exact cell-level and current row-level eligibility and stop if the case-cohort difference
   exceeds the predeclared tolerance;
 - registration month is not monthly ZIP publication time. A strict operational-availability
@@ -199,6 +200,29 @@ feature availability were not scanned in this design handoff.
   repeated dated register snapshots; otherwise unlabelled companies remain unlabelled, not
   confirmed negatives.
 
+### Candidate prospective outcome source
+
+The concrete candidate is the updated **Insolvency Service record-level company insolvency CSV**
+used by the existing validation loader, currently stored locally as
+`data/labels/record-level-data.csv`. The repository identifies it as the Insolvency Service
+record-level publication and preserves its required fields and exclusions
+([`validation/labels.py`](../src/ukcompany/validation/labels.py),
+[`AUDIT.md`](AUDIT.md#insolvency-service-agreement-validation-harness)). Link companies by the
+existing normalised `company_number`; define the event month from `month_registered`; retain the
+four supported adverse case groups; and apply the existing bulk, Administration-to-CVL, malformed
+number and duplicate handling.
+
+- **Last verified coverage:** the checked local file runs through 2024-04. It cannot ascertain the
+  proposed 2026-11–2027-10 outcomes.
+- **Source identity still to verify:** the repository does not retain the official landing URL,
+  release identifier or source checksum for this file. Before acquisition, the maintainer must
+  approve the canonical official publication page and confirm that a successor release preserves
+  the required fields and definitions.
+- **Publication lag is unverified:** one unmanifested local file cannot establish release cadence,
+  delay or revision policy. A three-calendar-month lag after the horizon is a conservative planning
+  assumption only, not a checked property of the publication. Implementation must measure release
+  date versus maximum covered month and use explicit official coverage notes where available.
+
 ## 4. Staged evaluation feasibility
 
 ### A. Case-only lead-time analysis
@@ -208,19 +232,39 @@ continuous 2014-01 onward accounts archives and cell-level provenance, contraste
 to 2024-04 label window (`docs/accounts-coverage.md`,
 `data/accounts/v2-internal-202609/manifest.sqlite`, bounded local label aggregate).
 
+- **Eligible population:** all companies in the four supported adverse label groups with an outcome
+  month from 2015-01 through 2024-04, a valid normalised company number, and at least one accounts
+  fact whose cell provenance shows availability by the selected historical cutoff. There are
+  165,292 label-side candidates for the primary 12-month cutoff before accounts linkage and
+  availability filtering. Never require presence in the 2026 register or exclude a case because it
+  is dissolved today (bounded local label aggregate; [`validation/labels.py`](../src/ukcompany/validation/labels.py)).
 - **Eligible source/features:** exact cell-level `as_first_reported` accounts values and provenance;
   latest/prior period, equity, current assets, creditors within one year, net current assets, cash,
-  negative equity/current liabilities, ratios and changes. Exclude current register
-  `accounts_category`; treat employee measures as secondary because of the 2020–2021 break.
-- **Population:** supported adverse labels with outcome month >=2015-01; never filter by 2026 status.
-- **Reference dates/horizon:** primary T is end of the month 12 months before outcome month;
-  sensitivities at 6 and 24 months.
-- **What it can establish:** whether those account attributes were available and their distribution
-  among later labelled cases at specified lead times.
+  negative-equity/current-liability indicators, ratios and changes. Exclude current register
+  `accounts_category`; treat employee measures as secondary because of the 2020–2021 tagging break.
+  No register, PSC, officer, filing-history or charge value is historically reconstructable over
+  this label window from the local evidence in the source matrix.
+- **Reference dates:** primary T is the end of the month 12 months before `month_registered`;
+  sensitivities use 6 and 24 months. At each T, use only cells with
+  `source_year * 100 + source_month <= T`. Exact historical ZIP publication dates are not retained,
+  so the operational-availability sensitivity must use a clearly labelled one-cycle lag
+  approximation rather than claim exact download-day knowledge.
+- **Useful analyses now:** report the fraction of cases with any eligible filing and each eligible
+  attribute at each lead time; distributions and predeclared descriptive states among observed
+  cases; paired within-case changes where two periods were already available; and coverage by
+  event year and case type. This establishes whether signals were genuinely recorded before the
+  event-registration month, how early, and for which subset of later cases.
 - **What it cannot establish:** rule recall (no existing rules use these financial attributes),
-  separation, control rates, precision, causality or population predictive performance.
+  specificity, precision, false-positive rates, population prevalence, separation from non-cases,
+  causality or population predictive performance.
+- **Selection limits:** the cohort is conditional on becoming a recorded adverse case and on having
+  parseable iXBRL/plain-XML accounts. Coverage differs by year, company type and filing practice;
+  companies with PDF-only/non-iXBRL accounts and non-filers are absent. Historical company type,
+  accounts category, alive-at-T status and competing dissolution cannot be recovered, so they must
+  not be imputed from 2026 values.
 - **Approval/new work:** an exact cell-cutoff feature builder or predeclared row-level sensitivity;
-  no new data is required.
+  no new source data is required. This is useful temporal/coverage validation, not validation of the
+  existing rules.
 
 ### B. Matched historical risk-set evaluation
 
@@ -246,8 +290,10 @@ yet available.** The frozen join records dated source states and hashes, while t
 file stops at 2024-04 (`data/join/v1-internal-202609/governed/join_manifest.json`, bounded local
 label aggregate).
 
-- **Baseline:** freeze the governed Handoff 10 join as assembled on 2026-10-10. Its component states
-  are register 2026-10-01, PSC 2026-09-25 and accounts registration month <=202609
+- **Baseline availability:** the governed Handoff 10 join finished at
+  `2026-10-10T12:33:23.902905+00:00`; use 2026-10-10 as the operational freeze/enrolment date. Its
+  component reference states are earlier: register 2026-10-01, PSC 2026-09-25 and accounts
+  registration month <=202609
   ([`join-internal-202609-stage2.md`](join-internal-202609-stage2.md), local join manifests). This is
   a prospective baseline only; it is not backdated to 2026-09-30 operational availability.
 - **Eligible existing predictive rules:** `ACCOUNTS_OVERDUE`, `CS_OVERDUE` and `PSC_UNRESOLVED`.
@@ -257,20 +303,31 @@ label aggregate).
   `SOLVENT_WINDING_UP` (case resource absent), `ADDR_DISPUTE` (flags absent), and the exact
   link-based `CHARGES_OUTSTANDING` definition. Missing rules must remain unavailable, never false.
 - **Population:** register-base companies active and not already in an insolvency-type state at
-  baseline. Preserve `has_psc` and `has_accounts` as coverage, not signals.
+  baseline. Preserve `has_psc` and `has_accounts` as coverage, not signals. When the updated outcome
+  source becomes available, exclude every company whose earliest supported registration month is
+  2026-10 or earlier as prevalent by enrolment; never count such an event as prospective. Because
+  labels are month-grained, all October outcomes are conservatively treated as pre-enrolment even
+  if their exact registration date might have followed the 10 October build.
 - **Outcome/horizon:** first supported adverse registration during 2026-11 through 2027-10. October
   2026 is excluded because the September monthly accounts artifact was only available in October
   and the outcome date is month-grained.
 - **What it can establish:** baseline per-rule firing rates, prospective case recall, and rule-specific
   event/non-event separation over a fixed horizon, subject to outcome completeness and censoring.
+- **Outcome-ready date:** the 12-month event horizon ends 2027-10-31, but that is not the analysis
+  date. Analysis waits for the first approved versioned release explicitly covering 2027-10 and
+  its observed publication lag. Under the unverified three-month planning assumption, the earliest
+  planned freeze is 2028-01-31; a later source release moves that date later.
 - **Required new data/approval:** updated versioned Insolvency Service outcomes through 2027-10;
-  prospective register snapshots during follow-up; approval of the outcome freeze/lag and the
-  matched-control design. No result can be run before those conditions are met.
+  prospective register snapshots during follow-up; a verified official source URL/release cadence;
+  and approval of the outcome freeze/lag and matched-control design. No result can be run before
+  those conditions are met.
 
 ## Conclusion
 
 Existing data support (1) the already-completed current-state insolvency agreement check and (2) an
-accounts-only case lead-time description. They do **not** support retrospective population
-prediction or a historical matched control study. The smallest defensible evaluation of existing
-rules is the prospective design in `validation-run-plan.md`. It must wait for approved outcome and
-follow-up data; no predictive claim should be made from the current 100% agreement result.
+accounts-only historical case lead-time study that can begin after plan approval without new data.
+That study can validate temporal reconstruction, coverage and the presence/timing of accounts
+signals among later cases; it does **not** support specificity, precision or population prediction.
+Historical matched controls remain unavailable. The smallest defensible evaluation of the existing
+rules is the prospective design in `validation-run-plan.md`; it requires future outcomes and
+register observation. No predictive claim should be made from the current 100% agreement result.
