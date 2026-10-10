@@ -28,6 +28,14 @@ dev = [
     "ixbrlparse>=0.11",
 ]
 snapshot = ["polars>=1.0"]
+analysis = [
+    "duckdb>=1.0",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pyarrow>=14.0",
+    "scikit-learn>=1.4",
+    "scipy>=1.11",
+]
 
 [project.scripts]
 ukcompany = "ukcompany.cli:main"

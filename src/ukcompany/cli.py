@@ -338,6 +338,30 @@ def cmd_accounts_lead_time(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_company_comparison(args: argparse.Namespace) -> int:
+    from .validation.company_comparison import run_company_comparison, write_aggregate_json
+
+    report = run_company_comparison(
+        args.config,
+        memory_limit_gb=args.memory_limit_gb,
+        spill_dir=args.spill_dir,
+    )
+    output = write_aggregate_json(report, args.out)
+    counts = report["spec"]["contents"]["outcome"]["expected_counts"]
+    print("-- contemporaneous recorded-status company comparison --")
+    print(
+        f"adverse={counts['recorded_adverse']:,}; "
+        f"comparison={counts['without_recorded_adverse']:,}; "
+        f"ambiguous-liquidation-excluded={counts['ambiguous_liquidation']:,}"
+    )
+    print(f"aggregate-only output={output}")
+    print(
+        f"runtime={report['runtime']['seconds']:.1f}s; "
+        f"peak_rss={report['runtime']['peak_rss_bytes'] / 1024**3:.2f} GiB"
+    )
+    return 0
+
+
 def _snapshot_cache_dir(args: argparse.Namespace) -> Path:
     if args.cache_dir:
         return Path(args.cache_dir)
@@ -506,6 +530,22 @@ def main(argv: list[str] | None = None) -> int:
     p_lead_time.add_argument("--memory-limit-gb", type=int, default=8)
     p_lead_time.add_argument("--spill-dir", default="/tmp/ukcompany-lead-time-spill")
     p_lead_time.set_defaults(func=cmd_accounts_lead_time)
+
+    p_company_comparison = sub.add_parser(
+        "company-comparison",
+        help="run the aggregate-only contemporaneous recorded-status comparison study",
+    )
+    p_company_comparison.add_argument(
+        "--config", default="config/company-comparison-study.json"
+    )
+    p_company_comparison.add_argument(
+        "--out", default="data/validation/company-comparison-aggregate.json"
+    )
+    p_company_comparison.add_argument("--memory-limit-gb", type=int, default=8)
+    p_company_comparison.add_argument(
+        "--spill-dir", default="/tmp/ukcompany-company-comparison-spill"
+    )
+    p_company_comparison.set_defaults(func=cmd_company_comparison)
 
     p_snapshot = sub.add_parser("snapshot", help="manage monthly Companies House snapshots")
     snapshot_sub = p_snapshot.add_subparsers(dest="snapshot_command", required=True)
