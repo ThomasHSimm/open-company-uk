@@ -309,6 +309,35 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_accounts_lead_time(args: argparse.Namespace) -> int:
+    from .validation.lead_time import run_lead_time_analysis, write_aggregate_json
+
+    report = run_lead_time_analysis(
+        args.labels,
+        args.wide,
+        args.provenance,
+        memory_limit_gb=args.memory_limit_gb,
+        spill_dir=args.spill_dir,
+    )
+    output = write_aggregate_json(report, args.out)
+    flow = report["cohort_flow"]
+    print("-- accounts-only historical case lead-time study --")
+    print(
+        f"candidates={flow['candidate_unique_companies_events']:,}; "
+        f"aggregate-only output={output}"
+    )
+    for row in report["cutoff_summary"]:
+        print(
+            f"lead={row['lead_months']}m convention={row['convention']}: "
+            f"accounts={row['any_accounts']:,}/{row['candidates']:,}"
+        )
+    print(
+        f"runtime={report['runtime']['seconds']:.1f}s; "
+        f"peak_rss={report['runtime']['peak_rss_bytes'] / 1024**3:.2f} GiB"
+    )
+    return 0
+
+
 def _snapshot_cache_dir(args: argparse.Namespace) -> Path:
     if args.cache_dir:
         return Path(args.cache_dir)
@@ -453,6 +482,30 @@ def main(argv: list[str] | None = None) -> int:
     p_validate.add_argument("--out", default="data/insolvency-validation.md")
     p_validate.add_argument("--settings", default="config/settings.yaml")
     p_validate.set_defaults(func=cmd_validate)
+
+    p_lead_time = sub.add_parser(
+        "accounts-lead-time",
+        help="run the aggregate-only historical accounts case lead-time study",
+    )
+    p_lead_time.add_argument("--labels", required=True)
+    p_lead_time.add_argument(
+        "--wide",
+        default="data/accounts/v2-internal-202609/accounts-wide-as_first_reported.parquet",
+    )
+    p_lead_time.add_argument(
+        "--provenance",
+        default=(
+            "data/accounts/v2-internal-202609/"
+            "accounts-wide-provenance-as_first_reported.parquet"
+        ),
+    )
+    p_lead_time.add_argument(
+        "--out",
+        default="data/validation/accounts-case-lead-time-aggregate.json",
+    )
+    p_lead_time.add_argument("--memory-limit-gb", type=int, default=8)
+    p_lead_time.add_argument("--spill-dir", default="/tmp/ukcompany-lead-time-spill")
+    p_lead_time.set_defaults(func=cmd_accounts_lead_time)
 
     p_snapshot = sub.add_parser("snapshot", help="manage monthly Companies House snapshots")
     snapshot_sub = p_snapshot.add_subparsers(dest="snapshot_command", required=True)
