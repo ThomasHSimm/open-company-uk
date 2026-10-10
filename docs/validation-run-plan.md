@@ -26,14 +26,55 @@ currently be identified
 
 - Start with the 165,292 label-side candidates in the four supported adverse groups with
   `month_registered` from 2015-01 through 2024-04 and a valid normalised company number.
+- Reuse `load_labels()` exactly: apply the bulk, Administration-to-CVL, malformed-month and invalid
+  company-number exclusions first; retain the first source row for each normalised company number;
+  then keep the four supported adverse groups and the date window. Report every loader disposition,
+  including duplicate rows and unsupported retained case types. The analysis unit is therefore one
+  retained event row per unique company, not every insolvency proceeding for that company.
 - Do not require presence in a current register and do not exclude companies dissolved today.
 - Primary cutoff T is month-end 12 months before the event-registration month; predeclared
-  sensitivities use 6 and 24 months.
+  sensitivities use 6 and 24 months. Subtract whole calendar months from `month_registered`; for
+  example, an event in 2020-07 has T=2019-07 at the 12-month lead.
 - A case enters an attribute-specific denominator only when the relevant account cell has
   first-reported provenance `source_year * 100 + source_month <= T`. Report zero-filing,
   source-row-present and attribute-observed states separately.
 - Use no current register, PSC, officer, filing-history or charge values. Their local observations
   postdate the outcome window and cannot be back-cast.
+
+### Period and attribute definitions
+
+For each case, lead and availability convention, join cell provenance to the matching
+`as_first_reported` WIDE cell on company, period end and mapped column. Exclude a cell unless its
+own source year/month is within the cutoff. Never gate on `row_available_yyyymm`, and never expose a
+WIDE value whose cell provenance is later than the cutoff. A period is available when at least one
+planned cell is eligible. Rank available periods by parsed `period_end`, newest first, using the
+existing plausible-date bounds and 18-month prior-period gap rule in
+[`accounts/features.py`](../src/ukcompany/accounts/features.py).
+
+Analyse only these predeclared attributes from the latest available period: `equity`,
+`current_assets`, `creditors_within_one_year`, `net_current_assets`, `cash`, `negative_equity`
+(`equity < 0`), `net_current_liabilities` (`net_current_assets < 0`), `current_ratio`
+(`current_assets / creditors_within_one_year`, null for zero/missing denominator), `employee_band`
+and `employees_unit_anomaly`. Also report latest/prior period end, periods available, months since
+latest period end, prior gap, and `d_equity`, `d_net_current_assets`, `d_cash` only when the relevant
+latest/prior cells are both observed and the period gap is at most 18 months. Do not use
+`accounts_category` or any additional WIDE concept.
+
+Denominators are fixed as follows:
+
+- **candidate denominator:** every unique retained case in the fixed label cohort;
+- **any-accounts coverage:** candidates with at least one eligible planned cell at that cutoff;
+- **attribute coverage:** candidates with that exact derived attribute observed;
+- **binary signal rate:** observed `true` divided by observed (`true` + `false`) for
+  `negative_equity`, `net_current_liabilities` and `employees_unit_anomaly`; null is unavailable,
+  never non-firing;
+- **numeric/category summaries:** only observed values, always accompanied by observed count and
+  candidate-denominator coverage; and
+- **change coverage:** candidates with the corresponding change observed under the 18-month rule.
+
+Report all denominators and counts at every 6/12/24-month cutoff and for both registration-month and
+one-cycle-lag conventions. Do not compare conventions or lead times without also reporting their
+coverage.
 
 ### Outputs and limits
 
@@ -89,13 +130,13 @@ company later because it dissolves. Later dissolution/removal is a follow-up sta
 eligibility rewrite.
 
 The outcome source available today ends in 2024-04, so this event-free check remains provisional
-until the approved successor release fills the gap through enrolment. At outcome freeze, use each
-company's earliest supported registration month: companies first registered in 2026-10 or earlier
-are prevalent and excluded from both case and control cohorts. No October event is credited as a
-prospective prediction. Month-only labels cannot distinguish events before versus after the exact
-10 October build time, so this exclusion is intentionally conservative. The outcome is registration,
-not unobserved distress onset; a process beginning before enrolment but first registered later
-cannot be identified from these labels and must be disclosed as a limitation.
+until the approved successor release fills the gap through enrolment. At outcome freeze, companies
+with an earliest supported registration month through 2026-09 are prevalent and excluded from both
+case and control cohorts. October 2026 is a separate **ambiguous baseline-month exclusion**:
+month-only labels cannot distinguish events before versus after the exact 10 October build time, so
+October events are neither assumed all prevalent nor credited as prospective predictions. The
+outcome is registration, not unobserved distress onset; a process beginning before enrolment but
+first registered later cannot be identified from these labels and must be disclosed as a limitation.
 
 **Checked population bound:** the register baseline contains 5,704,711 rows. The exact active,
 event-free risk-set count has not been scanned in this design handoff and must be the first aggregate
@@ -109,8 +150,8 @@ reported by implementation (`data/join/v1-internal-202609/governed/join_manifest
   ([`validation/labels.py`](../src/ukcompany/validation/labels.py)).
 - **Follow-up window:** outcome month 2026-11 through 2027-10 inclusive. This is a 12-month outcome
   horizon after the operational baseline month, not a claim that labels are complete on 2027-10-31.
-  Exclude all October 2026 outcomes because month-only timestamps cannot order them around the
-  2026-10-10 freeze.
+  Exclude October 2026 as an ambiguous baseline month because month-only timestamps cannot order
+  its events around the 2026-10-10 freeze; do not classify the entire month as prevalent.
 - **Concrete candidate source:** a successor to the official Insolvency Service record-level company
   insolvency CSV already consumed as `data/labels/record-level-data.csv`. Link on the existing
   normalised `company_number`, take event month from `month_registered`, retain the four controlled

@@ -305,12 +305,13 @@ label aggregate).
 - **Population:** register-base companies active and not already in an insolvency-type state at
   baseline. Preserve `has_psc` and `has_accounts` as coverage, not signals. When the updated outcome
   source becomes available, exclude every company whose earliest supported registration month is
-  2026-10 or earlier as prevalent by enrolment; never count such an event as prospective. Because
-  labels are month-grained, all October outcomes are conservatively treated as pre-enrolment even
-  if their exact registration date might have followed the 10 October build.
+  2026-09 or earlier as prevalent by enrolment. Classify October 2026 separately as an ambiguous
+  baseline-month exclusion: month-grained labels cannot determine which October registrations
+  preceded the 10 October build, so none count as prospective predictions, but the whole month is
+  not asserted to be prevalent.
 - **Outcome/horizon:** first supported adverse registration during 2026-11 through 2027-10. October
-  2026 is excluded because the September monthly accounts artifact was only available in October
-  and the outcome date is month-grained.
+  2026 is excluded as the ambiguous baseline month because month-grained outcomes cannot be ordered
+  around the 10 October availability date.
 - **What it can establish:** baseline per-rule firing rates, prospective case recall, and rule-specific
   event/non-event separation over a fixed horizon, subject to outcome completeness and censoring.
 - **Outcome-ready date:** the 12-month event horizon ends 2027-10-31, but that is not the analysis
