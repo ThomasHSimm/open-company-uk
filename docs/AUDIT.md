@@ -2974,3 +2974,20 @@ is a unique-proceeding count. Signal tables continue to show observed-feature de
 candidate coverage; missing values remain unavailable, never non-firing. Updated `docs/TASKS.md` to
 mark the historical accounts case-only study complete, historical matched evaluation blocked by
 data availability, and prospective evaluation on hold.
+
+## Company-attribute comparison study design (2026-10-10)
+
+Inspected the governed Handoff 10 join schema, provenance and a bounded aggregate over status,
+company type, age, register accounts category and source-presence flags. The selected register has
+5,704,711 companies: 7,318 carry a clearly adverse administration/receivership/voluntary-
+arrangement status, 5,589,063 have no recorded adverse insolvency status, and 108,330 liquidation
+rows are ambiguous because the join lacks case types needed to separate solvent members' voluntary
+liquidation. Source coverage among the narrow adverse group is 5,810 PSC, 4,961 accounts and 4,881
+both; no row-level aggregate was retained.
+
+Added `docs/company-comparison-study-plan.md`. It predeclares outcome exclusions, structural and
+size sensitivities, missingness reporting, descriptive effect sizes, a regularised logistic
+baseline, consistent full/intersection populations, company-separated splits, training-only
+preprocessing and prevalence correction. This remains contemporaneous association/classification,
+not forecasting, causal inference, a new rule, ranking or score. No study, download or heavy scan
+was run; broader liquidation labels require separately approved point-in-time case-type data.
