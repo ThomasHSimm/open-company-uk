@@ -2934,3 +2934,27 @@ versioned outcomes and prospective register follow-up. Full evidence, gates, una
 treatment, uncertainty and required approvals are in `docs/validation-feasibility.md` and
 `docs/validation-run-plan.md`. No data was downloaded, no full bulk table was scanned, no rules were
 changed or tuned, and no evaluation was run.
+
+## Handoff 03 — accounts-only historical case lead-time study (2026-10-10)
+
+After committing a clarification of cohort selection, exact cell gating, planned attributes and
+denominators, added `ukcompany accounts-lead-time`. The command reuses the existing insolvency label
+loader and accounts feature definitions, but reconstructs each value from its own first-reported
+cell provenance rather than `row_available_yyyymm`; later-filled cells cannot enter an earlier
+cutoff. Synthetic tests cover temporal exclusion, later fills, missing-versus-false semantics,
+one-cycle lag and cohort selection.
+
+Ran the aggregate-only study on 165,292 unique supported case companies/events from 2015-01 through
+2024-04, without joining today's register. Any planned accounts cell was available for 124,228
+(75.2%) at six months, 114,615 (69.3%) at 12 months and 91,190 (55.2%) at 24 months. At the primary
+12-month cutoff, negative equity was observed for 71,999 cases and true for 21,725 (30.2% of
+observed); net current assets were observed for 111,266 and negative for 47,570 (42.8%). Coverage
+varied strongly by case type and event year. The one-cycle publication-lag approximation reduced
+12-month any-accounts coverage to 112,724 (68.2%).
+
+The scan took 6.4 seconds and peaked at 2.97 GiB RSS. Input hashes, cohort flow, all denominators,
+temporal summaries and limitations are in `docs/validation-case-lead-time-results.md`. Results are
+case-only temporal/coverage evidence, not specificity, precision, predictive lift or population
+performance. No rules, thresholds or composite score changed; no data was downloaded; prospective
+evaluation remains on hold. Real company-level outputs were not written, and the gitignored JSON is
+aggregate-only.
