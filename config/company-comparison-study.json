@@ -47,7 +47,9 @@
     "c_grid": [0.1, 1.0, 10.0],
     "bootstrap_replicates": 300,
     "categorical_min_frequency": 10,
+    "solver": "newton-cholesky",
     "max_iter": 800,
+    "tolerance": 1e-6,
     "random_seed": 20261010
   },
   "structural": {

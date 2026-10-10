@@ -87,7 +87,9 @@ def _synthetic_spec(tmp_path: Path) -> tuple[Path, Path]:
             "c_grid": [1.0],
             "bootstrap_replicates": 3,
             "categorical_min_frequency": 2,
+            "solver": "newton-cholesky",
             "max_iter": 100,
+            "tolerance": 1e-6,
         }
     )
     manifest = {

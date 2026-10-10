@@ -560,10 +560,10 @@ def _build_pipeline(spec: dict[str, Any], model_name: str, c_value: float):
     preprocessor = ColumnTransformer(transformers, remainder="drop", sparse_threshold=0.3)
     model = LogisticRegression(
         C=c_value,
-        solver="saga",
+        solver=spec["modelling"]["solver"],
         max_iter=spec["modelling"]["max_iter"],
         random_state=spec["modelling"]["random_seed"],
-        tol=1e-4,
+        tol=spec["modelling"]["tolerance"],
     )
     return Pipeline([("preprocess", preprocessor), ("model", model)]), definition
 
@@ -595,6 +595,23 @@ def _weighted_metrics(y_true, probability, weight) -> dict[str, float]:
     }
 
 
+def _weighted_core_metrics(y_true, probability, weight) -> dict[str, float]:
+    import numpy as np
+    from sklearn.metrics import average_precision_score, log_loss, roc_auc_score
+
+    clipped = np.clip(np.asarray(probability, dtype=float), 1e-8, 1 - 1e-8)
+    labels = np.asarray(y_true, dtype=int)
+    weights = np.asarray(weight, dtype=float)
+    return {
+        "roc_auc": float(roc_auc_score(labels, clipped, sample_weight=weights)),
+        "average_precision": float(
+            average_precision_score(labels, clipped, sample_weight=weights)
+        ),
+        "log_loss": float(log_loss(labels, clipped, sample_weight=weights, labels=[0, 1])),
+        "brier": float(np.average((labels - clipped) ** 2, weights=weights)),
+    }
+
+
 def _fit_model(frame, spec: dict[str, Any], model_name: str):
     import numpy as np
     from sklearn.base import clone
@@ -620,13 +637,17 @@ def _fit_model(frame, spec: dict[str, Any], model_name: str):
         losses = []
         for fit_index, validation_index in folds.split(x_train, y_train):
             candidate = clone(pipeline)
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", category=ConvergenceWarning)
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", category=ConvergenceWarning)
                 candidate.fit(
                     x_train.iloc[fit_index],
                     y_train[fit_index],
                     model__sample_weight=w_train[fit_index],
                 )
+                if any(issubclass(item.category, ConvergenceWarning) for item in caught):
+                    raise RuntimeError(
+                        f"{model_name} did not converge during cross-validation at C={c_value}"
+                    )
             probability = candidate.predict_proba(x_train.iloc[validation_index])[:, 1]
             losses.append(
                 log_loss(
@@ -648,6 +669,8 @@ def _fit_model(frame, spec: dict[str, Any], model_name: str):
         convergence_warnings = sum(
             issubclass(item.category, ConvergenceWarning) for item in caught
         )
+    if convergence_warnings:
+        raise RuntimeError(f"{model_name} final fit did not converge at C={selected_c}")
     x_test = test[predictors]
     y_test = test["outcome"].astype(int).to_numpy()
     w_test = test["sample_weight"].astype(float).to_numpy()
@@ -696,10 +719,10 @@ def _paired_bootstrap(reference, combined, replicates: int, seed: int) -> dict[s
         indices = np.concatenate(
             [rng.choice(values, size=len(values), replace=True) for values in by_label.values()]
         )
-        ref_metrics = _weighted_metrics(
+        ref_metrics = _weighted_core_metrics(
             outcome[indices], reference["probability"][indices], reference["weight"][indices]
         )
-        combined_metrics = _weighted_metrics(
+        combined_metrics = _weighted_core_metrics(
             outcome[indices], combined["probability"][indices], combined["weight"][indices]
         )
         deltas["roc_auc"].append(combined_metrics["roc_auc"] - ref_metrics["roc_auc"])
@@ -996,6 +1019,8 @@ def run_company_comparison(
         population_results = {}
         primary_rank_effects = None
         for population in spec["populations"]:
+            population_started = time.perf_counter()
+            print(f"sampling population={population}", flush=True)
             sampled, sampling = _sample_population(con, spec, population)
             prepared = _prepare_features(sampled, spec)
             if population == "primary":
@@ -1011,9 +1036,16 @@ def run_company_comparison(
             model_results = {}
             predictions = {}
             for model_name in MODEL_NAMES:
+                model_started = time.perf_counter()
+                print(f"fitting population={population} model={model_name}", flush=True)
                 model_result, model_predictions = _fit_model(prepared, spec, model_name)
                 model_results[model_name] = model_result
                 predictions[model_name] = model_predictions
+                print(
+                    f"completed population={population} model={model_name} "
+                    f"seconds={time.perf_counter() - model_started:.1f}",
+                    flush=True,
+                )
             paired = _paired_bootstrap(
                 predictions["structural_missingness"],
                 predictions["combined"],
@@ -1025,6 +1057,11 @@ def run_company_comparison(
                 "models": model_results,
                 "paired_combined_vs_structural_missingness": paired,
             }
+            print(
+                f"completed population={population} "
+                f"seconds={time.perf_counter() - population_started:.1f}",
+                flush=True,
+            )
     finally:
         con.close()
     if primary_rank_effects is not None:
