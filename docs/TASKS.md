@@ -25,14 +25,23 @@ The audit log remains append-only; move items between sections here as work is v
   T=202609, and built governed/ungoverned register-base joins using register 2026-10-01 and
   PSC 2026-09-25. Provenance, coverage and reconciliation are documented in
   `accounts-internal-202609-stage1.md` and `join-internal-202609-stage2.md`; nothing was published.
+- **Historical accounts case-only study complete:** reconstructed planned accounts attributes at
+  6/12/24-month pre-event cutoffs using exact first-reported cell provenance for 165,292 candidate
+  companies. This establishes case-only temporal availability and covered-case patterns, not
+  specificity, precision or population performance. Results are in
+  `validation-case-lead-time-results.md`.
 - Baseline Quarto methodology site under `docs/site/` (local build only).
 
-## In progress / needs a real run
+## Blocked / on hold
 
-- Run the first representative validation study: draw and fetch approximately 500 recent
-  adverse positives and 500 stratified controls, then evaluate. Interpret the genuine-miss
-  list and control flag rate by age band. This is an operator/network run; no results are
-  claimed until it is complete.
+- **Historical matched evaluation — blocked by data availability.** The repository lacks
+  contemporaneous historical register populations/status, censoring and valid at-risk controls;
+  today's surviving register cannot substitute. It needs approved historical register snapshots or
+  another versioned population source plus outcome/censoring history.
+- **Prospective evaluation — on hold.** Preserve the 2026-10-10 frozen baseline, but do not analyse
+  until approved versioned outcomes cover the full 2026-11–2027-10 horizon and prospective register
+  snapshots support censoring/risk-set maintenance. October 2026 remains an ambiguous baseline
+  month, not a prospective outcome month.
 
 ## Ready to build (specified, not started)
 

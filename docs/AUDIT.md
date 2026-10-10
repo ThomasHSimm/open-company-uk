@@ -2902,3 +2902,75 @@ columns / 3.60s, ungoverned 206,304,904 bytes / 66 columns / 3.77s. Full input/o
 category breakdowns and availability semantics are in the manifests and
 `docs/join-internal-202609-stage2.md`. Tests use synthetic fixtures only. Kaggle, staging, accounts
 extraction/WIDE and published-v2 descriptions were untouched. Nothing pushed or published.
+
+## Handoff 03 revised — validation feasibility and evaluation design (2026-10-10)
+
+Design-only review from `main` after Handoff 10 merged. Reconciled the existing validation rather
+than claiming none occurred: the corrected run measured current-state agreement/detection on 500
+labelled positives (298 current-status exclusions, 202 adverse detections, zero screenable misses),
+not pre-event prediction. Local gitignored evidence also contains a 499-row control draw; one invalid
+number leaves 498 assessed and 3 current high-severity firings. That remains a control flag rate,
+not a false-positive rate.
+
+Found a checked semantic flaw in the old control matching: the label's `month_registered` is the
+2012-01–2024-04 insolvency-registration month, but `stratify_targets()` treated it as company
+incorporation month for age bands. The control was SIC-stratified but not validly age matched and was
+drawn from the 2026-08 active register, not historical risk sets.
+
+Historical availability audit: only accounts overlap the outcome window (153 complete monthly
+archives, 2014-01–2026-09, with cell-level source-month provenance). Register state exists locally
+only at 2026-08-01 and 2026-10-01; PSC only in September 2026; the 1,013-company API cache was fetched
+in August 2026 and has no response history; filing history is not implemented; charge history is not
+present. Current records carrying old effective dates were not back-cast. Accounts row-level
+availability is conservative but can move later when a later filing fills a previously absent cell,
+so historical work must use exact cell cutoffs or a predeclared sensitivity.
+
+The current label file has 220,260 supported adverse labels; 165,292 lie in 2015-01–2024-04 and can
+in principle receive a 12-month-prior accounts cutoff. This supports an accounts-only case lead-time
+description, not existing-rule recall or a population comparison. Historical matched risk sets are
+blocked by absent register/status history and survival selection. Recommended first actual rule
+evaluation is prospective from the frozen governed Handoff 10 baseline, with 12 months of updated,
+versioned outcomes and prospective register follow-up. Full evidence, gates, unavailable-rule
+treatment, uncertainty and required approvals are in `docs/validation-feasibility.md` and
+`docs/validation-run-plan.md`. No data was downloaded, no full bulk table was scanned, no rules were
+changed or tuned, and no evaluation was run.
+
+## Handoff 03 — accounts-only historical case lead-time study (2026-10-10)
+
+After committing a clarification of cohort selection, exact cell gating, planned attributes and
+denominators, added `ukcompany accounts-lead-time`. The command reuses the existing insolvency label
+loader and accounts feature definitions, but reconstructs each value from its own first-reported
+cell provenance rather than `row_available_yyyymm`; later-filled cells cannot enter an earlier
+cutoff. Synthetic tests cover temporal exclusion, later fills, missing-versus-false semantics,
+one-cycle lag and cohort selection.
+
+Ran the aggregate-only study on 165,292 unique supported case companies/events from 2015-01 through
+2024-04, without joining today's register. Any planned accounts cell was available for 124,228
+(75.2%) at six months, 114,615 (69.3%) at 12 months and 91,190 (55.2%) at 24 months. At the primary
+12-month cutoff, negative equity was observed for 71,999 cases and true for 21,725 (30.2% of
+observed); net current assets were observed for 111,266 and negative for 47,570 (42.8%). Coverage
+varied strongly by case type and event year. The one-cycle publication-lag approximation reduced
+12-month any-accounts coverage to 112,724 (68.2%).
+
+The scan took 6.4 seconds and peaked at 2.97 GiB RSS. Input hashes, cohort flow, all denominators,
+temporal summaries and limitations are in `docs/validation-case-lead-time-results.md`. Results are
+case-only temporal/coverage evidence, not specificity, precision, predictive lift or population
+performance. No rules, thresholds or composite score changed; no data was downloaded; prospective
+evaluation remains on hold. Real company-level outputs were not written, and the gitignored JSON is
+aggregate-only.
+
+## Handoff 03 — cohort-accounting clarification (2026-10-10)
+
+Reconciled the completed case-only study without rerunning it. Of 237,391 publication rows, 13,578
+are excluded before deduplication: 5,740 explicit bulk, 7,102 Administration-to-CVL, 736 unusable
+company numbers and zero unusable-month rows. That leaves 223,813 rows; removing 3,352 subsequent
+rows for a company already retained leaves 220,461 unique companies with one retained label row
+each. Removing 201 unsupported retained case types and 54,968 pre-2015 labels leaves the fixed
+165,292-company cohort. Every transition now reconciles explicitly in the results report.
+
+Corrected “unique companies/events” wording: the source has no event identifier, and the loader
+deduplicates on company number, so neither the 3,352 removed rows nor the 220,461 retained companies
+is a unique-proceeding count. Signal tables continue to show observed-feature denominators and
+candidate coverage; missing values remain unavailable, never non-firing. Updated `docs/TASKS.md` to
+mark the historical accounts case-only study complete, historical matched evaluation blocked by
+data availability, and prospective evaluation on hold.
