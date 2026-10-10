@@ -2880,3 +2880,25 @@ register-reconciliation helpers plus tests. Full evidence and the resolved archi
 publication-time distinction are in `docs/accounts-internal-202609-stage1.md`.
 
 **STOP:** Stage 2 has not started. Nothing pushed or published.
+
+## Handoff 10 Stage 2 — internal joined table at T=202609 (2026-10-10)
+
+Started from local Stage 1 commit `9d9761e` on `feature/handoff-10-stage2-202609`. Added
+`ukcompany join --t YYYYMM`, which resolves point-in-time register/PSC/accounts inputs, rejects
+missing or duplicate normalised keys, left-joins from the register, prefixes source attributes,
+derives source-row-presence flags, and writes per-tier provenance/coverage manifests. Governed
+schema assertions exclude both PSC companies-per-person bands and exact-address concentration.
+
+Built internal governed and ungoverned joins from register 2026-10-01 (5,704,711 base rows), PSC
+2026-09-25 and accounts T=202609. Both retain exactly 5,704,711 unique register companies.
+Coverage: PSC 5,539,128; accounts 4,016,936; all three 4,014,892; register+PSC only 1,524,236;
+register+accounts only 2,044; register only 163,539. Source rows absent from the selected register:
+PSC 5,392,988 and accounts 2,874,341, with no unsupported dissolved classification. The 31-company
+difference from reconciliation's 4,016,905 both-dates-present denominator is explained and asserted:
+those rows match accounts by company number but have no register `LastMadeUpDate` and remain joined.
+
+Outputs are internal-only under `data/join/v1-internal-202609/`: governed 199,085,870 bytes / 63
+columns / 3.60s, ungoverned 206,304,904 bytes / 66 columns / 3.77s. Full input/output hashes,
+category breakdowns and availability semantics are in the manifests and
+`docs/join-internal-202609-stage2.md`. Tests use synthetic fixtures only. Kaggle, staging, accounts
+extraction/WIDE and published-v2 descriptions were untouched. Nothing pushed or published.
