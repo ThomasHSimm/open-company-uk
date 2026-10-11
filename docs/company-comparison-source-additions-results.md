@@ -75,22 +75,27 @@ training-only cross-validation.
 
 ## Paired increments
 
-The tables report candidate minus reference for ROC AUC and average precision. For log loss and
-Brier score, positive values mean the candidate reduced error. Intervals are paired bootstrap 95%
-intervals on identical held-out companies.
+The point in each table is the observed difference calculated directly from unrounded held-out
+metrics: candidate minus reference for ROC AUC and average precision, and reference minus candidate
+for log loss and Brier score so positive values favour the candidate. Parentheses are paired
+bootstrap 95% percentile intervals on identical held-out companies. The legacy JSON field named
+`estimate` is the bootstrap-replicate mean, not the observed difference. For example, primary
+register + accounts versus register has observed AP difference `0.11135021`, while its bootstrap
+mean is `0.10784981`; the interval is unchanged. Bootstrap means are diagnostic and are not used as
+the reported point estimates.
 
 ### Primary population
 
 | comparison | ROC AUC increment (95% CI) | AP increment (95% CI) | log-loss reduction (95% CI) | Brier reduction (95% CI) |
 |---|---:|---:|---:|---:|
-| register + accounts vs register | 0.00285 (0.00039, 0.00527) | 0.10785 (0.06849, 0.14421) | 0.000506 (0.000375, 0.000623) | 0.000106 (0.000068, 0.000139) |
-| register + accounts vs accounts availability | 0.00297 (0.00038, 0.00538) | 0.10567 (0.06846, 0.15333) | 0.000492 (0.000372, 0.000606) | 0.000104 (0.000068, 0.000139) |
-| register + PSC vs register | 0.00108 (-0.00051, 0.00249) | 0.03087 (-0.00346, 0.07855) | 0.000185 (0.000086, 0.000284) | 0.000035 (-0.000008, 0.000075) |
-| register + PSC vs PSC availability | -0.00066 (-0.00191, 0.00054) | 0.01988 (-0.00728, 0.05121) | 0.000100 (0.000022, 0.000182) | 0.000030 (-0.000002, 0.000058) |
-| all three vs register | 0.00419 (0.00163, 0.00657) | 0.12772 (0.07514, 0.17477) | 0.000625 (0.000475, 0.000757) | 0.000128 (0.000077, 0.000172) |
-| all three vs all-source availability | 0.00266 (0.00017, 0.00462) | 0.10993 (0.06539, 0.16132) | 0.000510 (0.000372, 0.000635) | 0.000117 (0.000075, 0.000161) |
-| all three vs register + accounts | 0.00139 (0.00063, 0.00228) | 0.02189 (-0.00818, 0.04915) | 0.000123 (0.000041, 0.000187) | 0.000024 (-0.000006, 0.000048) |
-| all three vs register + PSC | 0.00303 (0.00064, 0.00549) | 0.09678 (0.06978, 0.12802) | 0.000440 (0.000335, 0.000537) | 0.000094 (0.000067, 0.000119) |
+| register + accounts vs register | 0.00275 (0.00039, 0.00527) | 0.11135 (0.06849, 0.14421) | 0.000506 (0.000375, 0.000623) | 0.000107 (0.000068, 0.000139) |
+| register + accounts vs accounts availability | 0.00303 (0.00038, 0.00538) | 0.10661 (0.06846, 0.15333) | 0.000490 (0.000372, 0.000606) | 0.000103 (0.000068, 0.000139) |
+| register + PSC vs register | 0.00109 (-0.00051, 0.00249) | 0.03034 (-0.00346, 0.07855) | 0.000186 (0.000086, 0.000284) | 0.000036 (-0.000008, 0.000075) |
+| register + PSC vs PSC availability | -0.00068 (-0.00191, 0.00054) | 0.01658 (-0.00728, 0.05121) | 0.000095 (0.000022, 0.000182) | 0.000028 (-0.000002, 0.000058) |
+| all three vs register | 0.00417 (0.00163, 0.00657) | 0.13166 (0.07514, 0.17477) | 0.000626 (0.000475, 0.000757) | 0.000129 (0.000077, 0.000172) |
+| all three vs all-source availability | 0.00254 (0.00017, 0.00462) | 0.11325 (0.06539, 0.16132) | 0.000509 (0.000372, 0.000635) | 0.000117 (0.000075, 0.000161) |
+| all three vs register + accounts | 0.00142 (0.00063, 0.00228) | 0.02031 (-0.00818, 0.04915) | 0.000119 (0.000041, 0.000187) | 0.000023 (-0.000006, 0.000048) |
+| all three vs register + PSC | 0.00307 (0.00064, 0.00549) | 0.10133 (0.06978, 0.12802) | 0.000440 (0.000335, 0.000537) | 0.000093 (0.000067, 0.000119) |
 
 Accounts availability alone did not clearly improve on register: its ROC AUC, average-precision,
 log-loss and Brier intervals all included zero. PSC availability increased ROC AUC and reduced log
@@ -102,14 +107,14 @@ paired results are in the committed JSON.
 
 | comparison | ROC AUC increment (95% CI) | AP increment (95% CI) | log-loss reduction (95% CI) | Brier reduction (95% CI) |
 |---|---:|---:|---:|---:|
-| register + accounts vs register | 0.00362 (-0.00037, 0.00693) | 0.04584 (-0.03190, 0.11437) | 0.000362 (0.000143, 0.000538) | 0.000045 (-0.000047, 0.000112) |
-| register + accounts vs accounts availability | 0.00392 (0.00039, 0.00726) | 0.03410 (-0.03441, 0.10123) | 0.000332 (0.000133, 0.000512) | 0.000038 (-0.000040, 0.000100) |
-| register + PSC vs register | -0.00004 (-0.00133, 0.00141) | 0.00816 (-0.02511, 0.03321) | 0.000045 (-0.000022, 0.000100) | 0.000009 (-0.000011, 0.000025) |
-| register + PSC vs PSC availability | 0.00002 (-0.00101, 0.00121) | -0.00102 (-0.02716, 0.02623) | 0.000033 (-0.000026, 0.000085) | 0.000005 (-0.000015, 0.000023) |
-| all three vs register | 0.00402 (0.00044, 0.00753) | 0.03819 (-0.05591, 0.12332) | 0.000358 (0.000103, 0.000562) | 0.000046 (-0.000043, 0.000120) |
-| all three vs all-source availability | 0.00452 (0.00086, 0.00783) | 0.03076 (-0.04967, 0.10932) | 0.000337 (0.000099, 0.000530) | 0.000040 (-0.000055, 0.000109) |
-| all three vs register + accounts | 0.00050 (-0.00051, 0.00146) | -0.00392 (-0.02885, 0.02275) | 0.000008 (-0.000087, 0.000073) | 0.000005 (-0.000017, 0.000023) |
-| all three vs register + PSC | 0.00404 (0.00022, 0.00760) | 0.03056 (-0.03418, 0.10379) | 0.000314 (0.000090, 0.000503) | 0.000037 (-0.000043, 0.000100) |
+| register + accounts vs register | 0.00352 (-0.00037, 0.00693) | 0.04394 (-0.03190, 0.11437) | 0.000361 (0.000143, 0.000538) | 0.000045 (-0.000047, 0.000112) |
+| register + accounts vs accounts availability | 0.00392 (0.00039, 0.00726) | 0.03220 (-0.03441, 0.10123) | 0.000335 (0.000133, 0.000512) | 0.000037 (-0.000040, 0.000100) |
+| register + PSC vs register | -0.00006 (-0.00133, 0.00141) | 0.01044 (-0.02511, 0.03321) | 0.000047 (-0.000022, 0.000100) | 0.000010 (-0.000011, 0.000025) |
+| register + PSC vs PSC availability | 0.00003 (-0.00101, 0.00121) | -0.00215 (-0.02716, 0.02623) | 0.000033 (-0.000026, 0.000085) | 0.000004 (-0.000015, 0.000023) |
+| all three vs register | 0.00404 (0.00044, 0.00753) | 0.03459 (-0.05591, 0.12332) | 0.000367 (0.000103, 0.000562) | 0.000050 (-0.000043, 0.000120) |
+| all three vs all-source availability | 0.00454 (0.00086, 0.00783) | 0.02150 (-0.04967, 0.10932) | 0.000335 (0.000099, 0.000530) | 0.000039 (-0.000055, 0.000109) |
+| all three vs register + accounts | 0.00052 (-0.00051, 0.00146) | -0.00935 (-0.02885, 0.02275) | 0.000006 (-0.000087, 0.000073) | 0.000004 (-0.000017, 0.000023) |
+| all three vs register + PSC | 0.00410 (0.00022, 0.00760) | 0.02414 (-0.03418, 0.10379) | 0.000320 (0.000090, 0.000503) | 0.000039 (-0.000043, 0.000100) |
 
 ## Findings
 

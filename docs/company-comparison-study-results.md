@@ -133,10 +133,12 @@ selected only by training-fold weighted log loss.
 | PSC | 0.8824 | 0.0804 | 0.007850 | 0.001238 |
 | combined | 0.9719 | 0.4387 | 0.004555 | 0.000936 |
 
-Against structural + missingness on the identical held-out companies, the combined model improved
-ROC AUC by 0.1091 (paired bootstrap 95% CI 0.1011–0.1180), weighted AP by 0.3516
-(0.2843–0.4225), log loss by 0.003435 (0.003201–0.003655) and Brier score by 0.000297
-(0.000243–0.000342). Register attributes account for most ROC separation: the combined and
+Against structural + missingness on the identical held-out companies, the combined model's
+observed difference from the unrounded held-out metrics is 0.1097 ROC AUC (paired bootstrap 95% CI
+0.1011–0.1180), 0.3506 weighted AP (0.2843–0.4225), a 0.003436 log-loss reduction
+(0.003201–0.003655) and a 0.000296 Brier-score reduction (0.000243–0.000342). The bootstrap
+replicate mean is not used as the point estimate. Register attributes account for most ROC
+separation: the combined and
 register point estimates differ by only 0.0011 ROC AUC, although the predeclared paired uncertainty
 comparison was combined versus structural + missingness, not combined versus register.
 
@@ -144,10 +146,10 @@ comparison was combined versus structural + missingness, not combined versus reg
 
 | population | structural + missingness AUC / AP | combined AUC / AP | paired AUC increment (95% CI) |
 |---|---:|---:|---:|
-| primary | 0.8622 / 0.0881 | 0.9719 / 0.4387 | 0.1091 (0.1011–0.1180) |
-| complete PSC and accounts | 0.7887 / 0.0056 | 0.9639 / 0.4329 | 0.1750 (0.1637–0.1871) |
-| Active-only comparison | 0.8610 / 0.0915 | 0.9822 / 0.5195 | 0.1209 (0.1133–0.1276) |
-| private limited | 0.8573 / 0.0724 | 0.9722 / 0.3049 | 0.1154 (0.1067–0.1243) |
+| primary | 0.8622 / 0.0881 | 0.9719 / 0.4387 | 0.1097 (0.1011–0.1180) |
+| complete PSC and accounts | 0.7887 / 0.0056 | 0.9639 / 0.4329 | 0.1752 (0.1637–0.1871) |
+| Active-only comparison | 0.8610 / 0.0915 | 0.9822 / 0.5195 | 0.1211 (0.1133–0.1276) |
+| private limited | 0.8573 / 0.0724 | 0.9722 / 0.3049 | 0.1150 (0.1067–0.1243) |
 
 The planned sensitivities all retain separation; they do not repair label incompleteness or make
 the task prospective. Complete-source analysis is conditioned on source availability. The
