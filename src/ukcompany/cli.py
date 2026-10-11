@@ -362,6 +362,28 @@ def cmd_company_comparison(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_company_comparison_source_additions(args: argparse.Namespace) -> int:
+    from .validation.company_comparison import (
+        run_company_comparison_source_additions,
+        write_aggregate_json,
+    )
+
+    report = run_company_comparison_source_additions(
+        args.config,
+        memory_limit_gb=args.memory_limit_gb,
+        spill_dir=args.spill_dir,
+    )
+    output = write_aggregate_json(report, args.out)
+    print("-- exploratory company-comparison source additions --")
+    print("register + accounts; register + PSC; all sources; paired against register")
+    print(f"aggregate-only output={output}")
+    print(
+        f"runtime={report['runtime']['seconds']:.1f}s; "
+        f"peak_rss={report['runtime']['peak_rss_bytes'] / 1024**3:.2f} GiB"
+    )
+    return 0
+
+
 def _snapshot_cache_dir(args: argparse.Namespace) -> Path:
     if args.cache_dir:
         return Path(args.cache_dir)
@@ -546,6 +568,24 @@ def main(argv: list[str] | None = None) -> int:
         "--spill-dir", default="/tmp/ukcompany-company-comparison-spill"
     )
     p_company_comparison.set_defaults(func=cmd_company_comparison)
+
+    p_source_additions = sub.add_parser(
+        "company-comparison-source-additions",
+        help="run exploratory paired register/accounts/PSC source-addition comparisons",
+    )
+    p_source_additions.add_argument(
+        "--config", default="config/company-comparison-source-additions.json"
+    )
+    p_source_additions.add_argument(
+        "--out",
+        default="data/validation/company-comparison-source-additions-aggregate.json",
+    )
+    p_source_additions.add_argument("--memory-limit-gb", type=int, default=8)
+    p_source_additions.add_argument(
+        "--spill-dir",
+        default="/tmp/ukcompany-company-comparison-source-additions-spill",
+    )
+    p_source_additions.set_defaults(func=cmd_company_comparison_source_additions)
 
     p_snapshot = sub.add_parser("snapshot", help="manage monthly Companies House snapshots")
     snapshot_sub = p_snapshot.add_subparsers(dest="snapshot_command", required=True)

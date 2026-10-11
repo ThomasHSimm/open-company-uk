@@ -30,6 +30,15 @@ MODEL_NAMES = (
     "psc",
     "combined",
 )
+SOURCE_ADDITION_MODEL_NAMES = (
+    "register",
+    "register_accounts_availability",
+    "register_accounts",
+    "register_psc_availability",
+    "register_psc",
+    "register_all_availability",
+    "combined",
+)
 POPULATION_FILTERS = {
     "primary": "TRUE",
     "complete_source": "has_psc AND has_accounts",
@@ -448,12 +457,42 @@ def _feature_definition(spec: dict[str, Any], model_name: str) -> dict[str, list
         definition["binary"].extend(structural_binary)
         if model_name == "structural_missingness":
             definition["binary"].extend(["has_psc", "has_accounts", *all_missing])
-        elif model_name in {"register", "accounts", "psc"}:
-            family = family_definition(model_name)
-            for kind, columns in family.items():
+        elif model_name in {
+            "register_accounts_availability",
+            "register_psc_availability",
+            "register_all_availability",
+        }:
+            register = family_definition("register")
+            for kind, columns in register.items():
                 definition[kind].extend(columns)
-        elif model_name == "combined":
-            for family_name in spec["features"]:
+            availability_families = {
+                "register_accounts_availability": ("accounts",),
+                "register_psc_availability": ("psc",),
+                "register_all_availability": ("accounts", "psc"),
+            }[model_name]
+            for family_name in availability_families:
+                definition["binary"].append(f"has_{family_name}")
+                definition["binary"].extend(
+                    f"missing__{column}"
+                    for column in _all_feature_columns(spec, family_name)
+                )
+        elif model_name in {
+            "register",
+            "accounts",
+            "psc",
+            "register_accounts",
+            "register_psc",
+            "combined",
+        }:
+            content_families = {
+                "register": ("register",),
+                "accounts": ("accounts",),
+                "psc": ("psc",),
+                "register_accounts": ("register", "accounts"),
+                "register_psc": ("register", "psc"),
+                "combined": tuple(spec["features"]),
+            }[model_name]
+            for family_name in content_families:
                 family = family_definition(family_name)
                 for kind, columns in family.items():
                     definition[kind].extend(columns)
@@ -705,13 +744,21 @@ def _fit_model(frame, spec: dict[str, Any], model_name: str):
     return result, predictions
 
 
-def _paired_bootstrap(reference, combined, replicates: int, seed: int) -> dict[str, Any]:
+def _paired_bootstrap(
+    reference,
+    candidate,
+    replicates: int,
+    seed: int,
+    *,
+    reference_name: str = "structural+missingness",
+    candidate_name: str = "combined",
+) -> dict[str, Any]:
     import numpy as np
 
     outcome = reference["outcome"]
-    if not np.array_equal(outcome, combined["outcome"]):
+    if not np.array_equal(outcome, candidate["outcome"]):
         raise RuntimeError("paired model predictions do not share held-out outcomes")
-    if not np.array_equal(reference["weight"], combined["weight"]):
+    if not np.array_equal(reference["weight"], candidate["weight"]):
         raise RuntimeError("paired model predictions do not share held-out weights")
     by_label = {label: np.flatnonzero(outcome == label) for label in (0, 1)}
     rng = np.random.default_rng(seed)
@@ -723,23 +770,26 @@ def _paired_bootstrap(reference, combined, replicates: int, seed: int) -> dict[s
         ref_metrics = _weighted_core_metrics(
             outcome[indices], reference["probability"][indices], reference["weight"][indices]
         )
-        combined_metrics = _weighted_core_metrics(
-            outcome[indices], combined["probability"][indices], combined["weight"][indices]
+        candidate_metrics = _weighted_core_metrics(
+            outcome[indices], candidate["probability"][indices], candidate["weight"][indices]
         )
-        deltas["roc_auc"].append(combined_metrics["roc_auc"] - ref_metrics["roc_auc"])
+        deltas["roc_auc"].append(candidate_metrics["roc_auc"] - ref_metrics["roc_auc"])
         deltas["average_precision"].append(
-            combined_metrics["average_precision"] - ref_metrics["average_precision"]
+            candidate_metrics["average_precision"] - ref_metrics["average_precision"]
         )
-        deltas["log_loss"].append(ref_metrics["log_loss"] - combined_metrics["log_loss"])
-        deltas["brier"].append(ref_metrics["brier"] - combined_metrics["brier"])
+        deltas["log_loss"].append(ref_metrics["log_loss"] - candidate_metrics["log_loss"])
+        deltas["brier"].append(ref_metrics["brier"] - candidate_metrics["brier"])
     return {
         name: {
             "estimate": float(np.mean(values)),
             "ci95": [float(np.quantile(values, 0.025)), float(np.quantile(values, 0.975))],
             "orientation": (
-                "combined minus structural+missingness"
+                f"{candidate_name} minus {reference_name}"
                 if name in {"roc_auc", "average_precision"}
-                else "structural+missingness minus combined; positive favours combined"
+                else (
+                    f"{reference_name} minus {candidate_name}; "
+                    f"positive favours {candidate_name}"
+                )
             ),
         }
         for name, values in deltas.items()
@@ -1092,6 +1142,165 @@ def run_company_comparison(
     }
 
 
+def _assert_model_reproduction(
+    observed: dict[str, Any], expected: dict[str, Any], *, population: str, model: str
+) -> dict[str, Any]:
+    if observed["selected_c"] != expected["selected_c"]:
+        raise RuntimeError(f"{population}/{model} selected C did not reproduce")
+    if observed["predictor_count_before_encoding"] != expected["predictor_count_before_encoding"]:
+        raise RuntimeError(f"{population}/{model} predictor count did not reproduce")
+    if observed["encoded_feature_count"] != expected["encoded_feature_count"]:
+        raise RuntimeError(f"{population}/{model} encoded feature count did not reproduce")
+    differences = []
+    for observed_row, expected_row in zip(observed["cv"], expected["cv"], strict=True):
+        if observed_row["c"] != expected_row["c"]:
+            raise RuntimeError(f"{population}/{model} CV grid did not reproduce")
+        differences.append(
+            abs(observed_row["weighted_log_loss"] - expected_row["weighted_log_loss"])
+        )
+    for metric, value in observed["test_metrics"].items():
+        differences.append(abs(value - expected["test_metrics"][metric]))
+    maximum_difference = max(differences, default=0.0)
+    if maximum_difference > 1e-12:
+        raise RuntimeError(
+            f"{population}/{model} held-out result did not reproduce; "
+            f"maximum absolute difference={maximum_difference}"
+        )
+    return {
+        "status": "passed",
+        "maximum_absolute_metric_difference": maximum_difference,
+    }
+
+
+def run_company_comparison_source_additions(
+    exploratory_spec_path: str | Path,
+    *,
+    memory_limit_gb: int = 8,
+    spill_dir: str | Path = "/tmp/ukcompany-company-comparison-source-additions-spill",
+) -> dict[str, Any]:
+    """Run the exploratory source-addition comparisons on the frozen split."""
+    started = time.perf_counter()
+    exploratory_spec = load_study_spec(exploratory_spec_path)
+    if exploratory_spec.get("exploratory") is not True:
+        raise ValueError("source-addition analysis must be labelled exploratory")
+    if tuple(exploratory_spec["models"]) != SOURCE_ADDITION_MODEL_NAMES:
+        raise ValueError("source-addition model order differs from the frozen implementation")
+    if tuple(exploratory_spec["populations"]) != ("primary", "complete_source"):
+        raise ValueError("source-addition populations differ from the frozen implementation")
+
+    base_spec = load_study_spec(exploratory_spec["base_study_spec_path"])
+    base_spec_hash = study_spec_sha256(base_spec)
+    if base_spec_hash != exploratory_spec["base_study_spec_sha256"]:
+        raise ValueError("base study spec hash differs from the exploratory freeze")
+    baseline_path = Path(exploratory_spec["baseline_aggregate_path"])
+    if sha256_file(baseline_path) != exploratory_spec["baseline_aggregate_sha256"]:
+        raise ValueError("baseline aggregate hash differs from the exploratory freeze")
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    validate_company_comparison_report(baseline, base_spec)
+    input_records = verify_study_input(base_spec)
+    if baseline["inputs"] != input_records:
+        raise ValueError("baseline and current input provenance differ")
+
+    con = _connect(memory_limit_gb, str(spill_dir))
+    try:
+        cohort = _prepare_cohort(con, base_spec)
+        if cohort != baseline["cohort"]:
+            raise RuntimeError("cohort or held-out split counts changed from the baseline")
+        population_results = {}
+        for population_index, population in enumerate(exploratory_spec["populations"]):
+            population_started = time.perf_counter()
+            print(f"sampling exploratory population={population}", flush=True)
+            sampled, sampling = _sample_population(con, base_spec, population)
+            if sampling != baseline["populations"][population]["sampling"]:
+                raise RuntimeError(f"{population} sample records changed from the baseline")
+            prepared = _prepare_features(sampled, base_spec)
+            model_results = {}
+            predictions = {}
+            reproduction = {}
+            for model_name in exploratory_spec["models"]:
+                model_started = time.perf_counter()
+                print(
+                    f"fitting exploratory population={population} model={model_name}",
+                    flush=True,
+                )
+                model_result, model_predictions = _fit_model(
+                    prepared, base_spec, model_name
+                )
+                model_results[model_name] = model_result
+                predictions[model_name] = model_predictions
+                if model_name in {"register", "combined"}:
+                    reproduction[model_name] = _assert_model_reproduction(
+                        model_result,
+                        baseline["populations"][population]["models"][model_name],
+                        population=population,
+                        model=model_name,
+                    )
+                print(
+                    f"completed exploratory population={population} model={model_name} "
+                    f"seconds={time.perf_counter() - model_started:.1f}",
+                    flush=True,
+                )
+            paired = {}
+            for comparison_index, comparison in enumerate(
+                exploratory_spec["comparisons"]
+            ):
+                paired[comparison["name"]] = _paired_bootstrap(
+                    predictions[comparison["reference"]],
+                    predictions[comparison["candidate"]],
+                    base_spec["modelling"]["bootstrap_replicates"],
+                    base_spec["modelling"]["random_seed"]
+                    + population_index * 100
+                    + comparison_index,
+                    reference_name=comparison["reference"],
+                    candidate_name=comparison["candidate"],
+                )
+            population_results[population] = {
+                "sampling": sampling,
+                "baseline_reproduction": reproduction,
+                "models": model_results,
+                "paired_comparisons": paired,
+            }
+            print(
+                f"completed exploratory population={population} "
+                f"seconds={time.perf_counter() - population_started:.1f}",
+                flush=True,
+            )
+    finally:
+        con.close()
+
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    peak_bytes = peak if __import__("sys").platform == "darwin" else peak * 1024
+    return {
+        "study": "exploratory company-comparison source additions",
+        "study_version": exploratory_spec["study_version"],
+        "exploratory": True,
+        "reason": exploratory_spec["reason"],
+        "aggregate_only": True,
+        "not_forecasting": True,
+        "code_commit": _git_commit(),
+        "exploratory_spec": {
+            "path": str(exploratory_spec_path),
+            "sha256": sha256_file(exploratory_spec_path),
+            "contents": exploratory_spec,
+        },
+        "base_study_spec": {
+            "path": exploratory_spec["base_study_spec_path"],
+            "sha256": base_spec_hash,
+        },
+        "baseline_aggregate": {
+            "path": str(baseline_path),
+            "sha256": exploratory_spec["baseline_aggregate_sha256"],
+        },
+        "inputs": input_records,
+        "cohort": cohort,
+        "populations": population_results,
+        "runtime": {
+            "seconds": time.perf_counter() - started,
+            "peak_rss_bytes": peak_bytes,
+        },
+    }
+
+
 def write_aggregate_json(report: dict[str, Any], path: str | Path) -> Path:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -1240,6 +1449,79 @@ def validate_company_comparison_report(
         "cross_validation_warning_gate": "passed_by_fail-fast_run_completion",
         "populations_checked": len(populations),
         "unchanged_from_diagnostic_design": unchanged_design,
+    }
+
+
+def validate_company_comparison_source_additions(
+    report: dict[str, Any],
+    exploratory_spec: dict[str, Any],
+    base_spec: dict[str, Any],
+    baseline: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate the exploratory source-addition aggregate before reporting it."""
+    import numpy as np
+
+    if report.get("exploratory") is not True or not report.get("aggregate_only"):
+        raise ValueError("exploratory aggregate scope flags are missing")
+    if report.get("not_forecasting") is not True:
+        raise ValueError("exploratory aggregate is not labelled non-forecasting")
+    if report["exploratory_spec"]["contents"] != exploratory_spec:
+        raise ValueError("embedded exploratory spec differs from the frozen spec")
+    if report["base_study_spec"]["sha256"] != study_spec_sha256(base_spec):
+        raise ValueError("base study spec hash does not reconcile")
+    if report["cohort"] != baseline["cohort"]:
+        raise ValueError("cohort or held-out split differs from the baseline")
+    if set(report["populations"]) != set(exploratory_spec["populations"]):
+        raise ValueError("exploratory populations differ from the frozen spec")
+
+    final_fits = 0
+    cv_fits = 0
+    paired_contrasts = 0
+    for population_name, population in report["populations"].items():
+        if population["sampling"] != baseline["populations"][population_name]["sampling"]:
+            raise ValueError(f"{population_name} sampling differs from the baseline")
+        if set(population["models"]) != set(exploratory_spec["models"]):
+            raise ValueError(f"{population_name} models differ from the frozen spec")
+        for baseline_model in ("register", "combined"):
+            reproduction = population["baseline_reproduction"].get(baseline_model, {})
+            if reproduction.get("status") != "passed":
+                raise ValueError(f"{population_name}/{baseline_model} did not reproduce")
+            if reproduction.get("maximum_absolute_metric_difference", 1) > 1e-12:
+                raise ValueError(f"{population_name}/{baseline_model} reproduction drifted")
+        for model_name, model in population["models"].items():
+            final_fits += 1
+            if model.get("convergence_warnings") != 0:
+                raise ValueError(f"{population_name}/{model_name} did not converge")
+            cv = model.get("cv", [])
+            if [row["c"] for row in cv] != [
+                float(value) for value in base_spec["modelling"]["c_grid"]
+            ]:
+                raise ValueError(f"{population_name}/{model_name} CV grid is incomplete")
+            if not all(np.isfinite(row["weighted_log_loss"]) for row in cv):
+                raise ValueError(f"{population_name}/{model_name} CV metric is non-finite")
+            cv_fits += len(cv) * base_spec["modelling"]["cv_folds"]
+            if not all(np.isfinite(value) for value in model["test_metrics"].values()):
+                raise ValueError(f"{population_name}/{model_name} metric is non-finite")
+        expected_comparisons = {row["name"] for row in exploratory_spec["comparisons"]}
+        if set(population["paired_comparisons"]) != expected_comparisons:
+            raise ValueError(f"{population_name} paired contrasts are incomplete")
+        for comparison in population["paired_comparisons"].values():
+            paired_contrasts += 1
+            for metric in comparison.values():
+                values = [metric["estimate"], *metric["ci95"]]
+                if not all(np.isfinite(value) for value in values):
+                    raise ValueError(f"{population_name} paired metric is non-finite")
+
+    return {
+        "status": "passed",
+        "exploratory": True,
+        "unchanged_cohort_split_and_sampling": True,
+        "baseline_models_reproduced": 2 * len(report["populations"]),
+        "final_fits_checked": final_fits,
+        "final_convergence_warnings": 0,
+        "cross_validation_fits_checked": cv_fits,
+        "cross_validation_warning_gate": "passed_by_fail-fast_run_completion",
+        "paired_contrasts_checked": paired_contrasts,
     }
 
 

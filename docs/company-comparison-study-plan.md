@@ -312,3 +312,40 @@ Approved implementation decisions:
 The narrow contemporaneous study is approved and feasible with existing local data. Broader
 adverse-insolvency coverage, especially classification of liquidation, remains outside scope and
 requires the additional point-in-time outcome evidence described above.
+
+## 7. Exploratory source-addition follow-up
+
+**Status:** frozen before execution. This follow-up is explicitly exploratory because the original
+held-out results were inspected before these comparisons were specified. Reusing that held-out
+partition cannot provide a new confirmatory test, and paired intervals must not be interpreted as
+unbiased model-selection evidence.
+
+Keep the original cohort, labels, company-number split, uniform comparison sample, inverse-
+probability weights, transformations, regularisation grid and training-only cross-validation
+unchanged. Run only the primary population and the complete PSC-and-accounts intersection. The
+complete-source analysis is selection-conditioned and remains secondary.
+
+Fit these seven predeclared matrices on identical companies within each population:
+
+1. **Register:** the existing structural + register model.
+2. **Register + accounts availability:** register plus `has_accounts` and accounts attribute
+   observation indicators, but no accounts values.
+3. **Register + accounts:** register plus accounts values, categories and missingness.
+4. **Register + PSC availability:** register plus `has_psc` and PSC attribute observation
+   indicators, but no PSC values.
+5. **Register + PSC:** register plus PSC values, categories and missingness.
+6. **Register + all-source availability:** register plus both source flags and all accounts/PSC
+   observation indicators, but no accounts or PSC values.
+7. **All three:** the existing combined register + accounts + PSC model.
+
+Report paired bootstrap differences in weighted held-out ROC AUC, average precision, log loss and
+Brier score for each source-content model versus register, each source-content model versus its
+availability control, all three versus register and all-source availability, and all three versus
+each two-source model. Refit register and all-three and require exact reproduction of their frozen
+CV and held-out metrics before accepting any new comparison.
+
+This asks whether accounts or PSC adds contemporaneous classification information beyond register
+attributes and how much apparent gain is explained by source availability. It does not determine
+whether either source predicts future insolvency, and it must not create a score, threshold, rule
+or company ranking. Confirmation requires a new dated snapshot or prospective outcomes not used in
+this analysis.

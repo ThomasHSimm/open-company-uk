@@ -9,15 +9,20 @@ import pytest
 
 from ukcompany.validation.company_comparison import (
     MODEL_NAMES,
+    SOURCE_ADDITION_MODEL_NAMES,
     _build_pipeline,
+    _feature_definition,
     _prepare_features,
     build_committed_company_comparison_aggregate,
     classify_status,
     run_company_comparison,
+    run_company_comparison_source_additions,
     sampling_plan,
     sha256_file,
     split_bucket,
+    study_spec_sha256,
     validate_company_comparison_report,
+    validate_company_comparison_source_additions,
     validate_predictor_whitelist,
 )
 
@@ -146,6 +151,25 @@ def test_forbidden_predictors_fail_closed():
         validate_predictor_whitelist(["invented_signal"], spec)
 
 
+def test_source_addition_feature_sets_separate_availability_from_content():
+    spec = json.loads(Path("config/company-comparison-study.json").read_text())
+    register_accounts = _feature_definition(spec, "register_accounts")
+    register_accounts_availability = _feature_definition(
+        spec, "register_accounts_availability"
+    )
+    register_psc = _feature_definition(spec, "register_psc")
+    register_psc_availability = _feature_definition(spec, "register_psc_availability")
+
+    assert "acc_equity" in register_accounts["signed_log1p"]
+    assert "acc_equity" not in register_accounts_availability["signed_log1p"]
+    assert "has_accounts" in register_accounts_availability["binary"]
+    assert "missing__acc_equity" in register_accounts_availability["binary"]
+    assert "psc_n_records" in register_psc["log1p"]
+    assert "psc_n_records" not in register_psc_availability["log1p"]
+    assert "has_psc" in register_psc_availability["binary"]
+    assert "missing__psc_n_records" in register_psc_availability["binary"]
+
+
 def test_preprocessing_statistics_are_fit_from_training_data_only(tmp_path: Path):
     pytest.importorskip("sklearn")
     spec_path, joined = _synthetic_spec(tmp_path)
@@ -208,3 +232,50 @@ def test_synthetic_study_is_aggregate_only_and_reconciles(tmp_path: Path):
         for effect in committed["descriptives"]["categorical_effects"]
         for row in effect["counts"]
     )
+
+
+def test_synthetic_source_additions_reproduce_baseline_and_pair_models(tmp_path: Path):
+    pytest.importorskip("sklearn")
+    base_spec_path, _ = _synthetic_spec(tmp_path)
+    base_spec = json.loads(base_spec_path.read_text())
+    baseline = run_company_comparison(
+        base_spec_path, memory_limit_gb=1, spill_dir=tmp_path / "baseline-spill"
+    )
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text(json.dumps(baseline, sort_keys=True))
+
+    exploratory_spec = json.loads(
+        Path("config/company-comparison-source-additions.json").read_text()
+    )
+    exploratory_spec.update(
+        {
+            "base_study_spec_path": str(base_spec_path),
+            "base_study_spec_sha256": study_spec_sha256(base_spec),
+            "baseline_aggregate_path": str(baseline_path),
+            "baseline_aggregate_sha256": sha256_file(baseline_path),
+        }
+    )
+    exploratory_spec_path = tmp_path / "source-additions.json"
+    exploratory_spec_path.write_text(json.dumps(exploratory_spec))
+    report = run_company_comparison_source_additions(
+        exploratory_spec_path,
+        memory_limit_gb=1,
+        spill_dir=tmp_path / "source-additions-spill",
+    )
+    validation = validate_company_comparison_source_additions(
+        report, exploratory_spec, base_spec, baseline
+    )
+
+    assert validation["status"] == "passed"
+    assert validation["final_fits_checked"] == 14
+    assert validation["cross_validation_fits_checked"] == 28
+    assert set(report["populations"]["primary"]["models"]) == set(
+        SOURCE_ADDITION_MODEL_NAMES
+    )
+    assert (
+        report["populations"]["primary"]["baseline_reproduction"]["register"][
+            "maximum_absolute_metric_difference"
+        ]
+        == 0
+    )
+    assert "company_number" not in report["populations"]["primary"]
