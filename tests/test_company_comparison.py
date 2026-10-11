@@ -335,6 +335,7 @@ def test_accounts_followup_groups_assign_every_column_once():
 
 
 def test_paired_bootstrap_reports_observed_difference_not_bootstrap_mean():
+    pytest.importorskip("sklearn")
     import numpy as np
 
     from ukcompany.validation.company_comparison import _paired_bootstrap
@@ -372,6 +373,7 @@ def _weighted_metrics_for_test(predictions):
 
 
 def test_grouped_permutation_preserves_rows_categories_and_weighted_baseline():
+    pytest.importorskip("sklearn")
     import numpy as np
 
     class FrozenPipeline:
