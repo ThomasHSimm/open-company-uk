@@ -2974,3 +2974,114 @@ is a unique-proceeding count. Signal tables continue to show observed-feature de
 candidate coverage; missing values remain unavailable, never non-firing. Updated `docs/TASKS.md` to
 mark the historical accounts case-only study complete, historical matched evaluation blocked by
 data availability, and prospective evaluation on hold.
+
+## Company-attribute comparison study design (2026-10-10)
+
+Inspected the governed Handoff 10 join schema, provenance and a bounded aggregate over status,
+company type, age, register accounts category and source-presence flags. The selected register has
+5,704,711 companies: 7,318 carry a clearly adverse administration/receivership/voluntary-
+arrangement status, 5,589,063 have no recorded adverse insolvency status, and 108,330 liquidation
+rows are ambiguous because the join lacks case types needed to separate solvent members' voluntary
+liquidation. Source coverage among the narrow adverse group is 5,810 PSC, 4,961 accounts and 4,881
+both; no row-level aggregate was retained.
+
+Added `docs/company-comparison-study-plan.md`. It predeclares outcome exclusions, structural and
+size sensitivities, missingness reporting, descriptive effect sizes, a regularised logistic
+baseline, consistent full/intersection populations, company-separated splits, training-only
+preprocessing and prevalence correction. This remains contemporaneous association/classification,
+not forecasting, causal inference, a new rule, ranking or score. No study, download or heavy scan
+was run; broader liquidation labels require separately approved point-in-time case-type data.
+
+## Company-attribute comparison study (2026-10-11)
+
+Completed the approved narrow contemporaneous study from the governed Handoff 10 join: 7,318
+companies with an explicit administration/receivership/voluntary-arrangement status versus
+5,589,063 `Active` or `Active - Proposal to Strike off` companies without recorded adverse
+insolvency. All 108,330 ambiguous `Liquidation` rows remained excluded. PSC is dated 2026-09-25,
+register 2026-10-01 and accounts `T=202609`; the six-day PSC difference is accepted and accounts
+registration month is not represented as ZIP publication time.
+
+The original diagnostic run at `303dd60` took 10,407.5 seconds / 5.84 GiB peak but every final
+`saga` fit warned on convergence and CV convergence was not certifiable, so none of its metrics was
+reported. Commit `a3b67db` switched to `newton-cholesky` at fixed tolerance `1e-6`, made every CV
+and final convergence warning fatal, removed unused calibration fitting from paired bootstrap
+replicates and added progress logging. Cohorts, features, regularisation grid, sampling, seeds,
+held-out split and metrics were unchanged; this was a numerical correction, not performance
+tuning. The corrected detached job `corrected-newton-cholesky-20261011` finished in 342.2 seconds
+at 5.80 GiB peak. All 252 CV fits passed the fail-fast gate and all 28 final fits recorded zero
+warnings; hashes, cohort closure, positive inclusion probabilities, weights and finite metrics
+were revalidated before promotion.
+
+Primary weighted held-out ROC AUC / average precision were 0.7395 / 0.0087 for missingness only,
+0.7924 / 0.0069 structural, 0.8622 / 0.0881 structural + missingness, 0.9708 / 0.3226 register,
+0.9266 / 0.0467 accounts, 0.8824 / 0.0804 PSC and 0.9719 / 0.4387 combined. Combined minus
+structural + missingness ROC AUC was 0.1091 (paired bootstrap 95% CI 0.1011–0.1180). The largest
+descriptive differences were already-current compliance and charge attributes: accounts overdue
+81.48% versus 6.06%, confirmation statement overdue 76.35% versus 10.90%, and median registered
+charges 3 versus 0. These may be consequences of an existing adverse process, not antecedent risk.
+
+Full denominators, effect sizes, complete-source/Active-only/private-limited sensitivities,
+provenance and limitations are in `docs/company-comparison-study-results.md`; the committed JSON is
+aggregate-only with sub-10 categorical cells pooled or suppressed. The private full aggregate,
+diagnostic output, persistent log and run metadata remain gitignored. No company scores, rules,
+thresholds, downloads, pushes or publication were produced. Validation: 283 tests passed, one was
+deselected, Ruff passed, and the committed aggregate reproduced byte-for-byte from the promoted
+private JSON.
+
+## Exploratory company-comparison source additions (2026-10-11)
+
+Completed the predeclared exploratory comparison of register + accounts, register + PSC and all
+three sources against register-only and source-availability controls. The held-out partition had
+already been inspected, so this is explicitly not a confirmatory source-selection analysis. The
+first attempt stopped before producing results because the original DuckDB reservoir identities
+had not been retained and were not reproducible across processes. Before seeing follow-up output,
+froze a deterministic company-number hash sample while preserving the cohort, split, fixed sample
+sizes, positive inclusion probabilities, weights, features, transformations and CV grid.
+
+In the primary population, register + accounts versus register increased weighted held-out ROC AUC
+by 0.00285 (paired 95% CI 0.00039–0.00527) and average precision by 0.10785 (0.06849–0.14421), and
+reduced log loss by 0.000506 (0.000375–0.000623). PSC content produced much smaller increments:
+its ROC AUC and average-precision intervals versus register and versus PSC availability crossed
+zero, although primary log loss improved. Adding PSC after accounts gave a small primary AUC and
+log-loss increment but no resolved average-precision/Brier increment, and no resolved increment in
+the complete-source population. These are associations with already-recorded status, not future
+insolvency predictions or production feature decisions.
+
+The corrected run took 316.3 seconds and 2.27 GiB peak RSS. All 126 CV fits passed the fail-fast
+warning gate, all 14 final fits recorded zero convergence warnings, and validation checked 22 paired
+contrasts, four sample-identity hashes, input provenance, cohort/split closure, sampling weights and
+finite metrics. The full synthetic suite passed 285 tests with one deselected, Ruff passed, and the
+committed JSON reproduced exactly from the validated private aggregate. Committed outputs are
+aggregate-only; private run artifacts remain gitignored. No downloads, scores, rankings,
+thresholds, new rules, pushes or publication were produced.
+
+## Exploratory accounts ablation and feature importance (2026-10-11)
+
+Corrected paired-difference presentation in both company-comparison reports: point estimates now
+come directly from unrounded held-out metrics, while percentile intervals come from the paired
+bootstrap. The previous JSON `estimate` field is explicitly identified as the bootstrap-replicate
+mean. For primary register + accounts versus register, observed AP difference is 0.11135021 rather
+than the 0.10784981 bootstrap mean; the interval and underlying predictions are unchanged.
+
+Froze all 17 accounts predictors into financial position/scale, financial change,
+recency/history, or availability/reporting metadata before fitting. Reused the source-addition
+cohort, deterministic samples, split, weights, preprocessing, regularisation grid and convergence
+gates. In the primary population, financial content beyond the common metadata baseline improved
+ROC AUC by 0.00284 and AP by 0.06931; adding timing/history after financial content changed ROC AUC
+by -0.00018 but improved AP by 0.02318 and reduced log loss by 0.000083. Complete-source financial
+ROC AUC and log-loss gains persisted, with wider AP/Brier intervals.
+
+Extracted all regularised coefficients with scale/reference semantics and ran ten seeded held-out
+raw-feature permutations without refitting. Register compliance dominated all-three log-loss
+importance (0.009881), followed by charges (0.001156), accounts financial content (0.000938),
+availability/reporting (0.000638), PSC (0.000466) and accounts timing/history (0.000230).
+Working-capital/liquidity and employee scale were the leading financial blocks; PSC identity
+verification and record composition exceeded ownership/voting. Correlation, missingness and
+contemporaneous measurement prevent causal or stable feature-ranking interpretations.
+
+The run at commit `511a605` took 410.7 seconds and 2.33 GiB peak RSS. All 126 CV fits and 14 final
+fits passed convergence gates; validation checked ten paired contrasts, 1,698 coefficient rows and
+170 permutation blocks. Focused synthetic tests cover grouping, arithmetic, permutation integrity,
+weighted metrics and sample preservation; the full suite passed 289 tests with one deselected and
+Ruff passed. Outputs are aggregate-only; no downloads, company scores, rules, thresholds, pushes,
+publication or further model search occurred.

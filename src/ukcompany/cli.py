@@ -338,6 +338,74 @@ def cmd_accounts_lead_time(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_company_comparison(args: argparse.Namespace) -> int:
+    from .validation.company_comparison import run_company_comparison, write_aggregate_json
+
+    report = run_company_comparison(
+        args.config,
+        memory_limit_gb=args.memory_limit_gb,
+        spill_dir=args.spill_dir,
+    )
+    output = write_aggregate_json(report, args.out)
+    counts = report["spec"]["contents"]["outcome"]["expected_counts"]
+    print("-- contemporaneous recorded-status company comparison --")
+    print(
+        f"adverse={counts['recorded_adverse']:,}; "
+        f"comparison={counts['without_recorded_adverse']:,}; "
+        f"ambiguous-liquidation-excluded={counts['ambiguous_liquidation']:,}"
+    )
+    print(f"aggregate-only output={output}")
+    print(
+        f"runtime={report['runtime']['seconds']:.1f}s; "
+        f"peak_rss={report['runtime']['peak_rss_bytes'] / 1024**3:.2f} GiB"
+    )
+    return 0
+
+
+def cmd_company_comparison_source_additions(args: argparse.Namespace) -> int:
+    from .validation.company_comparison import (
+        run_company_comparison_source_additions,
+        write_aggregate_json,
+    )
+
+    report = run_company_comparison_source_additions(
+        args.config,
+        memory_limit_gb=args.memory_limit_gb,
+        spill_dir=args.spill_dir,
+    )
+    output = write_aggregate_json(report, args.out)
+    print("-- exploratory company-comparison source additions --")
+    print("register + accounts; register + PSC; all sources; paired against register")
+    print(f"aggregate-only output={output}")
+    print(
+        f"runtime={report['runtime']['seconds']:.1f}s; "
+        f"peak_rss={report['runtime']['peak_rss_bytes'] / 1024**3:.2f} GiB"
+    )
+    return 0
+
+
+def cmd_company_comparison_accounts_importance(args: argparse.Namespace) -> int:
+    from .validation.company_comparison import write_aggregate_json
+    from .validation.company_comparison_followup import (
+        run_company_comparison_accounts_importance,
+    )
+
+    report = run_company_comparison_accounts_importance(
+        args.config,
+        memory_limit_gb=args.memory_limit_gb,
+        spill_dir=args.spill_dir,
+    )
+    output = write_aggregate_json(report, args.out)
+    print("-- exploratory accounts content, timing and feature importance --")
+    print("financial content versus timing/history; coefficients and permutation importance")
+    print(f"aggregate-only output={output}")
+    print(
+        f"runtime={report['runtime']['seconds']:.1f}s; "
+        f"peak_rss={report['runtime']['peak_rss_bytes'] / 1024**3:.2f} GiB"
+    )
+    return 0
+
+
 def _snapshot_cache_dir(args: argparse.Namespace) -> Path:
     if args.cache_dir:
         return Path(args.cache_dir)
@@ -506,6 +574,58 @@ def main(argv: list[str] | None = None) -> int:
     p_lead_time.add_argument("--memory-limit-gb", type=int, default=8)
     p_lead_time.add_argument("--spill-dir", default="/tmp/ukcompany-lead-time-spill")
     p_lead_time.set_defaults(func=cmd_accounts_lead_time)
+
+    p_company_comparison = sub.add_parser(
+        "company-comparison",
+        help="run the aggregate-only contemporaneous recorded-status comparison study",
+    )
+    p_company_comparison.add_argument(
+        "--config", default="config/company-comparison-study.json"
+    )
+    p_company_comparison.add_argument(
+        "--out", default="data/validation/company-comparison-aggregate.json"
+    )
+    p_company_comparison.add_argument("--memory-limit-gb", type=int, default=8)
+    p_company_comparison.add_argument(
+        "--spill-dir", default="/tmp/ukcompany-company-comparison-spill"
+    )
+    p_company_comparison.set_defaults(func=cmd_company_comparison)
+
+    p_source_additions = sub.add_parser(
+        "company-comparison-source-additions",
+        help="run exploratory paired register/accounts/PSC source-addition comparisons",
+    )
+    p_source_additions.add_argument(
+        "--config", default="config/company-comparison-source-additions.json"
+    )
+    p_source_additions.add_argument(
+        "--out",
+        default="data/validation/company-comparison-source-additions-aggregate.json",
+    )
+    p_source_additions.add_argument("--memory-limit-gb", type=int, default=8)
+    p_source_additions.add_argument(
+        "--spill-dir",
+        default="/tmp/ukcompany-company-comparison-source-additions-spill",
+    )
+    p_source_additions.set_defaults(func=cmd_company_comparison_source_additions)
+
+    p_accounts_importance = sub.add_parser(
+        "company-comparison-accounts-importance",
+        help="run exploratory accounts ablations and frozen-model importance",
+    )
+    p_accounts_importance.add_argument(
+        "--config", default="config/company-comparison-accounts-importance.json"
+    )
+    p_accounts_importance.add_argument(
+        "--out",
+        default="data/validation/company-comparison-accounts-importance-aggregate.json",
+    )
+    p_accounts_importance.add_argument("--memory-limit-gb", type=int, default=8)
+    p_accounts_importance.add_argument(
+        "--spill-dir",
+        default="/tmp/ukcompany-company-comparison-accounts-importance-spill",
+    )
+    p_accounts_importance.set_defaults(func=cmd_company_comparison_accounts_importance)
 
     p_snapshot = sub.add_parser("snapshot", help="manage monthly Companies House snapshots")
     snapshot_sub = p_snapshot.add_subparsers(dest="snapshot_command", required=True)

@@ -1,0 +1,188 @@
+{
+  "study_version": "v1-internal-202609",
+  "input": {
+    "join_path": "data/join/v1-internal-202609/governed/joined_company_features.parquet",
+    "manifest_path": "data/join/v1-internal-202609/governed/join_manifest.json",
+    "join_sha256": "909414cb617ce3862954cb55dff1bde54983a7898cb7ec0c02f15026e098e031",
+    "register_snapshot_date": "2026-10-01",
+    "psc_snapshot_date": "2026-09-25",
+    "accounts_reference_month": 202609,
+    "rows": 5704711
+  },
+  "outcome": {
+    "adverse_statuses": [
+      "In Administration",
+      "Live but Receiver Manager on at least one charge",
+      "Voluntary Arrangement",
+      "In Administration/Administrative Receiver",
+      "RECEIVERSHIP",
+      "ADMINISTRATION ORDER",
+      "ADMINISTRATIVE RECEIVER",
+      "In Administration/Receiver Manager",
+      "RECEIVER MANAGER / ADMINISTRATIVE RECEIVER",
+      "VOLUNTARY ARRANGEMENT / RECEIVER MANAGER",
+      "VOLUNTARY ARRANGEMENT / ADMINISTRATIVE RECEIVER"
+    ],
+    "comparison_statuses": [
+      "Active",
+      "Active - Proposal to Strike off"
+    ],
+    "ambiguous_statuses": [
+      "Liquidation"
+    ],
+    "expected_counts": {
+      "recorded_adverse": 7318,
+      "without_recorded_adverse": 5589063,
+      "ambiguous_liquidation": 108330
+    }
+  },
+  "sampling": {
+    "split_seed": 20260901,
+    "sample_seed": 20260925,
+    "train_fraction": 0.8,
+    "comparison_per_case": 20
+  },
+  "modelling": {
+    "cv_folds": 3,
+    "c_grid": [0.1, 1.0, 10.0],
+    "bootstrap_replicates": 300,
+    "categorical_min_frequency": 10,
+    "solver": "newton-cholesky",
+    "max_iter": 800,
+    "tolerance": 1e-6,
+    "random_seed": 20261010
+  },
+  "structural": {
+    "categorical": [
+      "reg_company_type",
+      "age_band"
+    ],
+    "generated_binary": [
+      "sic_A",
+      "sic_B",
+      "sic_C",
+      "sic_D",
+      "sic_E",
+      "sic_F",
+      "sic_G",
+      "sic_H",
+      "sic_I",
+      "sic_J",
+      "sic_K",
+      "sic_L",
+      "sic_M",
+      "sic_N",
+      "sic_O",
+      "sic_P",
+      "sic_Q",
+      "sic_R",
+      "sic_S",
+      "sic_T",
+      "sic_U",
+      "sic_unknown",
+      "sic_multiple"
+    ],
+    "age_bands_months": [0, 24, 60, 120, 240]
+  },
+  "features": {
+    "register": {
+      "log1p": [
+        "reg_n_sic_codes",
+        "reg_n_previous_names",
+        "reg_n_charges",
+        "reg_n_charges_outstanding",
+        "reg_n_charges_part_satisfied",
+        "reg_n_charges_satisfied",
+        "reg_n_companies_same_postcode"
+      ],
+      "binary": [
+        "reg_flag_dormant_sic",
+        "reg_flag_non_trading_sic",
+        "reg_flag_nec_sic",
+        "reg_accounts_overdue",
+        "reg_confirmation_statement_overdue",
+        "reg_accounts_never_filed"
+      ],
+      "categorical": [
+        "reg_accounts_category"
+      ]
+    },
+    "accounts": {
+      "log1p": [
+        "acc_n_periods_available"
+      ],
+      "signed_log1p": [
+        "acc_months_since_latest_period_end",
+        "acc_prior_gap_months",
+        "acc_equity",
+        "acc_current_assets",
+        "acc_creditors_within_one_year",
+        "acc_net_current_assets",
+        "acc_cash",
+        "acc_current_ratio",
+        "acc_d_equity",
+        "acc_d_net_current_assets",
+        "acc_d_cash"
+      ],
+      "binary": [
+        "acc_negative_equity",
+        "acc_net_current_liabilities",
+        "acc_employees_unit_anomaly"
+      ],
+      "categorical": [
+        "acc_employee_band",
+        "acc_accounts_category"
+      ]
+    },
+    "psc": {
+      "log1p": [
+        "psc_n_records",
+        "psc_n_ceased",
+        "psc_n_distinct_natures",
+        "psc_n_individual",
+        "psc_n_corporate",
+        "psc_n_legal_person",
+        "psc_n_super_secure",
+        "psc_n_corporate_uk_format_regno",
+        "psc_unmapped_natures",
+        "psc_n_psc_id_verified",
+        "psc_n_psc_id_verification_due",
+        "psc_n_psc_id_statement_filed"
+      ],
+      "binary": [
+        "psc_has_appointment_rights",
+        "psc_has_significant_influence"
+      ],
+      "categorical": [
+        "psc_natures_of_control",
+        "psc_max_ownership_band",
+        "psc_max_voting_band",
+        "psc_active_psc_statement_codes",
+        "psc_information_state"
+      ]
+    }
+  },
+  "forbidden_predictors": [
+    "company_number",
+    "reg_company_status",
+    "study_group",
+    "outcome",
+    "reg_date_of_creation",
+    "reg_accounts_next_due",
+    "reg_confirmation_statement_next_due",
+    "acc_latest_period_end",
+    "acc_prior_period_end",
+    "psc_corporate_reg_numbers",
+    "insolvency_case_types",
+    "insolvency_adverse_case_types",
+    "insolvency_solvent_case_types",
+    "has_been_liquidated",
+    "has_insolvency_link"
+  ],
+  "populations": [
+    "primary",
+    "complete_source",
+    "active_only",
+    "private_limited"
+  ]
+}

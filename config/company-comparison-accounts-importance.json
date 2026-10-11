@@ -1,0 +1,371 @@
+{
+  "study_version": "v1-internal-202609-exploratory-accounts-importance",
+  "exploratory": true,
+  "reason": "The held-out results were inspected before this accounts ablation and importance analysis was specified. Results are exploratory and cannot be used as confirmatory model-selection evidence.",
+  "base_study_spec_path": "config/company-comparison-study.json",
+  "base_study_spec_sha256": "6fd23b82cb221cab64caa80a094593f667713d90332cae2384cb6c449f20d70c",
+  "source_additions_result_path": "docs/company-comparison-source-additions-results.json",
+  "source_additions_result_sha256": "4f482bb7355724019adf286cf655c7d2115ce7986e3eada802c9d24b4e035ac5",
+  "source_additions_aggregate_sha256": "78bb2707308dfba4bd965b9b186b2708623558de8b8fae2f3faab5d9e70f3956",
+  "populations": [
+    "primary",
+    "complete_source"
+  ],
+  "sample_identity_hashes": {
+    "primary": {
+      "train": "5da655927896cab8200d87a15011f819cffaeb45425024b2bf92becf1a93a6f7",
+      "test": "6b28fb76340f8aba73581eec9ad03468d2943fd5c2053d0123b2c23bbbf7adc7"
+    },
+    "complete_source": {
+      "train": "2b217294711d3da3927771e589f1b8422aafd4f58f7bd87863ca71b6e5af0909",
+      "test": "da9ca321bbe3931ca87a9a99e45f3a7f736970f47a3566ce205482341a02466f"
+    }
+  },
+  "accounts_column_groups": {
+    "financial_position_scale": [
+      "acc_equity",
+      "acc_current_assets",
+      "acc_creditors_within_one_year",
+      "acc_net_current_assets",
+      "acc_cash",
+      "acc_current_ratio",
+      "acc_negative_equity",
+      "acc_net_current_liabilities",
+      "acc_employee_band"
+    ],
+    "financial_change": [
+      "acc_d_equity",
+      "acc_d_net_current_assets",
+      "acc_d_cash"
+    ],
+    "recency_history": [
+      "acc_n_periods_available",
+      "acc_months_since_latest_period_end",
+      "acc_prior_gap_months"
+    ],
+    "availability_reporting_metadata": [
+      "has_accounts",
+      "missing__acc_n_periods_available",
+      "missing__acc_months_since_latest_period_end",
+      "missing__acc_prior_gap_months",
+      "missing__acc_equity",
+      "missing__acc_current_assets",
+      "missing__acc_creditors_within_one_year",
+      "missing__acc_net_current_assets",
+      "missing__acc_cash",
+      "missing__acc_negative_equity",
+      "missing__acc_net_current_liabilities",
+      "missing__acc_current_ratio",
+      "missing__acc_employee_band",
+      "missing__acc_employees_unit_anomaly",
+      "missing__acc_d_equity",
+      "missing__acc_d_net_current_assets",
+      "missing__acc_d_cash",
+      "missing__acc_accounts_category",
+      "acc_accounts_category",
+      "acc_employees_unit_anomaly"
+    ]
+  },
+  "assignment_notes": {
+    "acc_employee_band": "Financial position/scale: it measures workforce scale despite categorical encoding.",
+    "acc_current_ratio": "Financial position/scale: it is a dimensionless financial ratio, not a timing field.",
+    "acc_accounts_category": "Availability/reporting metadata: it describes the filing/reporting regime and is not a financial value.",
+    "acc_employees_unit_anomaly": "Availability/reporting metadata: it is a parser/reporting diagnostic and is not financial content.",
+    "observation_indicators": "All missing__acc_* indicators remain in every ablation baseline. For logical permutation blocks they move with their owning raw feature to preserve the null pattern; source-presence and reporting-only fields form separate availability blocks."
+  },
+  "ablation_models": {
+    "accounts_metadata_baseline": [],
+    "accounts_financial": [
+      "financial_position_scale",
+      "financial_change"
+    ],
+    "accounts_history": [
+      "recency_history"
+    ],
+    "accounts_financial_history": [
+      "financial_position_scale",
+      "financial_change",
+      "recency_history"
+    ]
+  },
+  "coefficient_models": [
+    "register",
+    "register_accounts",
+    "register_psc",
+    "combined"
+  ],
+  "importance_groups": {
+    "logical": {
+      "structural_company_type": [
+        "reg_company_type"
+      ],
+      "structural_age": [
+        "age_band"
+      ],
+      "structural_sic_sections": [
+        "sic_A",
+        "sic_B",
+        "sic_C",
+        "sic_D",
+        "sic_E",
+        "sic_F",
+        "sic_G",
+        "sic_H",
+        "sic_I",
+        "sic_J",
+        "sic_K",
+        "sic_L",
+        "sic_M",
+        "sic_N",
+        "sic_O",
+        "sic_P",
+        "sic_Q",
+        "sic_R",
+        "sic_S",
+        "sic_T",
+        "sic_U",
+        "sic_unknown",
+        "sic_multiple"
+      ],
+      "register_sic_characteristics": [
+        "reg_n_sic_codes",
+        "reg_flag_dormant_sic",
+        "reg_flag_non_trading_sic",
+        "reg_flag_nec_sic"
+      ],
+      "register_previous_names": [
+        "reg_n_previous_names"
+      ],
+      "register_charges": [
+        "reg_n_charges",
+        "reg_n_charges_outstanding",
+        "reg_n_charges_part_satisfied",
+        "reg_n_charges_satisfied"
+      ],
+      "register_address_concentration": [
+        "reg_n_companies_same_postcode"
+      ],
+      "register_compliance": [
+        "reg_accounts_category",
+        "reg_accounts_overdue",
+        "reg_confirmation_statement_overdue",
+        "reg_accounts_never_filed"
+      ],
+      "accounts_equity_position": [
+        "acc_equity",
+        "acc_negative_equity"
+      ],
+      "accounts_working_capital_liquidity": [
+        "acc_current_assets",
+        "acc_creditors_within_one_year",
+        "acc_net_current_assets",
+        "acc_net_current_liabilities",
+        "acc_current_ratio"
+      ],
+      "accounts_cash": [
+        "acc_cash"
+      ],
+      "accounts_employee_scale": [
+        "acc_employee_band"
+      ],
+      "accounts_financial_change": [
+        "acc_d_equity",
+        "acc_d_net_current_assets",
+        "acc_d_cash"
+      ],
+      "accounts_timing_history": [
+        "acc_n_periods_available",
+        "acc_months_since_latest_period_end",
+        "acc_prior_gap_months"
+      ],
+      "accounts_reporting_metadata": [
+        "acc_accounts_category",
+        "acc_employees_unit_anomaly"
+      ],
+      "accounts_presence": [
+        "has_accounts"
+      ],
+      "psc_record_composition": [
+        "psc_n_records",
+        "psc_n_ceased",
+        "psc_n_individual",
+        "psc_n_corporate",
+        "psc_n_legal_person"
+      ],
+      "psc_ownership_voting": [
+        "psc_max_ownership_band",
+        "psc_max_voting_band"
+      ],
+      "psc_control_natures": [
+        "psc_n_distinct_natures",
+        "psc_natures_of_control",
+        "psc_has_appointment_rights",
+        "psc_has_significant_influence",
+        "psc_unmapped_natures"
+      ],
+      "psc_identity_verification": [
+        "psc_n_psc_id_verified",
+        "psc_n_psc_id_verification_due",
+        "psc_n_psc_id_statement_filed"
+      ],
+      "psc_information_protection": [
+        "psc_n_super_secure",
+        "psc_n_corporate_uk_format_regno",
+        "psc_active_psc_statement_codes",
+        "psc_information_state"
+      ],
+      "psc_presence": [
+        "has_psc"
+      ]
+    },
+    "broad": {
+      "structural": [
+        "reg_company_type",
+        "age_band",
+        "sic_A",
+        "sic_B",
+        "sic_C",
+        "sic_D",
+        "sic_E",
+        "sic_F",
+        "sic_G",
+        "sic_H",
+        "sic_I",
+        "sic_J",
+        "sic_K",
+        "sic_L",
+        "sic_M",
+        "sic_N",
+        "sic_O",
+        "sic_P",
+        "sic_Q",
+        "sic_R",
+        "sic_S",
+        "sic_T",
+        "sic_U",
+        "sic_unknown",
+        "sic_multiple"
+      ],
+      "register_compliance": [
+        "reg_accounts_category",
+        "reg_accounts_overdue",
+        "reg_confirmation_statement_overdue",
+        "reg_accounts_never_filed"
+      ],
+      "charges": [
+        "reg_n_charges",
+        "reg_n_charges_outstanding",
+        "reg_n_charges_part_satisfied",
+        "reg_n_charges_satisfied"
+      ],
+      "other_register": [
+        "reg_n_sic_codes",
+        "reg_flag_dormant_sic",
+        "reg_flag_non_trading_sic",
+        "reg_flag_nec_sic",
+        "reg_n_previous_names",
+        "reg_n_companies_same_postcode"
+      ],
+      "accounts_financial_content": [
+        "acc_equity",
+        "acc_current_assets",
+        "acc_creditors_within_one_year",
+        "acc_net_current_assets",
+        "acc_cash",
+        "acc_current_ratio",
+        "acc_negative_equity",
+        "acc_net_current_liabilities",
+        "acc_employee_band",
+        "acc_d_equity",
+        "acc_d_net_current_assets",
+        "acc_d_cash"
+      ],
+      "accounts_timing_history": [
+        "acc_n_periods_available",
+        "acc_months_since_latest_period_end",
+        "acc_prior_gap_months"
+      ],
+      "psc": [
+        "psc_n_records",
+        "psc_n_ceased",
+        "psc_n_distinct_natures",
+        "psc_n_individual",
+        "psc_n_corporate",
+        "psc_n_legal_person",
+        "psc_n_super_secure",
+        "psc_n_corporate_uk_format_regno",
+        "psc_unmapped_natures",
+        "psc_n_psc_id_verified",
+        "psc_n_psc_id_verification_due",
+        "psc_n_psc_id_statement_filed",
+        "psc_has_appointment_rights",
+        "psc_has_significant_influence",
+        "psc_natures_of_control",
+        "psc_max_ownership_band",
+        "psc_max_voting_band",
+        "psc_active_psc_statement_codes",
+        "psc_information_state"
+      ],
+      "availability_reporting": [
+        "has_accounts",
+        "has_psc",
+        "acc_accounts_category",
+        "acc_employees_unit_anomaly",
+        "missing__acc_n_periods_available",
+        "missing__acc_months_since_latest_period_end",
+        "missing__acc_prior_gap_months",
+        "missing__acc_equity",
+        "missing__acc_current_assets",
+        "missing__acc_creditors_within_one_year",
+        "missing__acc_net_current_assets",
+        "missing__acc_cash",
+        "missing__acc_negative_equity",
+        "missing__acc_net_current_liabilities",
+        "missing__acc_current_ratio",
+        "missing__acc_employee_band",
+        "missing__acc_employees_unit_anomaly",
+        "missing__acc_d_equity",
+        "missing__acc_d_net_current_assets",
+        "missing__acc_d_cash",
+        "missing__acc_accounts_category",
+        "missing__psc_n_records",
+        "missing__psc_n_ceased",
+        "missing__psc_n_distinct_natures",
+        "missing__psc_n_individual",
+        "missing__psc_n_corporate",
+        "missing__psc_n_legal_person",
+        "missing__psc_n_super_secure",
+        "missing__psc_n_corporate_uk_format_regno",
+        "missing__psc_unmapped_natures",
+        "missing__psc_n_psc_id_verified",
+        "missing__psc_n_psc_id_verification_due",
+        "missing__psc_n_psc_id_statement_filed",
+        "missing__psc_has_appointment_rights",
+        "missing__psc_has_significant_influence",
+        "missing__psc_natures_of_control",
+        "missing__psc_max_ownership_band",
+        "missing__psc_max_voting_band",
+        "missing__psc_active_psc_statement_codes",
+        "missing__psc_information_state"
+      ]
+    }
+  },
+  "permutation": {
+    "replicates": 10,
+    "seed": 20261011,
+    "primary_metric": "weighted_log_loss_increase",
+    "secondary_metric": "weighted_average_precision_decrease",
+    "variability": "mean and sample standard deviation across seeded permutations; not a confidence interval over companies",
+    "missingness_policy": "For logical and content-group permutations, an observation indicator moves with its owning raw feature. The broad availability/reporting diagnostic instead permutes source presence, observation indicators and reporting-only metadata together while holding content fixed; it is overlapping and non-additive, and its counterfactual combinations are not interpreted causally."
+  },
+  "difference_reporting": {
+    "point_estimate": "observed difference from unrounded held-out metrics",
+    "interval": "paired stratified bootstrap percentile interval",
+    "bootstrap_mean": "diagnostic only and explicitly labelled when shown"
+  },
+  "outputs": {
+    "private_aggregate": "data/validation/company-comparison-accounts-importance-aggregate.json",
+    "committed_aggregate": "docs/company-comparison-accounts-importance-results.json",
+    "report": "docs/company-comparison-accounts-importance-results.md"
+  }
+}

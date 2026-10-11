@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="455" viewBox="0 0 920 455" role="img" aria-labelledby="title desc">
+  <title id="title">Primary all-three model grouped permutation importance</title>
+  <desc id="desc">Register compliance dominates weighted log-loss increase, followed by charges and accounts financial content.</desc>
+  <rect width="920" height="455" fill="#ffffff"/>
+  <style>
+    text { font-family: system-ui, sans-serif; fill: #1f2937; }
+    .title { font-size: 18px; font-weight: 700; }
+    .label { font-size: 13px; }
+    .value { font-size: 12px; }
+    .axis { stroke: #9ca3af; stroke-width: 1; }
+    .grid { stroke: #e5e7eb; stroke-width: 1; }
+  </style>
+  <text class="title" x="20" y="28">Weighted log-loss increase after grouped permutation</text>
+  <line class="axis" x1="245" y1="48" x2="245" y2="414"/>
+  <line class="grid" x1="395" y1="48" x2="395" y2="414"/><text class="value" x="386" y="435">.0025</text>
+  <line class="grid" x1="545" y1="48" x2="545" y2="414"/><text class="value" x="536" y="435">.0050</text>
+  <line class="grid" x1="695" y1="48" x2="695" y2="414"/><text class="value" x="686" y="435">.0075</text>
+  <line class="grid" x1="845" y1="48" x2="845" y2="414"/><text class="value" x="836" y="435">.0100</text>
+  <text class="label" x="20" y="78">Register compliance</text><rect x="245" y="61" width="593" height="20" fill="#b91c1c"/><text class="value" x="844" y="76">.009881</text>
+  <text class="label" x="20" y="123">Charges</text><rect x="245" y="106" width="69" height="20" fill="#dc2626"/><text class="value" x="320" y="121">.001156</text>
+  <text class="label" x="20" y="168">Accounts financial content</text><rect x="245" y="151" width="56" height="20" fill="#2563eb"/><text class="value" x="307" y="166">.000938</text>
+  <text class="label" x="20" y="213">Availability/reporting</text><rect x="245" y="196" width="38" height="20" fill="#7c3aed"/><text class="value" x="289" y="211">.000638</text>
+  <text class="label" x="20" y="258">PSC</text><rect x="245" y="241" width="28" height="20" fill="#059669"/><text class="value" x="279" y="256">.000466</text>
+  <text class="label" x="20" y="303">Structural</text><rect x="245" y="286" width="15" height="20" fill="#6b7280"/><text class="value" x="266" y="301">.000242</text>
+  <text class="label" x="20" y="348">Accounts timing/history</text><rect x="245" y="331" width="14" height="20" fill="#60a5fa"/><text class="value" x="265" y="346">.000230</text>
+  <text class="label" x="20" y="393">Other register</text><rect x="245" y="376" width="11" height="20" fill="#9ca3af"/><text class="value" x="262" y="391">.000183</text>
+  <text class="value" x="20" y="450">Linear scale; mean across 10 seeded permutations. Variability is reported in the table.</text>
+</svg>

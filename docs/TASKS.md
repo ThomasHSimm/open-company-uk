@@ -30,6 +30,25 @@ The audit log remains append-only; move items between sections here as work is v
   companies. This establishes case-only temporal availability and covered-case patterns, not
   specificity, precision or population performance. Results are in
   `validation-case-lead-time-results.md`.
+- **Contemporaneous company-attribute comparison complete (internal only):** compared the narrow
+  7,318-company recorded administration/receivership/voluntary-arrangement group with companies
+  without recorded adverse insolvency in the Handoff 10 register population. Ambiguous liquidation
+  was excluded. Weighted held-out structural, register, accounts, PSC, missingness and combined
+  logistic models plus predeclared cohort sensitivities are reported in
+  `company-comparison-study-results.md`. This is recorded-status association/classification, not
+  future insolvency prediction; no scores, rankings, rules or thresholds were produced.
+- **Exploratory source-addition comparison complete (internal only):** on a newly frozen,
+  reproducible sample using the unchanged cohort and split, compared register + accounts, register
+  + PSC and all three with register-only and availability controls. Accounts added the clearest
+  incremental classification information; PSC content added little. Results are exploratory
+  because the held-out partition had already been inspected and are reported in
+  `company-comparison-source-additions-results.md`.
+- **Exploratory accounts ablation and model-importance follow-up complete (internal only):** kept
+  the frozen deterministic samples and separated accounts financial content from timing/history
+  and reporting metadata. Financial content added most of the incremental separation;
+  timing/history added smaller AP and loss improvements. Coefficients and repeated held-out grouped
+  permutation importance are reported in `company-comparison-accounts-importance-results.md`;
+  they are conditional exploratory explanations, not causal effects or production rankings.
 - Baseline Quarto methodology site under `docs/site/` (local build only).
 
 ## Blocked / on hold
