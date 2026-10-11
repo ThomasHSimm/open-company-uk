@@ -3027,3 +3027,30 @@ diagnostic output, persistent log and run metadata remain gitignored. No company
 thresholds, downloads, pushes or publication were produced. Validation: 283 tests passed, one was
 deselected, Ruff passed, and the committed aggregate reproduced byte-for-byte from the promoted
 private JSON.
+
+## Exploratory company-comparison source additions (2026-10-11)
+
+Completed the predeclared exploratory comparison of register + accounts, register + PSC and all
+three sources against register-only and source-availability controls. The held-out partition had
+already been inspected, so this is explicitly not a confirmatory source-selection analysis. The
+first attempt stopped before producing results because the original DuckDB reservoir identities
+had not been retained and were not reproducible across processes. Before seeing follow-up output,
+froze a deterministic company-number hash sample while preserving the cohort, split, fixed sample
+sizes, positive inclusion probabilities, weights, features, transformations and CV grid.
+
+In the primary population, register + accounts versus register increased weighted held-out ROC AUC
+by 0.00285 (paired 95% CI 0.00039–0.00527) and average precision by 0.10785 (0.06849–0.14421), and
+reduced log loss by 0.000506 (0.000375–0.000623). PSC content produced much smaller increments:
+its ROC AUC and average-precision intervals versus register and versus PSC availability crossed
+zero, although primary log loss improved. Adding PSC after accounts gave a small primary AUC and
+log-loss increment but no resolved average-precision/Brier increment, and no resolved increment in
+the complete-source population. These are associations with already-recorded status, not future
+insolvency predictions or production feature decisions.
+
+The corrected run took 316.3 seconds and 2.27 GiB peak RSS. All 126 CV fits passed the fail-fast
+warning gate, all 14 final fits recorded zero convergence warnings, and validation checked 22 paired
+contrasts, four sample-identity hashes, input provenance, cohort/split closure, sampling weights and
+finite metrics. The full synthetic suite passed 285 tests with one deselected, Ruff passed, and the
+committed JSON reproduced exactly from the validated private aggregate. Committed outputs are
+aggregate-only; private run artifacts remain gitignored. No downloads, scores, rankings,
+thresholds, new rules, pushes or publication were produced.

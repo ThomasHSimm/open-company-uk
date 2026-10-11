@@ -201,3 +201,12 @@ The detached corrected job was `corrected-newton-cholesky-20261011`, PID 247524,
   publication time or exact public availability timestamp.
 - No threshold, company score, ranking, production rule or prospective claim is produced. A future
   insolvency evaluation still requires dated baseline enrolment and later outcome follow-up.
+
+## Exploratory source-addition follow-up
+
+After inspecting this study's held-out results, a separately labelled exploratory analysis compared
+register + accounts, register + PSC and all three against register-only and source-availability
+controls. Accounts supplied the clearest incremental classification information; PSC content added
+little beyond register and availability. Because the test partition was already inspected, this is
+not confirmatory source-selection evidence. See
+[`company-comparison-source-additions-results.md`](company-comparison-source-additions-results.md).

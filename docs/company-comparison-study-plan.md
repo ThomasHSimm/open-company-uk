@@ -315,10 +315,11 @@ requires the additional point-in-time outcome evidence described above.
 
 ## 7. Exploratory source-addition follow-up
 
-**Status:** frozen before execution. This follow-up is explicitly exploratory because the original
-held-out results were inspected before these comparisons were specified. Reusing that held-out
-partition cannot provide a new confirmatory test, and paired intervals must not be interpreted as
-unbiased model-selection evidence.
+**Status:** completed as an explicitly exploratory follow-up. The original held-out results were
+inspected before these comparisons were specified. Reusing that held-out partition cannot provide
+a new confirmatory test, and paired intervals must not be interpreted as unbiased model-selection
+evidence. Aggregate findings and validation are in
+[`company-comparison-source-additions-results.md`](company-comparison-source-additions-results.md).
 
 Keep the original cohort, labels, company-number split, uniform comparison sampling design,
 inverse-probability weights, transformations, regularisation grid and training-only cross-

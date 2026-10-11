@@ -1,0 +1,4253 @@
+{
+  "aggregate_only": true,
+  "base_study_spec": {
+    "path": "config/company-comparison-study.json",
+    "sha256": "6fd23b82cb221cab64caa80a094593f667713d90332cae2384cb6c449f20d70c"
+  },
+  "baseline_aggregate": {
+    "path": "data/validation/company-comparison-aggregate.json",
+    "sha256": "bcd1ab2d6bd1cf37abc6d9e064cad62411dc68d2ab2b2fc9a8ff309c6fbfacb9"
+  },
+  "code_commit": "adfe22b44651e3d94f3d149bfb0721108068652b",
+  "cohort": {
+    "split_counts": [
+      {
+        "companies": 1119506,
+        "outcome": 0,
+        "split": "test"
+      },
+      {
+        "companies": 1456,
+        "outcome": 1,
+        "split": "test"
+      },
+      {
+        "companies": 4469557,
+        "outcome": 0,
+        "split": "train"
+      },
+      {
+        "companies": 5862,
+        "outcome": 1,
+        "split": "train"
+      }
+    ],
+    "status_counts": {
+      "ambiguous_liquidation": 108330,
+      "recorded_adverse": 7318,
+      "without_recorded_adverse": 5589063
+    }
+  },
+  "exploratory": true,
+  "exploratory_spec": {
+    "contents": {
+      "base_study_spec_path": "config/company-comparison-study.json",
+      "base_study_spec_sha256": "6fd23b82cb221cab64caa80a094593f667713d90332cae2384cb6c449f20d70c",
+      "baseline_aggregate_path": "data/validation/company-comparison-aggregate.json",
+      "baseline_aggregate_sha256": "bcd1ab2d6bd1cf37abc6d9e064cad62411dc68d2ab2b2fc9a8ff309c6fbfacb9",
+      "comparisons": [
+        {
+          "candidate": "register_accounts_availability",
+          "name": "register_accounts_availability_vs_register",
+          "reference": "register"
+        },
+        {
+          "candidate": "register_accounts",
+          "name": "register_accounts_vs_register",
+          "reference": "register"
+        },
+        {
+          "candidate": "register_accounts",
+          "name": "register_accounts_vs_availability",
+          "reference": "register_accounts_availability"
+        },
+        {
+          "candidate": "register_psc_availability",
+          "name": "register_psc_availability_vs_register",
+          "reference": "register"
+        },
+        {
+          "candidate": "register_psc",
+          "name": "register_psc_vs_register",
+          "reference": "register"
+        },
+        {
+          "candidate": "register_psc",
+          "name": "register_psc_vs_availability",
+          "reference": "register_psc_availability"
+        },
+        {
+          "candidate": "register_all_availability",
+          "name": "register_all_availability_vs_register",
+          "reference": "register"
+        },
+        {
+          "candidate": "combined",
+          "name": "combined_vs_register",
+          "reference": "register"
+        },
+        {
+          "candidate": "combined",
+          "name": "combined_vs_all_availability",
+          "reference": "register_all_availability"
+        },
+        {
+          "candidate": "combined",
+          "name": "combined_vs_register_accounts",
+          "reference": "register_accounts"
+        },
+        {
+          "candidate": "combined",
+          "name": "combined_vs_register_psc",
+          "reference": "register_psc"
+        }
+      ],
+      "exploratory": true,
+      "models": [
+        "register",
+        "register_accounts_availability",
+        "register_accounts",
+        "register_psc_availability",
+        "register_psc",
+        "register_all_availability",
+        "combined"
+      ],
+      "populations": [
+        "primary",
+        "complete_source"
+      ],
+      "reason": "The original held-out results were inspected before this source-addition analysis was specified, so all comparisons and intervals are exploratory.",
+      "sampling_resolution": "The original fixed-size reservoir identities were not retained and DuckDB reservoir sampling was not identity-reproducible with preserve_insertion_order=false. Keep the original cohort, split, eligible counts, sample sizes, probabilities and weights, but freeze a new deterministic company-number hash sample before fitting. Record only its train/test hashes.",
+      "study_version": "v1-internal-202609-exploratory-source-additions"
+    },
+    "path": "config/company-comparison-source-additions.json",
+    "sha256": "496bd0a87810c1503bb1a45333db6446ad1e95bda57fcec8e76efd78b37aaaff"
+  },
+  "inputs": {
+    "generated_at": "2026-10-10T12:33:23.902905+00:00",
+    "join": {
+      "bytes": 199085870,
+      "path": "data/join/v1-internal-202609/governed/joined_company_features.parquet",
+      "sha256": "909414cb617ce3862954cb55dff1bde54983a7898cb7ec0c02f15026e098e031"
+    },
+    "manifest": {
+      "bytes": 16953,
+      "path": "data/join/v1-internal-202609/governed/join_manifest.json",
+      "sha256": "d93c82f3aa57d95e5d168728bcda619a5400ffb9f2c3b0a8656296d7f5174ef1"
+    },
+    "pairing": {
+      "accounts_reference_month": 202609,
+      "archive_timing_note": "Accounts registration-month availability is distinct from monthly ZIP publication/download time; this does not claim the ZIP existed at month-end.",
+      "psc_snapshot_date": "2026-09-25",
+      "register_snapshot_date": "2026-10-01",
+      "rule": "Register is dated the first day of T+1; PSC is the latest available snapshot on or before that date; accounts rows were available in registration month <= T."
+    }
+  },
+  "not_forecasting": true,
+  "populations": {
+    "complete_source": {
+      "models": {
+        "combined": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.005046916865799092
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.005078734317225264
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.005111347433772194
+            }
+          ],
+          "encoded_feature_count": 315,
+          "model": "combined",
+          "predictor_count_before_encoding": 127,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.33862107585814855,
+            "brier": 0.0009697077885665152,
+            "calibration_intercept": -0.2086937115973422,
+            "calibration_slope": 0.940761157126432,
+            "log_loss": 0.004915779611106495,
+            "roc_auc": 0.9653768734714788
+          },
+          "top_coefficients": [
+            {
+              "coefficient": 1.1054559348377984,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": -1.0300503369937042,
+              "feature": "categorical__acc_employee_band_0"
+            },
+            {
+              "coefficient": -1.02768237232436,
+              "feature": "categorical__acc_employee_band_1-10"
+            },
+            {
+              "coefficient": 1.0028398284988846,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": 0.9019570428590171,
+              "feature": "categorical__acc_employee_band_51-250"
+            },
+            {
+              "coefficient": 0.8927516213441175,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": -0.8563868884332045,
+              "feature": "categorical__psc_natures_of_control_right-to-share-surplus-assets-25-to-50-percent-limited-liability-partnership,voting-rights-25-to-50-percent-limited-liability-partnership"
+            },
+            {
+              "coefficient": 0.7663079339136593,
+              "feature": "categorical__acc_employee_band_11-50"
+            },
+            {
+              "coefficient": 0.721218779342081,
+              "feature": "signed_log1p__acc_current_assets"
+            },
+            {
+              "coefficient": -0.678318938608531,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": -0.6783189386085309,
+              "feature": "categorical__acc_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": -0.6350134207955624,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent-as-firm,right-to-appoint-and-remove-directors-as-firm,significant-influence-or-control-as-firm,voting-rights-75-to-100-percent-as-firm"
+            },
+            {
+              "coefficient": -0.5926316964605285,
+              "feature": "signed_log1p__acc_equity"
+            },
+            {
+              "coefficient": 0.5861724002689378,
+              "feature": "binary__missing__acc_current_ratio"
+            },
+            {
+              "coefficient": 0.5847792290980017,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": -0.5565634843977132,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.5557854692189874,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": 0.5215478242651969,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-50-to-75-percent,right-to-appoint-and-remove-directors,voting-rights-50-to-75-percent"
+            },
+            {
+              "coefficient": 0.5110142750632498,
+              "feature": "signed_log1p__acc_creditors_within_one_year"
+            },
+            {
+              "coefficient": -0.5007772223212313,
+              "feature": "binary__acc_negative_equity"
+            },
+            {
+              "coefficient": 0.4743816436906337,
+              "feature": "categorical__psc_natures_of_control_voting-rights-25-to-50-percent"
+            },
+            {
+              "coefficient": 0.4610805489189732,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": 0.45183020535965407,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control-limited-liability-partnership"
+            },
+            {
+              "coefficient": 0.4290531644737429,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.4290531644737429,
+              "feature": "categorical__acc_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.41755383910339583,
+              "feature": "categorical__acc_employee_band_251+"
+            },
+            {
+              "coefficient": -0.4155799076360024,
+              "feature": "categorical__psc_information_state_none_reported"
+            },
+            {
+              "coefficient": -0.4013381115148016,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,ownership-of-shares-50-to-75-percent,right-to-appoint-and-remove-directors,voting-rights-25-to-50-percent,voting-rights-50-to-75-percent"
+            },
+            {
+              "coefficient": -0.39660664880348556,
+              "feature": "categorical__age_band_240+"
+            },
+            {
+              "coefficient": 0.3901281083015054,
+              "feature": "categorical__psc_information_state_statement_only"
+            },
+            {
+              "coefficient": 0.3793619639347749,
+              "feature": "binary__missing__acc_cash"
+            },
+            {
+              "coefficient": -0.3709427554545641,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": -0.3709427554545641,
+              "feature": "categorical__acc_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": -0.3645684321694878,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent"
+            },
+            {
+              "coefficient": 0.361160007781923,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,ownership-of-shares-75-to-100-percent,voting-rights-25-to-50-percent,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.3517817775669141,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control-as-trust"
+            },
+            {
+              "coefficient": 0.34714275116397725,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,voting-rights-25-to-50-percent"
+            },
+            {
+              "coefficient": -0.34108232495997814,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control"
+            },
+            {
+              "coefficient": -0.32153118215234583,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": 0.3105043043388198,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 0.3105043043388198,
+              "feature": "categorical__acc_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 0.3020967177447161,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,significant-influence-or-control,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.30050389369556424,
+              "feature": "log1p__acc_n_periods_available"
+            },
+            {
+              "coefficient": -0.29191279026816724,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,ownership-of-shares-75-to-100-percent-as-firm,ownership-of-shares-75-to-100-percent-as-trust,right-to-appoint-and-remove-directors,right-to-appoint-and-remove-directors-as-firm,right-to-appoint-and-remove-directors-as-trust,voting-rights-75-to-100-percent,voting-rights-75-to-100-percent-as-firm,voting-rights-75-to-100-percent-as-trust"
+            },
+            {
+              "coefficient": 0.28529687438836543,
+              "feature": "log1p__psc_n_individual"
+            },
+            {
+              "coefficient": 0.28526814054926375,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": 0.28526814054926375,
+              "feature": "categorical__acc_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": -0.27739168376425366,
+              "feature": "binary__missing__acc_current_assets"
+            },
+            {
+              "coefficient": -0.2758041814605014,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,right-to-appoint-and-remove-directors,voting-rights-25-to-50-percent,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": -0.27427406271081656,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,ownership-of-shares-75-to-100-percent-as-firm,ownership-of-shares-75-to-100-percent-as-trust,right-to-appoint-and-remove-directors,right-to-appoint-and-remove-directors-as-firm,right-to-appoint-and-remove-directors-as-trust,significant-influence-or-control,significant-influence-or-control-as-firm,significant-influence-or-control-as-trust,voting-rights-75-to-100-percent,voting-rights-75-to-100-percent-as-firm,voting-rights-75-to-100-percent-as-trust"
+            }
+          ]
+        },
+        "register": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.005536224926728836
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.00554080785924689
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.005542765805147035
+            }
+          ],
+          "encoded_feature_count": 74,
+          "model": "register",
+          "predictor_count_before_encoding": 53,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.30403176254653624,
+            "brier": 0.0010192331544456625,
+            "calibration_intercept": 0.24948251637289448,
+            "calibration_slope": 1.0427266662730457,
+            "log_loss": 0.005282753591873694,
+            "roc_auc": 0.9613361549011834
+          },
+          "top_coefficients": [
+            {
+              "coefficient": -1.4119583171054204,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": 1.369391222945113,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": -1.1629709074789756,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": 0.8831193731424742,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": 0.810039467872628,
+              "feature": "categorical__reg_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": 0.7625050122360622,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": 0.7017324721453176,
+              "feature": "categorical__reg_accounts_category_FULL"
+            },
+            {
+              "coefficient": 0.7005192658073959,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.5288496937269751,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": 0.526450935041316,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 0.45904217273146125,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": -0.42294872404394357,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": 0.3979402563271868,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": 0.38205318202256905,
+              "feature": "categorical__reg_accounts_category_AUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.3608514834420716,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": -0.357161948381031,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": -0.34067744067081523,
+              "feature": "categorical__age_band_0-23"
+            },
+            {
+              "coefficient": -0.24921636228017907,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": -0.23054708075619126,
+              "feature": "binary__sic_S"
+            },
+            {
+              "coefficient": -0.2302158327632396,
+              "feature": "categorical__reg_company_type_Community Interest Company"
+            },
+            {
+              "coefficient": 0.17226015178620738,
+              "feature": "log1p__reg_n_previous_names"
+            },
+            {
+              "coefficient": -0.15975258915549734,
+              "feature": "binary__sic_J"
+            },
+            {
+              "coefficient": -0.1498405707238648,
+              "feature": "binary__sic_M"
+            },
+            {
+              "coefficient": -0.1468055835767499,
+              "feature": "binary__sic_N"
+            },
+            {
+              "coefficient": -0.13988964319731806,
+              "feature": "categorical__age_band_240+"
+            },
+            {
+              "coefficient": 0.12847164944533745,
+              "feature": "categorical__reg_company_type_Private Limited Company"
+            },
+            {
+              "coefficient": -0.12242255409482339,
+              "feature": "log1p__reg_n_charges_outstanding"
+            },
+            {
+              "coefficient": -0.11908569074376316,
+              "feature": "binary__sic_G"
+            },
+            {
+              "coefficient": -0.11477829545319648,
+              "feature": "binary__sic_R"
+            },
+            {
+              "coefficient": -0.11201008094072065,
+              "feature": "binary__sic_H"
+            },
+            {
+              "coefficient": -0.11007090223965303,
+              "feature": "binary__sic_U"
+            },
+            {
+              "coefficient": -0.10525482041520265,
+              "feature": "binary__sic_L"
+            },
+            {
+              "coefficient": 0.10441993975964078,
+              "feature": "categorical__age_band_120-239"
+            },
+            {
+              "coefficient": -0.09498830831296796,
+              "feature": "binary__sic_unknown"
+            },
+            {
+              "coefficient": 0.09425981094639127,
+              "feature": "binary__sic_C"
+            },
+            {
+              "coefficient": 0.08669591494799912,
+              "feature": "categorical__reg_accounts_category_infrequent_sklearn"
+            },
+            {
+              "coefficient": -0.08562585872507729,
+              "feature": "binary__sic_F"
+            },
+            {
+              "coefficient": 0.08381395359912491,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": -0.0790949761720453,
+              "feature": "binary__reg_flag_dormant_sic"
+            },
+            {
+              "coefficient": -0.0681464683287058,
+              "feature": "binary__sic_I"
+            },
+            {
+              "coefficient": 0.06742424063420142,
+              "feature": "categorical__reg_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.06593942004356179,
+              "feature": "binary__sic_O"
+            },
+            {
+              "coefficient": -0.05803824271187031,
+              "feature": "categorical__reg_company_type_PRI/LTD BY GUAR/NSC (Private, limited by guarantee, no share capital)"
+            },
+            {
+              "coefficient": -0.05668144043398592,
+              "feature": "binary__sic_A"
+            },
+            {
+              "coefficient": -0.05340564827217795,
+              "feature": "binary__sic_Q"
+            },
+            {
+              "coefficient": -0.043173497303336986,
+              "feature": "binary__sic_P"
+            },
+            {
+              "coefficient": -0.04172170427704172,
+              "feature": "categorical__reg_company_type_Private Unlimited Company"
+            },
+            {
+              "coefficient": 0.03972689350991201,
+              "feature": "binary__sic_multiple"
+            },
+            {
+              "coefficient": -0.03726138515705873,
+              "feature": "binary__sic_B"
+            },
+            {
+              "coefficient": -0.03386330259644193,
+              "feature": "binary__sic_K"
+            }
+          ]
+        },
+        "register_accounts": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.005046894087141591
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.005057071086093321
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.005060146949372982
+            }
+          ],
+          "encoded_feature_count": 125,
+          "model": "register_accounts",
+          "predictor_count_before_encoding": 88,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.34797087779224034,
+            "brier": 0.0009739697005399375,
+            "calibration_intercept": -0.13573643532773416,
+            "calibration_slope": 0.9557306037268226,
+            "log_loss": 0.0049217940383680095,
+            "roc_auc": 0.9648541811256529
+          },
+          "top_coefficients": [
+            {
+              "coefficient": 1.1506724808330688,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": -1.0616976053049167,
+              "feature": "categorical__acc_employee_band_0"
+            },
+            {
+              "coefficient": -1.0046446395300923,
+              "feature": "categorical__acc_employee_band_1-10"
+            },
+            {
+              "coefficient": 0.9940576434207463,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": 0.8873430835436118,
+              "feature": "categorical__acc_employee_band_51-250"
+            },
+            {
+              "coefficient": 0.8663237407304334,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": 0.7658037402750282,
+              "feature": "signed_log1p__acc_current_assets"
+            },
+            {
+              "coefficient": 0.7483854851177556,
+              "feature": "categorical__acc_employee_band_11-50"
+            },
+            {
+              "coefficient": -0.7354674549335477,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": -0.7354674549335477,
+              "feature": "categorical__acc_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": 0.6213417918259241,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": 0.5972384501004468,
+              "feature": "binary__missing__acc_current_ratio"
+            },
+            {
+              "coefficient": -0.5707447765835864,
+              "feature": "signed_log1p__acc_equity"
+            },
+            {
+              "coefficient": 0.5643754107123312,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": 0.5024829157297221,
+              "feature": "signed_log1p__acc_creditors_within_one_year"
+            },
+            {
+              "coefficient": -0.4764925457051543,
+              "feature": "binary__acc_negative_equity"
+            },
+            {
+              "coefficient": 0.4625139382848201,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": 0.46191651618030877,
+              "feature": "categorical__acc_employee_band_251+"
+            },
+            {
+              "coefficient": -0.41145334473359485,
+              "feature": "categorical__age_band_240+"
+            },
+            {
+              "coefficient": 0.40341906416196155,
+              "feature": "binary__missing__acc_cash"
+            },
+            {
+              "coefficient": 0.371308508092538,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.371308508092538,
+              "feature": "categorical__acc_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.34183736107137813,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 0.34183736107137813,
+              "feature": "categorical__acc_accounts_category_SMALL"
+            },
+            {
+              "coefficient": -0.3314082402922336,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": -0.2993938011192988,
+              "feature": "categorical__acc_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": -0.2993938011192987,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": -0.2847089917094189,
+              "feature": "binary__missing__acc_current_assets"
+            },
+            {
+              "coefficient": 0.28390018168792075,
+              "feature": "log1p__acc_n_periods_available"
+            },
+            {
+              "coefficient": -0.2800896776977765,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": -0.2800896776977765,
+              "feature": "categorical__acc_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": 0.253296652857425,
+              "feature": "categorical__acc_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": 0.2532966528574245,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": -0.23031879115522247,
+              "feature": "categorical__age_band_0-23"
+            },
+            {
+              "coefficient": -0.20739123110868907,
+              "feature": "binary__sic_J"
+            },
+            {
+              "coefficient": -0.2047149049238161,
+              "feature": "binary__missing__acc_creditors_within_one_year"
+            },
+            {
+              "coefficient": -0.19724515116229283,
+              "feature": "binary__sic_M"
+            },
+            {
+              "coefficient": -0.19251882837774298,
+              "feature": "signed_log1p__acc_months_since_latest_period_end"
+            },
+            {
+              "coefficient": -0.1881065848058577,
+              "feature": "binary__sic_S"
+            },
+            {
+              "coefficient": 0.16906162065831476,
+              "feature": "categorical__acc_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": 0.16906162065830896,
+              "feature": "categorical__reg_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.16752688279392558,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": 0.15770400576824145,
+              "feature": "categorical__acc_accounts_category_FULL"
+            },
+            {
+              "coefficient": 0.15770400576824142,
+              "feature": "categorical__reg_accounts_category_FULL"
+            },
+            {
+              "coefficient": -0.1489008186623636,
+              "feature": "categorical__reg_company_type_Private Limited Company"
+            },
+            {
+              "coefficient": -0.1421189678780387,
+              "feature": "binary__sic_R"
+            },
+            {
+              "coefficient": -0.1409955078551753,
+              "feature": "binary__missing__acc_d_cash"
+            },
+            {
+              "coefficient": -0.14081833029863491,
+              "feature": "binary__sic_I"
+            },
+            {
+              "coefficient": -0.1390809698926851,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": -0.1390809698926851,
+              "feature": "categorical__acc_accounts_category_TOTAL EXEMPTION SMALL"
+            }
+          ]
+        },
+        "register_accounts_availability": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.005516083589865348
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.005521830655987958
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.0055237924162422
+            }
+          ],
+          "encoded_feature_count": 92,
+          "model": "register_accounts_availability",
+          "predictor_count_before_encoding": 71,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.3157715809186776,
+            "brier": 0.0010111582387499617,
+            "calibration_intercept": 0.19180391667664345,
+            "calibration_slope": 1.030574797161343,
+            "log_loss": 0.005256774501319341,
+            "roc_auc": 0.9609361831994847
+          },
+          "top_coefficients": [
+            {
+              "coefficient": 1.3637953809241847,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": -1.294535293260468,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": -1.0762062359337765,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": 0.8906686321351164,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": 0.7861476772444167,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": 0.7388402636113438,
+              "feature": "categorical__reg_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": 0.6773363537985895,
+              "feature": "categorical__reg_accounts_category_FULL"
+            },
+            {
+              "coefficient": 0.6123409019005842,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.5294745822387878,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": 0.4574034364577417,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 0.44886737294494883,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": 0.43301332142060783,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": -0.42624655586916876,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": -0.36847836256448174,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": 0.3662542077280585,
+              "feature": "categorical__reg_accounts_category_AUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.3589737780115215,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": 0.33810827792400855,
+              "feature": "binary__missing__acc_creditors_within_one_year"
+            },
+            {
+              "coefficient": -0.29205842443671576,
+              "feature": "categorical__age_band_0-23"
+            },
+            {
+              "coefficient": -0.23628590931920432,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": -0.2272914521542093,
+              "feature": "binary__sic_S"
+            },
+            {
+              "coefficient": -0.20823435814887953,
+              "feature": "binary__missing__acc_current_assets"
+            },
+            {
+              "coefficient": -0.19132330090408847,
+              "feature": "binary__missing__acc_prior_gap_months"
+            },
+            {
+              "coefficient": -0.18190198891189563,
+              "feature": "categorical__age_band_240+"
+            },
+            {
+              "coefficient": -0.18107859258958298,
+              "feature": "binary__missing__acc_d_cash"
+            },
+            {
+              "coefficient": 0.17270292674935767,
+              "feature": "binary__missing__acc_d_equity"
+            },
+            {
+              "coefficient": 0.17062852834087525,
+              "feature": "log1p__reg_n_previous_names"
+            },
+            {
+              "coefficient": 0.16470118431151107,
+              "feature": "binary__missing__acc_d_net_current_assets"
+            },
+            {
+              "coefficient": 0.1636375375194891,
+              "feature": "categorical__reg_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.1614076811632146,
+              "feature": "categorical__reg_company_type_Community Interest Company"
+            },
+            {
+              "coefficient": -0.1566742843831157,
+              "feature": "binary__sic_J"
+            },
+            {
+              "coefficient": 0.153600371238461,
+              "feature": "binary__missing__acc_cash"
+            },
+            {
+              "coefficient": -0.150453422097329,
+              "feature": "binary__missing__acc_current_ratio"
+            },
+            {
+              "coefficient": -0.1498912580097888,
+              "feature": "binary__sic_M"
+            },
+            {
+              "coefficient": -0.13064916926411582,
+              "feature": "binary__sic_N"
+            },
+            {
+              "coefficient": -0.11644304019409409,
+              "feature": "log1p__reg_n_charges_outstanding"
+            },
+            {
+              "coefficient": -0.11281524801682426,
+              "feature": "binary__sic_R"
+            },
+            {
+              "coefficient": -0.1124897575808829,
+              "feature": "binary__sic_G"
+            },
+            {
+              "coefficient": -0.11235881279986647,
+              "feature": "binary__sic_U"
+            },
+            {
+              "coefficient": 0.0976244151866943,
+              "feature": "binary__sic_C"
+            },
+            {
+              "coefficient": -0.09716770799308465,
+              "feature": "binary__sic_unknown"
+            },
+            {
+              "coefficient": -0.09566510243211171,
+              "feature": "binary__sic_H"
+            },
+            {
+              "coefficient": -0.09223832212178483,
+              "feature": "binary__sic_L"
+            },
+            {
+              "coefficient": 0.08424769555551115,
+              "feature": "categorical__reg_accounts_category_infrequent_sklearn"
+            },
+            {
+              "coefficient": -0.08157724763681655,
+              "feature": "binary__sic_F"
+            },
+            {
+              "coefficient": -0.08100206359505116,
+              "feature": "binary__reg_flag_dormant_sic"
+            },
+            {
+              "coefficient": -0.06654944413556027,
+              "feature": "binary__sic_I"
+            },
+            {
+              "coefficient": 0.06540605105591667,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": -0.06280633196396555,
+              "feature": "binary__sic_A"
+            },
+            {
+              "coefficient": -0.056536434409551896,
+              "feature": "binary__sic_O"
+            },
+            {
+              "coefficient": 0.05619846312790517,
+              "feature": "categorical__age_band_120-239"
+            }
+          ]
+        },
+        "register_all_availability": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.005501441521184325
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.005508477161780131
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.00551090018316299
+            }
+          ],
+          "encoded_feature_count": 112,
+          "model": "register_all_availability",
+          "predictor_count_before_encoding": 91,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.31712347404072716,
+            "brier": 0.0010086756209287855,
+            "calibration_intercept": 0.1723702325274083,
+            "calibration_slope": 1.0253047102166624,
+            "log_loss": 0.005250718490945001,
+            "roc_auc": 0.9608338342339218
+          },
+          "top_coefficients": [
+            {
+              "coefficient": 1.350673222446263,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": -1.2764996530784594,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": -1.031856246585478,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": 0.8977010636289454,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": 0.7982986174132508,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": 0.7414618542028144,
+              "feature": "categorical__reg_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": 0.6767245593852151,
+              "feature": "categorical__reg_accounts_category_FULL"
+            },
+            {
+              "coefficient": 0.6265071530368876,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.530860767012853,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": -0.4831669878546519,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": 0.4592503430209978,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 0.41685538943950556,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": 0.4053865376515607,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": -0.387700180720802,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": -0.3540303753197057,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": 0.3483873437140907,
+              "feature": "categorical__reg_accounts_category_AUDITED ABRIDGED"
+            },
+            {
+              "coefficient": 0.3285662550999684,
+              "feature": "binary__missing__acc_creditors_within_one_year"
+            },
+            {
+              "coefficient": -0.3022869362314292,
+              "feature": "categorical__age_band_0-23"
+            },
+            {
+              "coefficient": -0.24586677772112378,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": -0.2261906907840168,
+              "feature": "binary__sic_S"
+            },
+            {
+              "coefficient": -0.19985529235474395,
+              "feature": "binary__missing__psc_active_psc_statement_codes"
+            },
+            {
+              "coefficient": -0.1975678227332758,
+              "feature": "binary__missing__psc_natures_of_control"
+            },
+            {
+              "coefficient": -0.1940730946732123,
+              "feature": "binary__missing__acc_current_assets"
+            },
+            {
+              "coefficient": -0.18962251916376077,
+              "feature": "binary__missing__acc_prior_gap_months"
+            },
+            {
+              "coefficient": 0.1770138003682328,
+              "feature": "categorical__reg_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": 0.17382793544170544,
+              "feature": "log1p__reg_n_previous_names"
+            },
+            {
+              "coefficient": 0.1668541737910534,
+              "feature": "binary__missing__acc_d_equity"
+            },
+            {
+              "coefficient": -0.16614250971635855,
+              "feature": "binary__missing__acc_d_cash"
+            },
+            {
+              "coefficient": 0.15933111408383463,
+              "feature": "binary__missing__acc_d_net_current_assets"
+            },
+            {
+              "coefficient": -0.15802660702985682,
+              "feature": "binary__missing__acc_current_ratio"
+            },
+            {
+              "coefficient": -0.15518832349749526,
+              "feature": "categorical__age_band_240+"
+            },
+            {
+              "coefficient": -0.1514643486115741,
+              "feature": "binary__sic_J"
+            },
+            {
+              "coefficient": -0.14640772694622767,
+              "feature": "categorical__reg_company_type_Community Interest Company"
+            },
+            {
+              "coefficient": -0.14233447143140693,
+              "feature": "binary__sic_M"
+            },
+            {
+              "coefficient": 0.14067812004073632,
+              "feature": "binary__missing__acc_cash"
+            },
+            {
+              "coefficient": -0.1268761989421757,
+              "feature": "binary__sic_N"
+            },
+            {
+              "coefficient": -0.11069308289198851,
+              "feature": "binary__sic_U"
+            },
+            {
+              "coefficient": -0.10792667495541848,
+              "feature": "binary__sic_R"
+            },
+            {
+              "coefficient": -0.10619378088391497,
+              "feature": "binary__sic_G"
+            },
+            {
+              "coefficient": -0.10563715469795099,
+              "feature": "log1p__reg_n_charges_outstanding"
+            },
+            {
+              "coefficient": 0.10351428342083199,
+              "feature": "binary__sic_C"
+            },
+            {
+              "coefficient": -0.09188378877432046,
+              "feature": "binary__sic_H"
+            },
+            {
+              "coefficient": -0.09110555417809459,
+              "feature": "binary__sic_unknown"
+            },
+            {
+              "coefficient": 0.08331170828749959,
+              "feature": "categorical__reg_accounts_category_infrequent_sklearn"
+            },
+            {
+              "coefficient": -0.0805146183108005,
+              "feature": "binary__reg_flag_dormant_sic"
+            },
+            {
+              "coefficient": -0.0774047262236203,
+              "feature": "binary__missing__psc_max_voting_band"
+            },
+            {
+              "coefficient": -0.07672710795202657,
+              "feature": "binary__sic_F"
+            },
+            {
+              "coefficient": -0.07653873666584324,
+              "feature": "binary__sic_L"
+            },
+            {
+              "coefficient": 0.07296768523805432,
+              "feature": "categorical__age_band_120-239"
+            },
+            {
+              "coefficient": 0.06656630622372502,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION FULL"
+            }
+          ]
+        },
+        "register_psc": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.005478849594226676
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.005503633351056379
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.005548510420752062
+            }
+          ],
+          "encoded_feature_count": 264,
+          "model": "register_psc",
+          "predictor_count_before_encoding": 92,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.31447646856827927,
+            "brier": 0.001008956496790983,
+            "calibration_intercept": 0.11269579423341264,
+            "calibration_slope": 1.0141622806991295,
+            "log_loss": 0.005235391893269498,
+            "roc_auc": 0.9612774927291958
+          },
+          "top_coefficients": [
+            {
+              "coefficient": 1.2646920742234549,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": -1.2426471996168402,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": -0.9596034151476733,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": 0.9226507316534264,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": -0.8975747568622562,
+              "feature": "categorical__psc_natures_of_control_right-to-share-surplus-assets-25-to-50-percent-limited-liability-partnership,voting-rights-25-to-50-percent-limited-liability-partnership"
+            },
+            {
+              "coefficient": 0.784969744038202,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": 0.7740071174273238,
+              "feature": "categorical__reg_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": 0.7453004971391635,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": -0.6010480777025385,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": 0.5613067754719053,
+              "feature": "categorical__reg_accounts_category_FULL"
+            },
+            {
+              "coefficient": -0.5555148542775865,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.5427646307464241,
+              "feature": "categorical__psc_natures_of_control_voting-rights-25-to-50-percent"
+            },
+            {
+              "coefficient": 0.5308830952699337,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": 0.5101524808529591,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-50-to-75-percent,right-to-appoint-and-remove-directors,voting-rights-50-to-75-percent"
+            },
+            {
+              "coefficient": -0.5087667884241133,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,voting-rights-25-to-50-percent"
+            },
+            {
+              "coefficient": 0.490255928774459,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control-limited-liability-partnership"
+            },
+            {
+              "coefficient": -0.4790737815049122,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent-as-firm,right-to-appoint-and-remove-directors-as-firm,significant-influence-or-control-as-firm,voting-rights-75-to-100-percent-as-firm"
+            },
+            {
+              "coefficient": -0.44581420844498837,
+              "feature": "categorical__psc_information_state_none_reported"
+            },
+            {
+              "coefficient": 0.43557486999552714,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": 0.4167774545399428,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,ownership-of-shares-75-to-100-percent,voting-rights-25-to-50-percent,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.41580341951226124,
+              "feature": "categorical__psc_information_state_statement_only"
+            },
+            {
+              "coefficient": -0.4110268094430211,
+              "feature": "categorical__psc_natures_of_control_right-to-appoint-and-remove-directors"
+            },
+            {
+              "coefficient": -0.38289287334120076,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent"
+            },
+            {
+              "coefficient": -0.37886352705505105,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": 0.3783457277073726,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,voting-rights-25-to-50-percent"
+            },
+            {
+              "coefficient": -0.3623916915974129,
+              "feature": "categorical__age_band_0-23"
+            },
+            {
+              "coefficient": 0.35651721253734214,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent-as-firm,right-to-appoint-and-remove-directors-as-firm,voting-rights-75-to-100-percent-as-firm"
+            },
+            {
+              "coefficient": 0.35475679148527944,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control-as-trust"
+            },
+            {
+              "coefficient": -0.3542257390104088,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,right-to-appoint-and-remove-directors,voting-rights-75-to-100-percent,voting-rights-75-to-100-percent-as-firm"
+            },
+            {
+              "coefficient": 0.350117898373643,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": -0.3431060293537341,
+              "feature": "categorical__psc_natures_of_control_right-to-appoint-and-remove-members-limited-liability-partnership,right-to-share-surplus-assets-75-to-100-percent-limited-liability-partnership,voting-rights-75-to-100-percent-limited-liability-partnership"
+            },
+            {
+              "coefficient": -0.3328794145791042,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": 0.3291380866976144,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": 0.3125362480779014,
+              "feature": "categorical__psc_max_voting_band_50-to-75-percent"
+            },
+            {
+              "coefficient": -0.3100425316132943,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control"
+            },
+            {
+              "coefficient": 0.30136310467944244,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,significant-influence-or-control,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.29150725012661566,
+              "feature": "categorical__reg_accounts_category_AUDITED ABRIDGED"
+            },
+            {
+              "coefficient": 0.26939939666607704,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control-as-firm"
+            },
+            {
+              "coefficient": -0.2562608880422843,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": -0.25293311671463325,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,ownership-of-shares-50-to-75-percent,right-to-appoint-and-remove-directors,voting-rights-25-to-50-percent,voting-rights-50-to-75-percent"
+            },
+            {
+              "coefficient": 0.25246148171388566,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,right-to-appoint-and-remove-directors-as-firm,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.24950273291855785,
+              "feature": "log1p__psc_n_corporate"
+            },
+            {
+              "coefficient": -0.24359338629133687,
+              "feature": "categorical__reg_company_type_Community Interest Company"
+            },
+            {
+              "coefficient": -0.24153915932421796,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,ownership-of-shares-75-to-100-percent-as-firm,ownership-of-shares-75-to-100-percent-as-trust,right-to-appoint-and-remove-directors,right-to-appoint-and-remove-directors-as-firm,right-to-appoint-and-remove-directors-as-trust,voting-rights-75-to-100-percent,voting-rights-75-to-100-percent-as-firm,voting-rights-75-to-100-percent-as-trust"
+            },
+            {
+              "coefficient": -0.24152226863150084,
+              "feature": "log1p__psc_n_distinct_natures"
+            },
+            {
+              "coefficient": -0.23775407849028535,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,right-to-appoint-and-remove-directors-as-firm,significant-influence-or-control-as-firm,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": -0.2305820693028578,
+              "feature": "binary__sic_S"
+            },
+            {
+              "coefficient": 0.22977277493619727,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,right-to-appoint-and-remove-directors,voting-rights-25-to-50-percent"
+            },
+            {
+              "coefficient": 0.22808629681315742,
+              "feature": "categorical__psc_natures_of_control_right-to-appoint-and-remove-directors,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.22457463838716146,
+              "feature": "log1p__psc_n_individual"
+            }
+          ]
+        },
+        "register_psc_availability": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.005519260562970401
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.005526001779943006
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.005528626696781769
+            }
+          ],
+          "encoded_feature_count": 94,
+          "model": "register_psc_availability",
+          "predictor_count_before_encoding": 73,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.31662459817928473,
+            "brier": 0.0010133294195910085,
+            "calibration_intercept": 0.24293883967996377,
+            "calibration_slope": 1.0405276872224065,
+            "log_loss": 0.0052685780303934416,
+            "roc_auc": 0.961248161643202
+          },
+          "top_coefficients": [
+            {
+              "coefficient": -1.385146963880163,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": 1.3589510922834154,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": -1.1154213823020025,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": 0.8922454623564541,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": 0.8074960369066101,
+              "feature": "categorical__reg_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": 0.7782760836334539,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": 0.7068352303035568,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.6974554472967931,
+              "feature": "categorical__reg_accounts_category_FULL"
+            },
+            {
+              "coefficient": 0.5285092693468443,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": 0.5186387260854192,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": -0.471493231884488,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": 0.43512942726412424,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": -0.38627873357700837,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": 0.36162378409990414,
+              "feature": "categorical__reg_accounts_category_AUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.3610640698978887,
+              "feature": "categorical__age_band_0-23"
+            },
+            {
+              "coefficient": -0.3551026699988496,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": 0.34631192691427615,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": -0.24961336585007138,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": -0.2274994142818484,
+              "feature": "binary__sic_S"
+            },
+            {
+              "coefficient": -0.21367441084290356,
+              "feature": "categorical__reg_company_type_Community Interest Company"
+            },
+            {
+              "coefficient": -0.19404061005050904,
+              "feature": "binary__missing__psc_natures_of_control"
+            },
+            {
+              "coefficient": -0.1920177186442692,
+              "feature": "binary__missing__psc_active_psc_statement_codes"
+            },
+            {
+              "coefficient": 0.17421951139766145,
+              "feature": "log1p__reg_n_previous_names"
+            },
+            {
+              "coefficient": -0.1509181699195426,
+              "feature": "binary__sic_J"
+            },
+            {
+              "coefficient": -0.14109176021919,
+              "feature": "binary__sic_M"
+            },
+            {
+              "coefficient": -0.13803355347547536,
+              "feature": "binary__sic_N"
+            },
+            {
+              "coefficient": 0.12918458594015186,
+              "feature": "categorical__age_band_120-239"
+            },
+            {
+              "coefficient": -0.11313601060780223,
+              "feature": "log1p__reg_n_charges_outstanding"
+            },
+            {
+              "coefficient": -0.11064688795413523,
+              "feature": "binary__sic_G"
+            },
+            {
+              "coefficient": -0.10842064625178843,
+              "feature": "categorical__age_band_240+"
+            },
+            {
+              "coefficient": -0.10839625966719028,
+              "feature": "binary__sic_R"
+            },
+            {
+              "coefficient": -0.1082917749386027,
+              "feature": "binary__sic_U"
+            },
+            {
+              "coefficient": -0.10503172445785008,
+              "feature": "binary__sic_H"
+            },
+            {
+              "coefficient": -0.10457870119466993,
+              "feature": "binary__missing__psc_max_voting_band"
+            },
+            {
+              "coefficient": 0.10150126719302166,
+              "feature": "binary__sic_C"
+            },
+            {
+              "coefficient": 0.09699590468275925,
+              "feature": "categorical__reg_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.08697013521138698,
+              "feature": "binary__sic_unknown"
+            },
+            {
+              "coefficient": 0.08530072170028523,
+              "feature": "categorical__reg_accounts_category_infrequent_sklearn"
+            },
+            {
+              "coefficient": -0.08401811767727163,
+              "feature": "binary__sic_L"
+            },
+            {
+              "coefficient": 0.08399446056894416,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": -0.07961563400585805,
+              "feature": "binary__reg_flag_dormant_sic"
+            },
+            {
+              "coefficient": -0.07818293997504144,
+              "feature": "binary__sic_F"
+            },
+            {
+              "coefficient": -0.07183231785003823,
+              "feature": "binary__missing__psc_max_ownership_band"
+            },
+            {
+              "coefficient": -0.06105507335260439,
+              "feature": "binary__sic_I"
+            },
+            {
+              "coefficient": -0.05923977610857347,
+              "feature": "binary__sic_O"
+            },
+            {
+              "coefficient": -0.054508645187820476,
+              "feature": "binary__sic_A"
+            },
+            {
+              "coefficient": 0.050429886703508196,
+              "feature": "categorical__reg_company_type_PRI/LTD BY GUAR/NSC (Private, limited by guarantee, no share capital)"
+            },
+            {
+              "coefficient": -0.046833331537518924,
+              "feature": "binary__sic_Q"
+            },
+            {
+              "coefficient": -0.045548536012141164,
+              "feature": "categorical__reg_company_type_Private Unlimited Company"
+            },
+            {
+              "coefficient": -0.038904392977148976,
+              "feature": "binary__sic_P"
+            }
+          ]
+        }
+      },
+      "paired_comparisons": {
+        "combined_vs_all_availability": {
+          "average_precision": {
+            "ci95": [
+              -0.04966864456166334,
+              0.10931770579777876
+            ],
+            "estimate": 0.03076102623328019,
+            "orientation": "combined minus register_all_availability"
+          },
+          "brier": {
+            "ci95": [
+              -5.465405527158129e-05,
+              0.00010915631622315648
+            ],
+            "estimate": 3.963844863590373e-05,
+            "orientation": "register_all_availability minus combined; positive favours combined"
+          },
+          "log_loss": {
+            "ci95": [
+              9.89062314406177e-05,
+              0.000529898419441477
+            ],
+            "estimate": 0.00033740066737095224,
+            "orientation": "register_all_availability minus combined; positive favours combined"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.0008594576227774211,
+              0.007834136194353592
+            ],
+            "estimate": 0.004515634295062435,
+            "orientation": "combined minus register_all_availability"
+          }
+        },
+        "combined_vs_register": {
+          "average_precision": {
+            "ci95": [
+              -0.05591469159822168,
+              0.12331512105296515
+            ],
+            "estimate": 0.03818606677153034,
+            "orientation": "combined minus register"
+          },
+          "brier": {
+            "ci95": [
+              -4.340844827198656e-05,
+              0.00012023610873922932
+            ],
+            "estimate": 4.633411394480134e-05,
+            "orientation": "register minus combined; positive favours combined"
+          },
+          "log_loss": {
+            "ci95": [
+              0.00010274442734418412,
+              0.0005623610246826068
+            ],
+            "estimate": 0.0003584034246158808,
+            "orientation": "register minus combined; positive favours combined"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.00043566345057494403,
+              0.007533991527034168
+            ],
+            "estimate": 0.0040207088827747765,
+            "orientation": "combined minus register"
+          }
+        },
+        "combined_vs_register_accounts": {
+          "average_precision": {
+            "ci95": [
+              -0.028852897593369637,
+              0.022751697193633118
+            ],
+            "estimate": -0.003919306105924557,
+            "orientation": "combined minus register_accounts"
+          },
+          "brier": {
+            "ci95": [
+              -1.7439399766699097e-05,
+              2.283897096097278e-05
+            ],
+            "estimate": 4.605946731149172e-06,
+            "orientation": "register_accounts minus combined; positive favours combined"
+          },
+          "log_loss": {
+            "ci95": [
+              -8.686886869751247e-05,
+              7.272227463489832e-05
+            ],
+            "estimate": 7.510751393669038e-06,
+            "orientation": "register_accounts minus combined; positive favours combined"
+          },
+          "roc_auc": {
+            "ci95": [
+              -0.0005147721780188908,
+              0.0014614962365324855
+            ],
+            "estimate": 0.0004971481371317681,
+            "orientation": "combined minus register_accounts"
+          }
+        },
+        "combined_vs_register_psc": {
+          "average_precision": {
+            "ci95": [
+              -0.0341814486316096,
+              0.10378503336306984
+            ],
+            "estimate": 0.030559030507191356,
+            "orientation": "combined minus register_psc"
+          },
+          "brier": {
+            "ci95": [
+              -4.3064744315571464e-05,
+              9.963443142516147e-05
+            ],
+            "estimate": 3.742525825469832e-05,
+            "orientation": "register_psc minus combined; positive favours combined"
+          },
+          "log_loss": {
+            "ci95": [
+              9.042061433142245e-05,
+              0.0005026610633551352
+            ],
+            "estimate": 0.00031445852485194407,
+            "orientation": "register_psc minus combined; positive favours combined"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.0002236211291228557,
+              0.0076012271031628605
+            ],
+            "estimate": 0.004043759777028652,
+            "orientation": "combined minus register_psc"
+          }
+        },
+        "register_accounts_availability_vs_register": {
+          "average_precision": {
+            "ci95": [
+              -0.009984875820565944,
+              0.028803715916832753
+            ],
+            "estimate": 0.009875194106493772,
+            "orientation": "register_accounts_availability minus register"
+          },
+          "brier": {
+            "ci95": [
+              -1.6428100162681775e-06,
+              1.861471564041493e-05
+            ],
+            "estimate": 7.68204611378498e-06,
+            "orientation": "register minus register_accounts_availability; positive favours register_accounts_availability"
+          },
+          "log_loss": {
+            "ci95": [
+              -1.0236558273238304e-05,
+              7.067349544319848e-05
+            ],
+            "estimate": 2.5117852267245977e-05,
+            "orientation": "register minus register_accounts_availability; positive favours register_accounts_availability"
+          },
+          "roc_auc": {
+            "ci95": [
+              -0.001321916027372888,
+              0.00034163033846425407
+            ],
+            "estimate": -0.0004187000476458021,
+            "orientation": "register_accounts_availability minus register"
+          }
+        },
+        "register_accounts_vs_availability": {
+          "average_precision": {
+            "ci95": [
+              -0.03440809810378185,
+              0.10123128985198579
+            ],
+            "estimate": 0.03410154142733441,
+            "orientation": "register_accounts minus register_accounts_availability"
+          },
+          "brier": {
+            "ci95": [
+              -3.9653097496940535e-05,
+              9.951066783027509e-05
+            ],
+            "estimate": 3.775315024229557e-05,
+            "orientation": "register_accounts_availability minus register_accounts; positive favours register_accounts"
+          },
+          "log_loss": {
+            "ci95": [
+              0.00013311228482152624,
+              0.0005123029883965369
+            ],
+            "estimate": 0.00033177192296822536,
+            "orientation": "register_accounts_availability minus register_accounts; positive favours register_accounts"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.0003867307561223527,
+              0.0072559787907330075
+            ],
+            "estimate": 0.003917459328937785,
+            "orientation": "register_accounts minus register_accounts_availability"
+          }
+        },
+        "register_accounts_vs_register": {
+          "average_precision": {
+            "ci95": [
+              -0.03190136873793787,
+              0.11437037864382586
+            ],
+            "estimate": 0.04584009383873788,
+            "orientation": "register_accounts minus register"
+          },
+          "brier": {
+            "ci95": [
+              -4.73989931128345e-05,
+              0.00011166801238500942
+            ],
+            "estimate": 4.4738083258498976e-05,
+            "orientation": "register minus register_accounts; positive favours register_accounts"
+          },
+          "log_loss": {
+            "ci95": [
+              0.00014270108359861608,
+              0.0005382991906138042
+            ],
+            "estimate": 0.0003624776488537767,
+            "orientation": "register minus register_accounts; positive favours register_accounts"
+          },
+          "roc_auc": {
+            "ci95": [
+              -0.0003705399191949565,
+              0.006931187361606894
+            ],
+            "estimate": 0.0036212973807202165,
+            "orientation": "register_accounts minus register"
+          }
+        },
+        "register_all_availability_vs_register": {
+          "average_precision": {
+            "ci95": [
+              -0.01532345232735492,
+              0.033790757455462915
+            ],
+            "estimate": 0.011559401314902079,
+            "orientation": "register_all_availability minus register"
+          },
+          "brier": {
+            "ci95": [
+              -2.9435651161750133e-06,
+              2.2474350087882778e-05
+            ],
+            "estimate": 1.0275025526889922e-05,
+            "orientation": "register minus register_all_availability; positive favours register_all_availability"
+          },
+          "log_loss": {
+            "ci95": [
+              -1.730561154506013e-05,
+              7.810662708538816e-05
+            ],
+            "estimate": 3.1081071438995354e-05,
+            "orientation": "register minus register_all_availability; positive favours register_all_availability"
+          },
+          "roc_auc": {
+            "ci95": [
+              -0.0015090959932084341,
+              0.0005578683478335897
+            ],
+            "estimate": -0.0005127244241192474,
+            "orientation": "register_all_availability minus register"
+          }
+        },
+        "register_psc_availability_vs_register": {
+          "average_precision": {
+            "ci95": [
+              -0.0035954090731702094,
+              0.02765801353567743
+            ],
+            "estimate": 0.011809658233859675,
+            "orientation": "register_psc_availability minus register"
+          },
+          "brier": {
+            "ci95": [
+              -7.038571914676379e-07,
+              1.4514305993009216e-05
+            ],
+            "estimate": 6.178400980445162e-06,
+            "orientation": "register minus register_psc_availability; positive favours register_psc_availability"
+          },
+          "log_loss": {
+            "ci95": [
+              -1.1107203793952482e-05,
+              4.676114106648823e-05
+            ],
+            "estimate": 1.5073193727753945e-05,
+            "orientation": "register minus register_psc_availability; positive favours register_psc_availability"
+          },
+          "roc_auc": {
+            "ci95": [
+              -0.0007615451130692147,
+              0.0005448113670351223
+            ],
+            "estimate": -7.379745990041134e-05,
+            "orientation": "register_psc_availability minus register"
+          }
+        },
+        "register_psc_vs_availability": {
+          "average_precision": {
+            "ci95": [
+              -0.027163476951998184,
+              0.026231456816609384
+            ],
+            "estimate": -0.0010249760865219649,
+            "orientation": "register_psc minus register_psc_availability"
+          },
+          "brier": {
+            "ci95": [
+              -1.4997368455869311e-05,
+              2.264994561300722e-05
+            ],
+            "estimate": 4.694727206855703e-06,
+            "orientation": "register_psc_availability minus register_psc; positive favours register_psc"
+          },
+          "log_loss": {
+            "ci95": [
+              -2.5909300287067044e-05,
+              8.536845637774685e-05
+            ],
+            "estimate": 3.300199463846828e-05,
+            "orientation": "register_psc_availability minus register_psc; positive favours register_psc"
+          },
+          "roc_auc": {
+            "ci95": [
+              -0.0010102551649564002,
+              0.001206137633022722
+            ],
+            "estimate": 2.421639180821685e-05,
+            "orientation": "register_psc minus register_psc_availability"
+          }
+        },
+        "register_psc_vs_register": {
+          "average_precision": {
+            "ci95": [
+              -0.025109365978720426,
+              0.033210754481935084
+            ],
+            "estimate": 0.008155527158022547,
+            "orientation": "register_psc minus register"
+          },
+          "brier": {
+            "ci95": [
+              -1.1474987867319565e-05,
+              2.4746675157986183e-05
+            ],
+            "estimate": 8.723604109790716e-06,
+            "orientation": "register minus register_psc; positive favours register_psc"
+          },
+          "log_loss": {
+            "ci95": [
+              -2.2151715260798037e-05,
+              9.961209090962719e-05
+            ],
+            "estimate": 4.452770414151461e-05,
+            "orientation": "register minus register_psc; positive favours register_psc"
+          },
+          "roc_auc": {
+            "ci95": [
+              -0.0013278229104699806,
+              0.0014080638281611156
+            ],
+            "estimate": -3.580595765308373e-05,
+            "orientation": "register_psc minus register"
+          }
+        }
+      },
+      "sample_identity_hashes": {
+        "test": "da9ca321bbe3931ca87a9a99e45f3a7f736970f47a3566ce205482341a02466f",
+        "train": "2b217294711d3da3927771e589f1b8422aafd4f58f7bd87863ca71b6e5af0909"
+      },
+      "sampling": [
+        {
+          "case_inclusion_probability": 1.0,
+          "case_weight": 1.0,
+          "comparison_inclusion_probability": 0.0247561311446042,
+          "comparison_weight": 40.39403387220939,
+          "eligible_cases": 3897,
+          "eligible_comparisons": 3148311,
+          "sample_method": "deterministic_hash",
+          "sample_seed": 20260935,
+          "sampled_cases": 3897,
+          "sampled_comparisons": 77940,
+          "split": "train",
+          "target_comparisons": 77940,
+          "weighted_cases": 3897.0,
+          "weighted_comparisons": 3148310.9999977476
+        },
+        {
+          "case_inclusion_probability": 1.0,
+          "case_weight": 1.0,
+          "comparison_inclusion_probability": 0.024927958453402576,
+          "comparison_weight": 40.115599593495936,
+          "eligible_cases": 984,
+          "eligible_comparisons": 789475,
+          "sample_method": "deterministic_hash",
+          "sample_seed": 20260936,
+          "sampled_cases": 984,
+          "sampled_comparisons": 19680,
+          "split": "test",
+          "target_comparisons": 19680,
+          "weighted_cases": 984.0,
+          "weighted_comparisons": 789475.000000018
+        }
+      ],
+      "sampling_design_check": {
+        "original_sample_identities_recoverable": false,
+        "same_eligible_counts_probabilities_weights_and_sample_sizes": true,
+        "status": "passed"
+      }
+    },
+    "primary": {
+      "models": {
+        "combined": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.004935533976111662
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.004989020911424918
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.005037184001854917
+            }
+          ],
+          "encoded_feature_count": 374,
+          "model": "combined",
+          "predictor_count_before_encoding": 127,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.39184627421346796,
+            "brier": 0.0009705015585201051,
+            "calibration_intercept": 0.13072285749588328,
+            "calibration_slope": 1.0200478906468176,
+            "log_loss": 0.004642074337295608,
+            "roc_auc": 0.9730638920231706
+          },
+          "top_coefficients": [
+            {
+              "coefficient": -1.3443558057435137,
+              "feature": "categorical__reg_company_type_Limited Partnership"
+            },
+            {
+              "coefficient": -1.2309034488437967,
+              "feature": "categorical__acc_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": 1.157834148186062,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": -1.1501458929937456,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,right-to-appoint-and-remove-directors,right-to-appoint-and-remove-directors-as-firm,significant-influence-or-control-as-firm,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": -1.1473562403382989,
+              "feature": "categorical__acc_employee_band_1-10"
+            },
+            {
+              "coefficient": 1.0885907377193793,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": -1.0854060760729292,
+              "feature": "categorical__acc_employee_band_0"
+            },
+            {
+              "coefficient": 1.068951940890018,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": -1.053130030158142,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent-as-trust,right-to-appoint-and-remove-directors-as-trust,voting-rights-75-to-100-percent-as-trust"
+            },
+            {
+              "coefficient": 1.034492937005954,
+              "feature": "categorical__acc_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": -1.0315779480642682,
+              "feature": "categorical__reg_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": 0.9807438642746696,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": -0.9447885886803514,
+              "feature": "categorical__reg_accounts_category_NO ACCOUNTS FILED"
+            },
+            {
+              "coefficient": 0.9316374850665287,
+              "feature": "categorical__acc_employee_band_51-250"
+            },
+            {
+              "coefficient": 0.8948347620474356,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": -0.8615125606157513,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control-limited-liability-partnership"
+            },
+            {
+              "coefficient": 0.8124916315387358,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 0.7024023840987556,
+              "feature": "categorical__acc_employee_band_11-50"
+            },
+            {
+              "coefficient": 0.661532675755083,
+              "feature": "categorical__acc_employee_band_251+"
+            },
+            {
+              "coefficient": -0.5643791647558829,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,ownership-of-shares-75-to-100-percent,voting-rights-25-to-50-percent"
+            },
+            {
+              "coefficient": 0.5434148023208257,
+              "feature": "categorical__reg_company_type_Private Limited Company"
+            },
+            {
+              "coefficient": 0.535305612696041,
+              "feature": "categorical__acc_accounts_category_FULL"
+            },
+            {
+              "coefficient": -0.5335492745441295,
+              "feature": "categorical__acc_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": 0.5251820508471514,
+              "feature": "signed_log1p__acc_current_assets"
+            },
+            {
+              "coefficient": 0.5019825154348186,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-50-to-75-percent,voting-rights-50-to-75-percent"
+            },
+            {
+              "coefficient": -0.47339794847567784,
+              "feature": "categorical__acc_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.46275777221031184,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": -0.4571457865570983,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": -0.43775438953218887,
+              "feature": "categorical__psc_natures_of_control_right-to-share-surplus-assets-75-to-100-percent-limited-liability-partnership,voting-rights-75-to-100-percent-limited-liability-partnership"
+            },
+            {
+              "coefficient": -0.4352339422811492,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent-as-firm,right-to-appoint-and-remove-directors-as-firm,significant-influence-or-control-as-firm,voting-rights-75-to-100-percent-as-firm"
+            },
+            {
+              "coefficient": 0.41807594489613714,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-50-to-75-percent,right-to-appoint-and-remove-directors,voting-rights-50-to-75-percent"
+            },
+            {
+              "coefficient": -0.4098654806069633,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.4027643948571175,
+              "feature": "categorical__reg_company_type_PRI/LTD BY GUAR/NSC (Private, limited by guarantee, no share capital)"
+            },
+            {
+              "coefficient": 0.3872221104220593,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,significant-influence-or-control"
+            },
+            {
+              "coefficient": -0.38078283060504386,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,right-to-appoint-and-remove-directors,significant-influence-or-control,voting-rights-25-to-50-percent"
+            },
+            {
+              "coefficient": 0.37491122344436434,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": 0.3658240340763631,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": 0.35761481624195174,
+              "feature": "signed_log1p__acc_creditors_within_one_year"
+            },
+            {
+              "coefficient": 0.3449513816543789,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control-as-trust"
+            },
+            {
+              "coefficient": 0.3333568100027226,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": -0.33227077495810964,
+              "feature": "categorical__reg_company_type_Other company type"
+            },
+            {
+              "coefficient": -0.33144351850811665,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-50-to-75-percent"
+            },
+            {
+              "coefficient": -0.3268196584009173,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,ownership-of-shares-25-to-50-percent-as-firm,right-to-appoint-and-remove-directors,voting-rights-25-to-50-percent,voting-rights-25-to-50-percent-as-firm"
+            },
+            {
+              "coefficient": -0.32679901565288655,
+              "feature": "categorical__psc_information_state_none_reported"
+            },
+            {
+              "coefficient": -0.3233891855511487,
+              "feature": "categorical__age_band_240+"
+            },
+            {
+              "coefficient": 0.3163884407638388,
+              "feature": "categorical__psc_natures_of_control_right-to-appoint-and-remove-members-limited-liability-partnership,right-to-share-surplus-assets-25-to-50-percent-limited-liability-partnership,voting-rights-25-to-50-percent-limited-liability-partnership"
+            },
+            {
+              "coefficient": 0.3083751808674326,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,right-to-appoint-and-remove-directors,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.3064957108917721,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent-as-firm"
+            },
+            {
+              "coefficient": -0.3056256923554773,
+              "feature": "categorical__reg_company_type_Registered Society"
+            },
+            {
+              "coefficient": 0.3012649737384507,
+              "feature": "categorical__acc_accounts_category_UNAUDITED ABRIDGED"
+            }
+          ]
+        },
+        "register": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.0054947985016823445
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.005505544153685406
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.005508077076028471
+            }
+          ],
+          "encoded_feature_count": 86,
+          "model": "register",
+          "predictor_count_before_encoding": 53,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.2601817384766545,
+            "brier": 0.0010995674657229206,
+            "calibration_intercept": 0.16117141009318253,
+            "calibration_slope": 1.0246795598841738,
+            "log_loss": 0.005267857171022162,
+            "roc_auc": 0.9688979289941002
+          },
+          "top_coefficients": [
+            {
+              "coefficient": -1.3643856506383218,
+              "feature": "categorical__reg_company_type_Limited Liability Partnership"
+            },
+            {
+              "coefficient": -1.2529760571968842,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": -1.251149946140304,
+              "feature": "categorical__reg_accounts_category_NO ACCOUNTS FILED"
+            },
+            {
+              "coefficient": -1.1793102215404745,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": 1.0677818290675725,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 0.976930396846907,
+              "feature": "categorical__reg_company_type_Private Limited Company"
+            },
+            {
+              "coefficient": -0.9766473460302902,
+              "feature": "categorical__reg_company_type_Limited Partnership"
+            },
+            {
+              "coefficient": 0.9219703811438048,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": 0.9094454814761705,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": 0.9004140537320338,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": 0.8934028571617183,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": 0.8265690541953017,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.8221257818364096,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": 0.7907052547955499,
+              "feature": "categorical__reg_accounts_category_ACCOUNTS TYPE NOT AVAILABLE"
+            },
+            {
+              "coefficient": 0.6426335686286098,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": 0.46665548404076534,
+              "feature": "categorical__reg_accounts_category_AUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.45194363251819347,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": 0.43215575623412794,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": -0.4041873340894671,
+              "feature": "categorical__age_band_0-23"
+            },
+            {
+              "coefficient": 0.34935366990854205,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": 0.33336555665602896,
+              "feature": "categorical__reg_company_type_PRI/LTD BY GUAR/NSC (Private, limited by guarantee, no share capital)"
+            },
+            {
+              "coefficient": -0.26781876773004076,
+              "feature": "categorical__reg_company_type_Overseas Entity"
+            },
+            {
+              "coefficient": -0.26662867932306034,
+              "feature": "categorical__reg_company_type_Other company type"
+            },
+            {
+              "coefficient": -0.26247092858453114,
+              "feature": "binary__sic_S"
+            },
+            {
+              "coefficient": 0.22956540759907565,
+              "feature": "binary__sic_unknown"
+            },
+            {
+              "coefficient": 0.17159882833329135,
+              "feature": "categorical__age_band_240+"
+            },
+            {
+              "coefficient": 0.16458546720369652,
+              "feature": "categorical__reg_accounts_category_infrequent_sklearn"
+            },
+            {
+              "coefficient": -0.16338566526033377,
+              "feature": "categorical__reg_company_type_Registered Society"
+            },
+            {
+              "coefficient": -0.16214109372400434,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": 0.16110220722710508,
+              "feature": "categorical__reg_accounts_category_FULL"
+            },
+            {
+              "coefficient": -0.1609400013359147,
+              "feature": "categorical__age_band_60-119"
+            },
+            {
+              "coefficient": -0.14981374632648362,
+              "feature": "binary__sic_J"
+            },
+            {
+              "coefficient": -0.14865699365234886,
+              "feature": "binary__sic_G"
+            },
+            {
+              "coefficient": 0.141164317812083,
+              "feature": "log1p__reg_n_previous_names"
+            },
+            {
+              "coefficient": -0.13876556401138368,
+              "feature": "binary__sic_N"
+            },
+            {
+              "coefficient": -0.13296323200340174,
+              "feature": "binary__sic_U"
+            },
+            {
+              "coefficient": -0.10339076733757441,
+              "feature": "binary__sic_K"
+            },
+            {
+              "coefficient": 0.09996230582615422,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": -0.0898594593265221,
+              "feature": "binary__sic_F"
+            },
+            {
+              "coefficient": 0.0861050549401232,
+              "feature": "categorical__reg_company_type_infrequent_sklearn"
+            },
+            {
+              "coefficient": 0.08123643913156046,
+              "feature": "binary__sic_L"
+            },
+            {
+              "coefficient": -0.080477224954868,
+              "feature": "categorical__reg_company_type_Private Unlimited Company"
+            },
+            {
+              "coefficient": -0.07809828991371356,
+              "feature": "categorical__reg_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.07358054494787215,
+              "feature": "binary__sic_R"
+            },
+            {
+              "coefficient": 0.06467962551790966,
+              "feature": "binary__sic_C"
+            },
+            {
+              "coefficient": -0.06091506894387347,
+              "feature": "binary__sic_O"
+            },
+            {
+              "coefficient": -0.060601869008118314,
+              "feature": "binary__sic_P"
+            },
+            {
+              "coefficient": -0.05841086305715542,
+              "feature": "categorical__reg_company_type_Charitable Incorporated Organisation"
+            },
+            {
+              "coefficient": -0.05750764945570529,
+              "feature": "binary__sic_H"
+            },
+            {
+              "coefficient": -0.05649635510756487,
+              "feature": "binary__sic_I"
+            }
+          ]
+        },
+        "register_accounts": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.005024696787882404
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.005032188148662571
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.005035236554202994
+            }
+          ],
+          "encoded_feature_count": 138,
+          "model": "register_accounts",
+          "predictor_count_before_encoding": 88,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.37153194893001296,
+            "brier": 0.0009930106428632244,
+            "calibration_intercept": 0.20360683160224965,
+            "calibration_slope": 1.0344005167028365,
+            "log_loss": 0.004761537148878112,
+            "roc_auc": 0.9716485898631059
+          },
+          "top_coefficients": [
+            {
+              "coefficient": -1.6594860595112686,
+              "feature": "categorical__acc_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": -1.3902274269940391,
+              "feature": "categorical__reg_company_type_Limited Liability Partnership"
+            },
+            {
+              "coefficient": -1.1830806027401315,
+              "feature": "categorical__reg_accounts_category_NO ACCOUNTS FILED"
+            },
+            {
+              "coefficient": -1.114543236882607,
+              "feature": "categorical__acc_employee_band_1-10"
+            },
+            {
+              "coefficient": -1.1052278009917216,
+              "feature": "categorical__reg_company_type_Limited Partnership"
+            },
+            {
+              "coefficient": 1.0550880456034544,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": 1.0087353539710104,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": -0.9606997415810153,
+              "feature": "categorical__acc_employee_band_0"
+            },
+            {
+              "coefficient": 0.8814866910416451,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": 0.8718248553335951,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.8534393661596612,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": 0.8519000017859475,
+              "feature": "categorical__reg_company_type_Private Limited Company"
+            },
+            {
+              "coefficient": 0.8478049627214191,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 0.828265121039612,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": 0.8214155460878255,
+              "feature": "categorical__acc_employee_band_51-250"
+            },
+            {
+              "coefficient": 0.6837241725479526,
+              "feature": "categorical__acc_employee_band_11-50"
+            },
+            {
+              "coefficient": 0.6768403188516608,
+              "feature": "categorical__acc_accounts_category_FULL"
+            },
+            {
+              "coefficient": 0.6577554982349145,
+              "feature": "categorical__acc_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": 0.615261299035168,
+              "feature": "signed_log1p__acc_current_assets"
+            },
+            {
+              "coefficient": 0.6149347364677636,
+              "feature": "categorical__acc_employee_band_251+"
+            },
+            {
+              "coefficient": -0.6130373523462576,
+              "feature": "categorical__reg_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": 0.5731930409604723,
+              "feature": "categorical__reg_accounts_category_ACCOUNTS TYPE NOT AVAILABLE"
+            },
+            {
+              "coefficient": -0.5139299848724106,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": -0.47697171986577863,
+              "feature": "categorical__acc_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.4186839677623583,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": 0.4177873196618197,
+              "feature": "categorical__acc_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.3993864497848167,
+              "feature": "categorical__acc_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": -0.3993511076219331,
+              "feature": "signed_log1p__acc_months_since_latest_period_end"
+            },
+            {
+              "coefficient": -0.3984696783712692,
+              "feature": "categorical__age_band_0-23"
+            },
+            {
+              "coefficient": 0.3870440680400482,
+              "feature": "signed_log1p__acc_creditors_within_one_year"
+            },
+            {
+              "coefficient": 0.3826585306907255,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": 0.3394369964366368,
+              "feature": "categorical__acc_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": -0.3256560888367118,
+              "feature": "categorical__reg_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.2931420615121507,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": -0.2790589618013321,
+              "feature": "categorical__reg_company_type_Overseas Entity"
+            },
+            {
+              "coefficient": -0.274723240761669,
+              "feature": "binary__sic_G"
+            },
+            {
+              "coefficient": 0.24694617427843982,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": -0.24475630419540798,
+              "feature": "binary__sic_J"
+            },
+            {
+              "coefficient": 0.24451043282755353,
+              "feature": "binary__missing__acc_cash"
+            },
+            {
+              "coefficient": 0.23145358295026294,
+              "feature": "categorical__reg_company_type_PRI/LTD BY GUAR/NSC (Private, limited by guarantee, no share capital)"
+            },
+            {
+              "coefficient": -0.2312565273499989,
+              "feature": "binary__sic_S"
+            },
+            {
+              "coefficient": -0.2297079105671753,
+              "feature": "binary__missing__acc_current_assets"
+            },
+            {
+              "coefficient": 0.21547225491848154,
+              "feature": "categorical__acc_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": -0.2116106385861429,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": -0.19705879200615184,
+              "feature": "signed_log1p__acc_equity"
+            },
+            {
+              "coefficient": -0.1959397170134529,
+              "feature": "binary__sic_N"
+            },
+            {
+              "coefficient": 0.19365159118132128,
+              "feature": "binary__sic_unknown"
+            },
+            {
+              "coefficient": -0.1898640383432392,
+              "feature": "categorical__reg_company_type_Registered Society"
+            },
+            {
+              "coefficient": -0.18197552486691293,
+              "feature": "binary__sic_I"
+            },
+            {
+              "coefficient": 0.17868384108432345,
+              "feature": "binary__missing__acc_creditors_within_one_year"
+            }
+          ]
+        },
+        "register_accounts_availability": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.0054526618490987515
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.005462129552614301
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.005464342014769374
+            }
+          ],
+          "encoded_feature_count": 104,
+          "model": "register_accounts_availability",
+          "predictor_count_before_encoding": 71,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.2649218232610129,
+            "brier": 0.0010962909679608534,
+            "calibration_intercept": 0.09672286079679697,
+            "calibration_slope": 1.013010523453378,
+            "log_loss": 0.005251539670663118,
+            "roc_auc": 0.9686144416624074
+          },
+          "top_coefficients": [
+            {
+              "coefficient": -1.36492730606808,
+              "feature": "categorical__reg_company_type_Limited Liability Partnership"
+            },
+            {
+              "coefficient": -1.3091795921381377,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": -1.1308336804687984,
+              "feature": "categorical__reg_accounts_category_NO ACCOUNTS FILED"
+            },
+            {
+              "coefficient": -1.00931278948521,
+              "feature": "categorical__reg_company_type_Limited Partnership"
+            },
+            {
+              "coefficient": 0.9699206636984342,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 0.9402082334215061,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": 0.934348663048731,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": 0.9199931871212498,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": 0.9032743542450742,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": 0.8916788086264549,
+              "feature": "categorical__reg_company_type_Private Limited Company"
+            },
+            {
+              "coefficient": 0.8695674145489601,
+              "feature": "categorical__reg_accounts_category_ACCOUNTS TYPE NOT AVAILABLE"
+            },
+            {
+              "coefficient": 0.8334150330310576,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": -0.8247536841532348,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": 0.7681605634926303,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": 0.7478018836144852,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.46539526850721025,
+              "feature": "binary__missing__acc_creditors_within_one_year"
+            },
+            {
+              "coefficient": 0.4302406151049033,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": -0.41057985994151147,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": 0.3915324922831705,
+              "feature": "categorical__reg_accounts_category_AUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.387173195249216,
+              "feature": "categorical__age_band_0-23"
+            },
+            {
+              "coefficient": 0.36816761213438576,
+              "feature": "categorical__reg_company_type_PRI/LTD BY GUAR/NSC (Private, limited by guarantee, no share capital)"
+            },
+            {
+              "coefficient": -0.35399680667459366,
+              "feature": "binary__missing__acc_current_ratio"
+            },
+            {
+              "coefficient": 0.31841668982101834,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": -0.2725418099745285,
+              "feature": "categorical__reg_company_type_Overseas Entity"
+            },
+            {
+              "coefficient": -0.27140939237058304,
+              "feature": "categorical__reg_company_type_Other company type"
+            },
+            {
+              "coefficient": -0.24411174851040413,
+              "feature": "binary__sic_S"
+            },
+            {
+              "coefficient": 0.2398474866109635,
+              "feature": "binary__sic_unknown"
+            },
+            {
+              "coefficient": -0.23556275154365613,
+              "feature": "categorical__reg_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.19973782484758731,
+              "feature": "binary__missing__acc_current_assets"
+            },
+            {
+              "coefficient": 0.18960516337602382,
+              "feature": "categorical__age_band_240+"
+            },
+            {
+              "coefficient": -0.17807470062016317,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": -0.1751443863109733,
+              "feature": "categorical__reg_company_type_Registered Society"
+            },
+            {
+              "coefficient": -0.16296539835022433,
+              "feature": "categorical__age_band_60-119"
+            },
+            {
+              "coefficient": 0.16243864624838605,
+              "feature": "binary__missing__acc_d_equity"
+            },
+            {
+              "coefficient": 0.16242790033455454,
+              "feature": "categorical__reg_accounts_category_infrequent_sklearn"
+            },
+            {
+              "coefficient": 0.16052456839111454,
+              "feature": "categorical__reg_accounts_category_FULL"
+            },
+            {
+              "coefficient": -0.15273642918761368,
+              "feature": "binary__missing__acc_employees_unit_anomaly"
+            },
+            {
+              "coefficient": -0.15273642918761327,
+              "feature": "binary__missing__acc_employee_band"
+            },
+            {
+              "coefficient": -0.14950473631133107,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": -0.1475326636378157,
+              "feature": "binary__sic_G"
+            },
+            {
+              "coefficient": -0.1434765944358931,
+              "feature": "binary__sic_J"
+            },
+            {
+              "coefficient": 0.1375528844139315,
+              "feature": "log1p__reg_n_previous_names"
+            },
+            {
+              "coefficient": -0.1289052197943923,
+              "feature": "binary__missing__acc_d_cash"
+            },
+            {
+              "coefficient": -0.12070963536031026,
+              "feature": "binary__sic_N"
+            },
+            {
+              "coefficient": -0.11753706215226747,
+              "feature": "binary__sic_U"
+            },
+            {
+              "coefficient": 0.1098884806139913,
+              "feature": "binary__missing__acc_d_net_current_assets"
+            },
+            {
+              "coefficient": 0.09908166367509119,
+              "feature": "binary__sic_L"
+            },
+            {
+              "coefficient": 0.08633052461258099,
+              "feature": "categorical__reg_company_type_infrequent_sklearn"
+            },
+            {
+              "coefficient": -0.08584051503456416,
+              "feature": "binary__sic_F"
+            },
+            {
+              "coefficient": -0.08489109144002714,
+              "feature": "binary__sic_K"
+            }
+          ]
+        },
+        "register_all_availability": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.005374597117060915
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.005386950020122867
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.005389147045558457
+            }
+          ],
+          "encoded_feature_count": 124,
+          "model": "register_all_availability",
+          "predictor_count_before_encoding": 91,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.27859355983191747,
+            "brier": 0.0010874741592155532,
+            "calibration_intercept": 0.12101829319170482,
+            "calibration_slope": 1.0153468814046838,
+            "log_loss": 0.00515095723900178,
+            "roc_auc": 0.9705257021910261
+          },
+          "top_coefficients": [
+            {
+              "coefficient": -1.194658395008619,
+              "feature": "categorical__reg_company_type_Limited Partnership"
+            },
+            {
+              "coefficient": 1.1125874305686356,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": -1.104010983888149,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": 1.0861903924662981,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 1.009526941023995,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.9829145902300966,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": 0.890483628341544,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": 0.8300745873470278,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": -0.743085726646137,
+              "feature": "categorical__reg_accounts_category_NO ACCOUNTS FILED"
+            },
+            {
+              "coefficient": -0.6747066839603733,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": 0.6196683753775852,
+              "feature": "categorical__reg_company_type_Private Limited Company"
+            },
+            {
+              "coefficient": -0.5681089398891178,
+              "feature": "categorical__reg_company_type_Other company type"
+            },
+            {
+              "coefficient": -0.5476075631440742,
+              "feature": "categorical__reg_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": 0.501890173386788,
+              "feature": "categorical__reg_company_type_PRI/LTD BY GUAR/NSC (Private, limited by guarantee, no share capital)"
+            },
+            {
+              "coefficient": 0.47471968014001437,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": 0.44548692919136096,
+              "feature": "binary__missing__acc_creditors_within_one_year"
+            },
+            {
+              "coefficient": 0.43943081218780816,
+              "feature": "categorical__reg_accounts_category_AUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.35074099849041995,
+              "feature": "binary__missing__acc_current_ratio"
+            },
+            {
+              "coefficient": 0.34180597627366854,
+              "feature": "categorical__reg_accounts_category_FULL"
+            },
+            {
+              "coefficient": 0.3133652052366019,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": 0.31210875202063304,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": -0.2870381712105899,
+              "feature": "categorical__reg_company_type_Limited Liability Partnership"
+            },
+            {
+              "coefficient": -0.27864435603370824,
+              "feature": "categorical__reg_company_type_Registered Society"
+            },
+            {
+              "coefficient": -0.26215484130472083,
+              "feature": "binary__sic_U"
+            },
+            {
+              "coefficient": 0.2539742101951987,
+              "feature": "categorical__reg_accounts_category_ACCOUNTS TYPE NOT AVAILABLE"
+            },
+            {
+              "coefficient": -0.24811836138241272,
+              "feature": "binary__sic_S"
+            },
+            {
+              "coefficient": -0.2174227513253113,
+              "feature": "binary__missing__acc_current_assets"
+            },
+            {
+              "coefficient": -0.18726655483804097,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": -0.18307497111702378,
+              "feature": "categorical__age_band_0-23"
+            },
+            {
+              "coefficient": -0.18009137489391733,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": 0.1735844768729828,
+              "feature": "binary__missing__acc_d_equity"
+            },
+            {
+              "coefficient": -0.1624284807679576,
+              "feature": "binary__missing__psc_natures_of_control"
+            },
+            {
+              "coefficient": 0.15936176689175233,
+              "feature": "log1p__reg_n_previous_names"
+            },
+            {
+              "coefficient": -0.1568789605440239,
+              "feature": "binary__sic_G"
+            },
+            {
+              "coefficient": -0.1521697970209765,
+              "feature": "binary__missing__acc_employee_band"
+            },
+            {
+              "coefficient": -0.1521697970209759,
+              "feature": "binary__missing__acc_employees_unit_anomaly"
+            },
+            {
+              "coefficient": -0.1464821435068104,
+              "feature": "binary__sic_J"
+            },
+            {
+              "coefficient": -0.14560863154059406,
+              "feature": "categorical__age_band_60-119"
+            },
+            {
+              "coefficient": 0.13923162582968782,
+              "feature": "categorical__reg_accounts_category_infrequent_sklearn"
+            },
+            {
+              "coefficient": -0.13477368728992628,
+              "feature": "categorical__reg_company_type_Charitable Incorporated Organisation"
+            },
+            {
+              "coefficient": -0.11215906878313149,
+              "feature": "binary__sic_N"
+            },
+            {
+              "coefficient": -0.11064387407921701,
+              "feature": "binary__missing__acc_d_cash"
+            },
+            {
+              "coefficient": -0.10314334898559942,
+              "feature": "categorical__reg_company_type_Overseas Entity"
+            },
+            {
+              "coefficient": -0.10037284974707004,
+              "feature": "binary__missing__psc_active_psc_statement_codes"
+            },
+            {
+              "coefficient": 0.0891490437125766,
+              "feature": "binary__missing__acc_d_net_current_assets"
+            },
+            {
+              "coefficient": -0.08429758392331275,
+              "feature": "binary__missing__psc_max_voting_band"
+            },
+            {
+              "coefficient": 0.08318411080293135,
+              "feature": "categorical__reg_company_type_infrequent_sklearn"
+            },
+            {
+              "coefficient": 0.08135900014071482,
+              "feature": "binary__sic_L"
+            },
+            {
+              "coefficient": 0.07884672983267661,
+              "feature": "categorical__reg_company_type_Community Interest Company"
+            },
+            {
+              "coefficient": 0.07784253228201254,
+              "feature": "binary__reg_flag_dormant_sic"
+            }
+          ]
+        },
+        "register_psc": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.0053248859826816345
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.005386895837721853
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.005429416807404111
+            }
+          ],
+          "encoded_feature_count": 322,
+          "model": "register_psc",
+          "predictor_count_before_encoding": 92,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.2905205012390893,
+            "brier": 0.0010634465677981772,
+            "calibration_intercept": 0.0837726963825295,
+            "calibration_slope": 1.0078199433881903,
+            "log_loss": 0.005081719343773869,
+            "roc_auc": 0.9699917591851999
+          },
+          "top_coefficients": [
+            {
+              "coefficient": -1.2274139690019126,
+              "feature": "categorical__reg_company_type_Limited Partnership"
+            },
+            {
+              "coefficient": -1.1073963340714845,
+              "feature": "categorical__reg_accounts_category_NO ACCOUNTS FILED"
+            },
+            {
+              "coefficient": -1.0401695150524919,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent-as-trust,right-to-appoint-and-remove-directors-as-trust,voting-rights-75-to-100-percent-as-trust"
+            },
+            {
+              "coefficient": -1.0362190479900955,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control-limited-liability-partnership"
+            },
+            {
+              "coefficient": 1.0277324013282683,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": 1.0174297295303738,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 1.0083542981624714,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": 0.8857188315906602,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": 0.8855905696193015,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": 0.8244714289734156,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": -0.7714789429380012,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,ownership-of-shares-75-to-100-percent,voting-rights-25-to-50-percent"
+            },
+            {
+              "coefficient": 0.762376959759267,
+              "feature": "categorical__reg_company_type_Private Limited Company"
+            },
+            {
+              "coefficient": -0.7347164944482362,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": -0.6248546024861539,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": 0.6001614046053183,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": 0.5359575659988138,
+              "feature": "categorical__reg_company_type_PRI/LTD BY GUAR/NSC (Private, limited by guarantee, no share capital)"
+            },
+            {
+              "coefficient": -0.5310062937768703,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": -0.5272328834088581,
+              "feature": "categorical__reg_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": -0.5196226623588607,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent"
+            },
+            {
+              "coefficient": -0.5057619731280188,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,right-to-appoint-and-remove-directors,significant-influence-or-control,voting-rights-25-to-50-percent"
+            },
+            {
+              "coefficient": 0.5003655337123182,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-50-to-75-percent,voting-rights-50-to-75-percent"
+            },
+            {
+              "coefficient": -0.48476940417755293,
+              "feature": "categorical__reg_company_type_Other company type"
+            },
+            {
+              "coefficient": 0.473611389217746,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-50-to-75-percent,right-to-appoint-and-remove-directors,voting-rights-50-to-75-percent"
+            },
+            {
+              "coefficient": 0.46230443126974136,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": 0.4550887018416119,
+              "feature": "categorical__reg_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": 0.4498104666435959,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": -0.44702655969710137,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,right-to-appoint-and-remove-directors,right-to-appoint-and-remove-directors-as-firm,significant-influence-or-control-as-firm,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.4313376080719,
+              "feature": "categorical__reg_accounts_category_AUDITED ABRIDGED"
+            },
+            {
+              "coefficient": 0.41825900020648243,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control-as-trust"
+            },
+            {
+              "coefficient": -0.4123501774913826,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent"
+            },
+            {
+              "coefficient": 0.37781251277458344,
+              "feature": "categorical__psc_natures_of_control_significant-influence-or-control,significant-influence-or-control-as-firm"
+            },
+            {
+              "coefficient": -0.3752461678176031,
+              "feature": "categorical__reg_company_type_Limited Liability Partnership"
+            },
+            {
+              "coefficient": 0.35836149490862473,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,ownership-of-shares-75-to-100-percent,voting-rights-25-to-50-percent,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.34184411951047133,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,right-to-appoint-and-remove-directors-as-firm,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.33265728109381304,
+              "feature": "categorical__psc_natures_of_control_right-to-appoint-and-remove-members-limited-liability-partnership,right-to-share-surplus-assets-25-to-50-percent-limited-liability-partnership,voting-rights-25-to-50-percent-limited-liability-partnership"
+            },
+            {
+              "coefficient": 0.3288305376823999,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": -0.3242994882215942,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent-as-firm,right-to-appoint-and-remove-directors-as-firm,significant-influence-or-control-as-firm,voting-rights-75-to-100-percent-as-firm"
+            },
+            {
+              "coefficient": 0.3222878328121877,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent-as-firm,voting-rights-75-to-100-percent-as-firm"
+            },
+            {
+              "coefficient": -0.3119045435288743,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,significant-influence-or-control,voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": 0.30633900149786375,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent-as-firm"
+            },
+            {
+              "coefficient": -0.30332056539145436,
+              "feature": "categorical__psc_information_state_none_reported"
+            },
+            {
+              "coefficient": 0.29889253172983615,
+              "feature": "log1p__psc_n_corporate"
+            },
+            {
+              "coefficient": -0.2898624477348563,
+              "feature": "categorical__psc_natures_of_control_voting-rights-75-to-100-percent"
+            },
+            {
+              "coefficient": -0.2711720769892595,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,ownership-of-shares-75-to-100-percent-as-firm,ownership-of-shares-75-to-100-percent-as-trust,right-to-appoint-and-remove-directors,right-to-appoint-and-remove-directors-as-firm,right-to-appoint-and-remove-directors-as-trust,significant-influence-or-control-as-firm,significant-influence-or-control-as-trust,voting-rights-75-to-100-percent,voting-rights-75-to-100-percent-as-firm,voting-rights-75-to-100-percent-as-trust"
+            },
+            {
+              "coefficient": -0.26667314097904893,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": -0.2635770245570761,
+              "feature": "categorical__reg_company_type_Registered Society"
+            },
+            {
+              "coefficient": 0.25984787606464127,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-25-to-50-percent,voting-rights-50-to-75-percent"
+            },
+            {
+              "coefficient": 0.2592740222695784,
+              "feature": "categorical__psc_natures_of_control_ownership-of-shares-75-to-100-percent,voting-rights-25-to-50-percent"
+            },
+            {
+              "coefficient": 0.25895330100733976,
+              "feature": "categorical__psc_information_state_statement_only"
+            },
+            {
+              "coefficient": -0.2583358125389842,
+              "feature": "categorical__psc_natures_of_control_right-to-appoint-and-remove-directors,voting-rights-50-to-75-percent"
+            }
+          ]
+        },
+        "register_psc_availability": {
+          "convergence_warnings": 0,
+          "cv": [
+            {
+              "c": 0.1,
+              "weighted_log_loss": 0.005438893452018437
+            },
+            {
+              "c": 1.0,
+              "weighted_log_loss": 0.00545262110294474
+            },
+            {
+              "c": 10.0,
+              "weighted_log_loss": 0.0054554304529681975
+            }
+          ],
+          "encoded_feature_count": 106,
+          "model": "register_psc_availability",
+          "predictor_count_before_encoding": 73,
+          "selected_c": 0.1,
+          "test_metrics": {
+            "average_precision": 0.27394124423210836,
+            "brier": 0.0010915133548727446,
+            "calibration_intercept": 0.20358336130614232,
+            "calibration_slope": 1.0319654021005082,
+            "log_loss": 0.0051764711702022076,
+            "roc_auc": 0.9706699400359422
+          },
+          "top_coefficients": [
+            {
+              "coefficient": -1.1621032050106148,
+              "feature": "categorical__reg_accounts_category_NO ACCOUNTS FILED"
+            },
+            {
+              "coefficient": 1.150099737577592,
+              "feature": "categorical__reg_accounts_category_SMALL"
+            },
+            {
+              "coefficient": -1.1211335092308474,
+              "feature": "categorical__reg_company_type_Limited Partnership"
+            },
+            {
+              "coefficient": 1.0707082142192212,
+              "feature": "categorical__reg_company_type_PRI/LBG/NSC (Private, Limited by guarantee, no share capital, use of 'Limited' exemption)"
+            },
+            {
+              "coefficient": 1.0528380120024212,
+              "feature": "categorical__reg_accounts_category_GROUP"
+            },
+            {
+              "coefficient": 0.910838381756933,
+              "feature": "log1p__reg_n_charges"
+            },
+            {
+              "coefficient": 0.8759104295353444,
+              "feature": "binary__reg_confirmation_statement_overdue"
+            },
+            {
+              "coefficient": -0.8629280522406622,
+              "feature": "categorical__reg_accounts_category_DORMANT"
+            },
+            {
+              "coefficient": -0.843747060834221,
+              "feature": "categorical__reg_accounts_category_MICRO ENTITY"
+            },
+            {
+              "coefficient": 0.8135452672458503,
+              "feature": "categorical__reg_company_type_Private Limited Company"
+            },
+            {
+              "coefficient": 0.8092068044323812,
+              "feature": "binary__reg_accounts_overdue"
+            },
+            {
+              "coefficient": -0.5562097284292892,
+              "feature": "categorical__reg_accounts_category_MEDIUM"
+            },
+            {
+              "coefficient": 0.54360766566334,
+              "feature": "categorical__reg_accounts_category_AUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.5262625084011435,
+              "feature": "categorical__reg_company_type_Other company type"
+            },
+            {
+              "coefficient": -0.5002142044212765,
+              "feature": "categorical__reg_company_type_Limited Liability Partnership"
+            },
+            {
+              "coefficient": 0.47176881052486014,
+              "feature": "log1p__reg_n_companies_same_postcode"
+            },
+            {
+              "coefficient": 0.4657747072615469,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION FULL"
+            },
+            {
+              "coefficient": 0.4602006254812338,
+              "feature": "categorical__reg_company_type_PRI/LTD BY GUAR/NSC (Private, limited by guarantee, no share capital)"
+            },
+            {
+              "coefficient": 0.3561521150155021,
+              "feature": "categorical__reg_company_type_Public Limited Company"
+            },
+            {
+              "coefficient": 0.3303931374275697,
+              "feature": "categorical__age_band_24-59"
+            },
+            {
+              "coefficient": -0.3205193737691443,
+              "feature": "categorical__age_band_0-23"
+            },
+            {
+              "coefficient": 0.2680296596824042,
+              "feature": "categorical__reg_accounts_category_UNAUDITED ABRIDGED"
+            },
+            {
+              "coefficient": -0.26436480470677404,
+              "feature": "binary__sic_S"
+            },
+            {
+              "coefficient": -0.2642229278566007,
+              "feature": "binary__sic_U"
+            },
+            {
+              "coefficient": -0.25301165691985494,
+              "feature": "categorical__reg_accounts_category_AUDIT EXEMPTION SUBSIDIARY"
+            },
+            {
+              "coefficient": -0.24993623179288854,
+              "feature": "categorical__reg_accounts_category_TOTAL EXEMPTION SMALL"
+            },
+            {
+              "coefficient": -0.24108513625855954,
+              "feature": "categorical__reg_company_type_Registered Society"
+            },
+            {
+              "coefficient": 0.20181939363146023,
+              "feature": "categorical__reg_accounts_category_FULL"
+            },
+            {
+              "coefficient": 0.16348863885863948,
+              "feature": "log1p__reg_n_previous_names"
+            },
+            {
+              "coefficient": -0.15769627426936242,
+              "feature": "log1p__reg_n_charges_satisfied"
+            },
+            {
+              "coefficient": -0.15043600692045303,
+              "feature": "binary__sic_J"
+            },
+            {
+              "coefficient": -0.14834898093956045,
+              "feature": "binary__missing__psc_natures_of_control"
+            },
+            {
+              "coefficient": -0.14554338686202098,
+              "feature": "binary__sic_G"
+            },
+            {
+              "coefficient": 0.1417944677760262,
+              "feature": "categorical__reg_accounts_category_infrequent_sklearn"
+            },
+            {
+              "coefficient": -0.12815248466076226,
+              "feature": "categorical__reg_company_type_Overseas Entity"
+            },
+            {
+              "coefficient": -0.1226595406851024,
+              "feature": "binary__sic_N"
+            },
+            {
+              "coefficient": 0.11865348538821625,
+              "feature": "categorical__reg_accounts_category_ACCOUNTS TYPE NOT AVAILABLE"
+            },
+            {
+              "coefficient": -0.11803907248843783,
+              "feature": "categorical__reg_company_type_Charitable Incorporated Organisation"
+            },
+            {
+              "coefficient": 0.11298563249523103,
+              "feature": "categorical__age_band_120-239"
+            },
+            {
+              "coefficient": -0.10604123269795575,
+              "feature": "binary__missing__psc_active_psc_statement_codes"
+            },
+            {
+              "coefficient": -0.09889455271995462,
+              "feature": "categorical__age_band_60-119"
+            },
+            {
+              "coefficient": -0.09830652013871584,
+              "feature": "binary__missing__psc_max_voting_band"
+            },
+            {
+              "coefficient": 0.08645721131423312,
+              "feature": "binary__reg_flag_dormant_sic"
+            },
+            {
+              "coefficient": 0.08300609482796358,
+              "feature": "categorical__reg_company_type_infrequent_sklearn"
+            },
+            {
+              "coefficient": 0.0825019211135709,
+              "feature": "binary__sic_L"
+            },
+            {
+              "coefficient": -0.076603391382455,
+              "feature": "binary__sic_K"
+            },
+            {
+              "coefficient": -0.07417616534354485,
+              "feature": "categorical__reg_company_type_Private Unlimited Company"
+            },
+            {
+              "coefficient": -0.0716433183707602,
+              "feature": "binary__sic_F"
+            },
+            {
+              "coefficient": 0.07141882042428635,
+              "feature": "binary__sic_C"
+            },
+            {
+              "coefficient": -0.0647768359943472,
+              "feature": "binary__sic_R"
+            }
+          ]
+        }
+      },
+      "paired_comparisons": {
+        "combined_vs_all_availability": {
+          "average_precision": {
+            "ci95": [
+              0.06538772820536184,
+              0.16131863264021562
+            ],
+            "estimate": 0.10993440973890863,
+            "orientation": "combined minus register_all_availability"
+          },
+          "brier": {
+            "ci95": [
+              7.502196977842206e-05,
+              0.00016083962051152733
+            ],
+            "estimate": 0.00011684822844278455,
+            "orientation": "register_all_availability minus combined; positive favours combined"
+          },
+          "log_loss": {
+            "ci95": [
+              0.0003722835165102633,
+              0.0006347097062157775
+            ],
+            "estimate": 0.000510036785445069,
+            "orientation": "register_all_availability minus combined; positive favours combined"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.00016681576707942573,
+              0.004623128952946845
+            ],
+            "estimate": 0.0026561962247902437,
+            "orientation": "combined minus register_all_availability"
+          }
+        },
+        "combined_vs_register": {
+          "average_precision": {
+            "ci95": [
+              0.07513940119395332,
+              0.1747707536219266
+            ],
+            "estimate": 0.12772296206210318,
+            "orientation": "combined minus register"
+          },
+          "brier": {
+            "ci95": [
+              7.666430079151501e-05,
+              0.00017173460104477847
+            ],
+            "estimate": 0.0001278771810935387,
+            "orientation": "register minus combined; positive favours combined"
+          },
+          "log_loss": {
+            "ci95": [
+              0.0004754900288213728,
+              0.0007565120553277887
+            ],
+            "estimate": 0.0006251347690600732,
+            "orientation": "register minus combined; positive favours combined"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.0016259980843743944,
+              0.00656908215625035
+            ],
+            "estimate": 0.004187894430144182,
+            "orientation": "combined minus register"
+          }
+        },
+        "combined_vs_register_accounts": {
+          "average_precision": {
+            "ci95": [
+              -0.008184540566914736,
+              0.049146869798634696
+            ],
+            "estimate": 0.021889101487371408,
+            "orientation": "combined minus register_accounts"
+          },
+          "brier": {
+            "ci95": [
+              -6.1238091860037835e-06,
+              4.812260244999096e-05
+            ],
+            "estimate": 2.3938941767961115e-05,
+            "orientation": "register_accounts minus combined; positive favours combined"
+          },
+          "log_loss": {
+            "ci95": [
+              4.093356244600046e-05,
+              0.0001873568998862866
+            ],
+            "estimate": 0.00012299247983309548,
+            "orientation": "register_accounts minus combined; positive favours combined"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.0006279812220745084,
+              0.0022832918069217857
+            ],
+            "estimate": 0.0013942438199387951,
+            "orientation": "combined minus register_accounts"
+          }
+        },
+        "combined_vs_register_psc": {
+          "average_precision": {
+            "ci95": [
+              0.06978165093397631,
+              0.12801823810029445
+            ],
+            "estimate": 0.0967790027469351,
+            "orientation": "combined minus register_psc"
+          },
+          "brier": {
+            "ci95": [
+              6.651278954593734e-05,
+              0.00011920937244608208
+            ],
+            "estimate": 9.359041130250292e-05,
+            "orientation": "register_psc minus combined; positive favours combined"
+          },
+          "log_loss": {
+            "ci95": [
+              0.00033524403433042224,
+              0.0005372776395405993
+            ],
+            "estimate": 0.00044005610277683064,
+            "orientation": "register_psc minus combined; positive favours combined"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.0006443372582942226,
+              0.005493233640069172
+            ],
+            "estimate": 0.0030298244066470164,
+            "orientation": "combined minus register_psc"
+          }
+        },
+        "register_accounts_availability_vs_register": {
+          "average_precision": {
+            "ci95": [
+              -0.00630656023299484,
+              0.014862827471160165
+            ],
+            "estimate": 0.004505131808492382,
+            "orientation": "register_accounts_availability minus register"
+          },
+          "brier": {
+            "ci95": [
+              -5.510973070126763e-06,
+              1.1548308812092304e-05
+            ],
+            "estimate": 3.7179098814555074e-06,
+            "orientation": "register minus register_accounts_availability; positive favours register_accounts_availability"
+          },
+          "log_loss": {
+            "ci95": [
+              -1.1032730362089872e-05,
+              4.556906434625808e-05
+            ],
+            "estimate": 1.66285752088294e-05,
+            "orientation": "register minus register_accounts_availability; positive favours register_accounts_availability"
+          },
+          "roc_auc": {
+            "ci95": [
+              -0.0010495381700195345,
+              0.00031089853655941457
+            ],
+            "estimate": -0.00030501306014244834,
+            "orientation": "register_accounts_availability minus register"
+          }
+        },
+        "register_accounts_vs_availability": {
+          "average_precision": {
+            "ci95": [
+              0.06846239139302918,
+              0.1533293626104945
+            ],
+            "estimate": 0.10566895001276556,
+            "orientation": "register_accounts minus register_accounts_availability"
+          },
+          "brier": {
+            "ci95": [
+              6.781896498678237e-05,
+              0.00013868606044229167
+            ],
+            "estimate": 0.00010391332427282435,
+            "orientation": "register_accounts_availability minus register_accounts; positive favours register_accounts"
+          },
+          "log_loss": {
+            "ci95": [
+              0.00037247085126966133,
+              0.0006064410775426356
+            ],
+            "estimate": 0.0004916842088651215,
+            "orientation": "register_accounts_availability minus register_accounts; positive favours register_accounts"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.0003758674790166922,
+              0.005376434713119975
+            ],
+            "estimate": 0.002972874495580301,
+            "orientation": "register_accounts minus register_accounts_availability"
+          }
+        },
+        "register_accounts_vs_register": {
+          "average_precision": {
+            "ci95": [
+              0.06848738280615638,
+              0.14421374600600775
+            ],
+            "estimate": 0.10784981006198083,
+            "orientation": "register_accounts minus register"
+          },
+          "brier": {
+            "ci95": [
+              6.844233954136904e-05,
+              0.00013869083590340204
+            ],
+            "estimate": 0.0001060939998347148,
+            "orientation": "register minus register_accounts; positive favours register_accounts"
+          },
+          "log_loss": {
+            "ci95": [
+              0.00037476552844475106,
+              0.0006230634249571075
+            ],
+            "estimate": 0.0005061803386651366,
+            "orientation": "register minus register_accounts; positive favours register_accounts"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.0003940154325409423,
+              0.00527061548084185
+            ],
+            "estimate": 0.002850670138153267,
+            "orientation": "register_accounts minus register"
+          }
+        },
+        "register_all_availability_vs_register": {
+          "average_precision": {
+            "ci95": [
+              -0.006904121973664477,
+              0.03966950476331696
+            ],
+            "estimate": 0.018521328816241772,
+            "orientation": "register_all_availability minus register"
+          },
+          "brier": {
+            "ci95": [
+              -1.687637530678462e-05,
+              3.426117875663806e-05
+            ],
+            "estimate": 1.1286943435418895e-05,
+            "orientation": "register minus register_all_availability; positive favours register_all_availability"
+          },
+          "log_loss": {
+            "ci95": [
+              3.771309946969445e-05,
+              0.00018307927067541755
+            ],
+            "estimate": 0.00011398946220739697,
+            "orientation": "register minus register_all_availability; positive favours register_all_availability"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.0007389315054790486,
+              0.0026318023279936925
+            ],
+            "estimate": 0.0016214079890454537,
+            "orientation": "register_all_availability minus register"
+          }
+        },
+        "register_psc_availability_vs_register": {
+          "average_precision": {
+            "ci95": [
+              -0.009007699019260998,
+              0.0364173982757638
+            ],
+            "estimate": 0.01551808919783801,
+            "orientation": "register_psc_availability minus register"
+          },
+          "brier": {
+            "ci95": [
+              -1.3054700444509767e-05,
+              2.819379682336779e-05
+            ],
+            "estimate": 9.898244347026515e-06,
+            "orientation": "register minus register_psc_availability; positive favours register_psc_availability"
+          },
+          "log_loss": {
+            "ci95": [
+              3.568548097487503e-05,
+              0.00014958607701271416
+            ],
+            "estimate": 9.650623369845803e-05,
+            "orientation": "register minus register_psc_availability; positive favours register_psc_availability"
+          },
+          "roc_auc": {
+            "ci95": [
+              0.0012206143841126589,
+              0.0024718729716357328
+            ],
+            "estimate": 0.0018051132597076017,
+            "orientation": "register_psc_availability minus register"
+          }
+        },
+        "register_psc_vs_availability": {
+          "average_precision": {
+            "ci95": [
+              -0.0072773537871932675,
+              0.05120928294926218
+            ],
+            "estimate": 0.019884231048508224,
+            "orientation": "register_psc minus register_psc_availability"
+          },
+          "brier": {
+            "ci95": [
+              -1.8646672614781834e-06,
+              5.769536523656778e-05
+            ],
+            "estimate": 3.0110786026283522e-05,
+            "orientation": "register_psc_availability minus register_psc; positive favours register_psc"
+          },
+          "log_loss": {
+            "ci95": [
+              2.2209335374162086e-05,
+              0.00018188835618818957
+            ],
+            "estimate": 9.973283868455902e-05,
+            "orientation": "register_psc_availability minus register_psc; positive favours register_psc"
+          },
+          "roc_auc": {
+            "ci95": [
+              -0.0019130147089334777,
+              0.0005354984773122761
+            ],
+            "estimate": -0.0006622367766443804,
+            "orientation": "register_psc minus register_psc_availability"
+          }
+        },
+        "register_psc_vs_register": {
+          "average_precision": {
+            "ci95": [
+              -0.003459748391406297,
+              0.07854788608826452
+            ],
+            "estimate": 0.030874702565885415,
+            "orientation": "register_psc minus register"
+          },
+          "brier": {
+            "ci95": [
+              -7.88661366692844e-06,
+              7.537119481067045e-05
+            ],
+            "estimate": 3.541433367497722e-05,
+            "orientation": "register minus register_psc; positive favours register_psc"
+          },
+          "log_loss": {
+            "ci95": [
+              8.607758680638871e-05,
+              0.00028386172542751434
+            ],
+            "estimate": 0.00018470790311431683,
+            "orientation": "register minus register_psc; positive favours register_psc"
+          },
+          "roc_auc": {
+            "ci95": [
+              -0.0005142139314578464,
+              0.002492199646592141
+            ],
+            "estimate": 0.0010764845023619478,
+            "orientation": "register_psc minus register"
+          }
+        }
+      },
+      "sample_identity_hashes": {
+        "test": "6b28fb76340f8aba73581eec9ad03468d2943fd5c2053d0123b2c23bbbf7adc7",
+        "train": "5da655927896cab8200d87a15011f819cffaeb45425024b2bf92becf1a93a6f7"
+      },
+      "sampling": [
+        {
+          "case_inclusion_probability": 1.0,
+          "case_weight": 1.0,
+          "comparison_inclusion_probability": 0.02623078752547512,
+          "comparison_weight": 38.1231405663596,
+          "eligible_cases": 5862,
+          "eligible_comparisons": 4469557,
+          "sample_method": "deterministic_hash",
+          "sample_seed": 20260925,
+          "sampled_cases": 5862,
+          "sampled_comparisons": 117240,
+          "split": "train",
+          "target_comparisons": 117240,
+          "weighted_cases": 5862.0,
+          "weighted_comparisons": 4469557.000004867
+        },
+        {
+          "case_inclusion_probability": 1.0,
+          "case_weight": 1.0,
+          "comparison_inclusion_probability": 0.026011472917518978,
+          "comparison_weight": 38.44457417582417,
+          "eligible_cases": 1456,
+          "eligible_comparisons": 1119506,
+          "sample_method": "deterministic_hash",
+          "sample_seed": 20260926,
+          "sampled_cases": 1456,
+          "sampled_comparisons": 29120,
+          "split": "test",
+          "target_comparisons": 29120,
+          "weighted_cases": 1456.0,
+          "weighted_comparisons": 1119506.0000005371
+        }
+      ],
+      "sampling_design_check": {
+        "original_sample_identities_recoverable": false,
+        "same_eligible_counts_probabilities_weights_and_sample_sizes": true,
+        "status": "passed"
+      }
+    }
+  },
+  "reason": "The original held-out results were inspected before this source-addition analysis was specified, so all comparisons and intervals are exploratory.",
+  "runtime": {
+    "peak_rss_bytes": 2441621504,
+    "seconds": 316.265810171004
+  },
+  "source_aggregate_sha256": "78bb2707308dfba4bd965b9b186b2708623558de8b8fae2f3faab5d9e70f3956",
+  "study": "exploratory company-comparison source additions",
+  "study_version": "v1-internal-202609-exploratory-source-additions",
+  "validation": {
+    "baseline_aggregate_reverified": true,
+    "candidate_path": "data/validation/company-comparison-source-additions-candidate.json",
+    "candidate_sha256": "78bb2707308dfba4bd965b9b186b2708623558de8b8fae2f3faab5d9e70f3956",
+    "cross_validation_fits_checked": 126,
+    "cross_validation_warning_gate": "passed_by_fail-fast_run_completion",
+    "deterministic_sample_identity_hashes_checked": 4,
+    "exploratory": true,
+    "final_convergence_warnings": 0,
+    "final_fits_checked": 14,
+    "input_provenance_reverified": true,
+    "original_reservoir_sample_reused": false,
+    "paired_contrasts_checked": 22,
+    "status": "passed",
+    "unchanged_cohort_split_and_sampling_design": true
+  }
+}

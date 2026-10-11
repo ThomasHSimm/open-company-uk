@@ -37,6 +37,12 @@ The audit log remains append-only; move items between sections here as work is v
   logistic models plus predeclared cohort sensitivities are reported in
   `company-comparison-study-results.md`. This is recorded-status association/classification, not
   future insolvency prediction; no scores, rankings, rules or thresholds were produced.
+- **Exploratory source-addition comparison complete (internal only):** on a newly frozen,
+  reproducible sample using the unchanged cohort and split, compared register + accounts, register
+  + PSC and all three with register-only and availability controls. Accounts added the clearest
+  incremental classification information; PSC content added little. Results are exploratory
+  because the held-out partition had already been inspected and are reported in
+  `company-comparison-source-additions-results.md`.
 - Baseline Quarto methodology site under `docs/site/` (local build only).
 
 ## Blocked / on hold
