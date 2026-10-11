@@ -15,6 +15,7 @@ import subprocess
 import time
 import warnings
 from collections.abc import Iterable
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -1096,3 +1097,292 @@ def write_aggregate_json(report: dict[str, Any], path: str | Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
     return destination
+
+
+def validate_company_comparison_report(
+    report: dict[str, Any],
+    spec: dict[str, Any],
+    *,
+    diagnostic_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Validate a completed aggregate before it is promoted or reported."""
+    import numpy as np
+
+    if not report.get("aggregate_only") or not report.get("not_forecasting"):
+        raise ValueError("report scope flags are missing")
+    if report.get("spec", {}).get("sha256") != study_spec_sha256(spec):
+        raise ValueError("report study-spec hash does not match the reviewed spec")
+    if report.get("spec", {}).get("contents") != spec:
+        raise ValueError("report embedded study spec differs from the reviewed spec")
+    if report.get("cohort", {}).get("status_counts") != spec["outcome"]["expected_counts"]:
+        raise ValueError("report cohort does not close to the frozen status counts")
+
+    split_counts = report["cohort"]["split_counts"]
+    split_totals = {
+        outcome: sum(row["companies"] for row in split_counts if row["outcome"] == outcome)
+        for outcome in (0, 1)
+    }
+    expected = spec["outcome"]["expected_counts"]
+    if split_totals != {
+        0: expected["without_recorded_adverse"],
+        1: expected["recorded_adverse"],
+    }:
+        raise ValueError(f"held-out split counts do not reconcile: {split_totals}")
+
+    populations = report.get("populations", {})
+    if set(populations) != set(spec["populations"]):
+        raise ValueError("report populations differ from the frozen design")
+    final_fits = 0
+    cv_fits = 0
+    for population_name, population in populations.items():
+        sampling = population.get("sampling", [])
+        if {row.get("split") for row in sampling} != {"train", "test"}:
+            raise ValueError(f"{population_name} does not contain both sampling partitions")
+        for row in sampling:
+            plan = sampling_plan(
+                row["eligible_cases"],
+                row["eligible_comparisons"],
+                spec["sampling"]["comparison_per_case"],
+            )
+            for key in (
+                "target_comparisons",
+                "case_inclusion_probability",
+                "comparison_inclusion_probability",
+                "case_weight",
+                "comparison_weight",
+            ):
+                if not math.isclose(row[key], plan[key], rel_tol=1e-12, abs_tol=1e-12):
+                    raise ValueError(f"{population_name}/{row['split']} has invalid {key}")
+            if row["sampled_cases"] != row["eligible_cases"]:
+                raise ValueError(f"{population_name}/{row['split']} omitted eligible cases")
+            if row["sampled_comparisons"] != row["target_comparisons"]:
+                raise ValueError(f"{population_name}/{row['split']} sample size is invalid")
+            if not math.isclose(
+                row["weighted_cases"], row["eligible_cases"], abs_tol=1e-7
+            ):
+                raise ValueError(f"{population_name}/{row['split']} case weights do not close")
+            if not math.isclose(
+                row["weighted_comparisons"], row["eligible_comparisons"], abs_tol=1e-5
+            ):
+                raise ValueError(
+                    f"{population_name}/{row['split']} comparison weights do not close"
+                )
+
+        models = population.get("models", {})
+        if set(models) != set(MODEL_NAMES):
+            raise ValueError(f"{population_name} model set differs from the frozen design")
+        for model_name, model in models.items():
+            final_fits += 1
+            if model.get("convergence_warnings") != 0:
+                raise ValueError(f"{population_name}/{model_name} did not converge")
+            cv = model.get("cv", [])
+            if [row["c"] for row in cv] != [float(value) for value in spec["modelling"]["c_grid"]]:
+                raise ValueError(f"{population_name}/{model_name} CV grid is incomplete")
+            if not all(np.isfinite(row["weighted_log_loss"]) for row in cv):
+                raise ValueError(f"{population_name}/{model_name} CV metric is non-finite")
+            cv_fits += len(cv) * spec["modelling"]["cv_folds"]
+            if model.get("selected_c") not in spec["modelling"]["c_grid"]:
+                raise ValueError(f"{population_name}/{model_name} selected C is invalid")
+            metrics = model.get("test_metrics", {})
+            expected_metrics = {
+                "roc_auc",
+                "average_precision",
+                "log_loss",
+                "brier",
+                "calibration_intercept",
+                "calibration_slope",
+            }
+            if set(metrics) != expected_metrics or not all(
+                np.isfinite(value) for value in metrics.values()
+            ):
+                raise ValueError(f"{population_name}/{model_name} metrics are incomplete")
+            if not 0 <= metrics["roc_auc"] <= 1 or not 0 <= metrics["average_precision"] <= 1:
+                raise ValueError(f"{population_name}/{model_name} discrimination metric is invalid")
+            if metrics["log_loss"] < 0 or not 0 <= metrics["brier"] <= 1:
+                raise ValueError(f"{population_name}/{model_name} loss metric is invalid")
+
+    unchanged_design = None
+    if diagnostic_report is not None:
+        old_spec = diagnostic_report["spec"]["contents"]
+        design_keys = (
+            "study_version",
+            "input",
+            "outcome",
+            "populations",
+            "sampling",
+            "structural",
+            "features",
+            "forbidden_predictors",
+        )
+        if any(old_spec[key] != spec[key] for key in design_keys):
+            raise ValueError("cohort, features, sampling or split changed after the diagnostic run")
+        old_modelling = dict(old_spec["modelling"])
+        new_modelling = dict(spec["modelling"])
+        new_modelling.pop("solver", None)
+        new_modelling.pop("tolerance", None)
+        if old_modelling != new_modelling:
+            raise ValueError("non-solver modelling choices changed after the diagnostic run")
+        if diagnostic_report["cohort"] != report["cohort"]:
+            raise ValueError("held-out split counts changed after the diagnostic run")
+        for population_name in spec["populations"]:
+            if (
+                diagnostic_report["populations"][population_name]["sampling"]
+                != report["populations"][population_name]["sampling"]
+            ):
+                raise ValueError(f"{population_name} sampled partition changed")
+        unchanged_design = True
+
+    return {
+        "status": "passed",
+        "final_fits_checked": final_fits,
+        "final_convergence_warnings": 0,
+        "cross_validation_fits_checked": cv_fits,
+        "cross_validation_warning_gate": "passed_by_fail-fast_run_completion",
+        "populations_checked": len(populations),
+        "unchanged_from_diagnostic_design": unchanged_design,
+    }
+
+
+def build_committed_company_comparison_aggregate(
+    report: dict[str, Any],
+    validation: dict[str, Any],
+    *,
+    source_sha256: str,
+    minimum_count: int = 10,
+) -> dict[str, Any]:
+    """Build the aggregate-only, small-count-suppressed committed result."""
+    from scipy.stats import chi2, norm, ttest_ind_from_stats
+
+    committed = deepcopy(report)
+    committed["source_aggregate_sha256"] = source_sha256
+    committed["validation"] = deepcopy(validation)
+    committed["small_count_suppression"] = {
+        "threshold": minimum_count,
+        "rule": "positive displayed counts below the threshold are null with suppressed=true",
+    }
+    committed["descriptive_inference"] = {
+        "binary_test": "two-sided pooled two-proportion z test",
+        "numeric_test": "two-sided Welch t test from aggregate mean/SD/count",
+        "categorical_test": "chi-square test reconstructed from Cramer's V",
+        "multiplicity": "Benjamini-Hochberg across all predeclared descriptive tests",
+        "interpretation": "descriptive only; effect sizes and intervals remain primary",
+    }
+
+    tests: list[dict[str, Any]] = []
+    for effect in committed["descriptives"]["binary_effects"]:
+        n1 = effect["adverse_observed"]
+        n0 = effect["comparison_observed"]
+        a = effect["adverse_true"]
+        c = effect["comparison_true"]
+        pooled = (a + c) / (n1 + n0) if n1 + n0 else 0
+        standard_error = math.sqrt(pooled * (1 - pooled) * (1 / n1 + 1 / n0))
+        p_value = 2 * norm.sf(abs((a / n1 - c / n0) / standard_error)) if standard_error else 1.0
+        effect["p_value"] = float(p_value)
+        tests.append(effect)
+    for effect in committed["descriptives"]["numeric_effects"]:
+        adverse = effect["adverse"]
+        comparison = effect["comparison"]
+        if adverse["observed"] > 1 and comparison["observed"] > 1:
+            result = ttest_ind_from_stats(
+                adverse["mean"],
+                adverse["sd"],
+                adverse["observed"],
+                comparison["mean"],
+                comparison["sd"],
+                comparison["observed"],
+                equal_var=False,
+            )
+            effect["p_value"] = float(result.pvalue)
+            tests.append(effect)
+        else:
+            effect["p_value"] = None
+    for effect in committed["descriptives"]["categorical_effects"]:
+        total = sum(row["companies"] for row in effect["counts"])
+        categories = {row["category"] for row in effect["counts"]}
+        degrees_of_freedom = max(len(categories) - 1, 1)
+        statistic = effect["cramers_v"] ** 2 * total
+        effect["p_value"] = float(chi2.sf(statistic, degrees_of_freedom))
+        tests.append(effect)
+
+    ordered = sorted(
+        ((index, row["p_value"]) for index, row in enumerate(tests)),
+        key=lambda item: item[1],
+    )
+    adjusted = [1.0] * len(ordered)
+    running = 1.0
+    for rank in range(len(ordered), 0, -1):
+        original_index, p_value = ordered[rank - 1]
+        running = min(running, p_value * len(ordered) / rank)
+        adjusted[original_index] = running
+    for row, q_value in zip(tests, adjusted, strict=True):
+        row["fdr_q_value"] = float(q_value)
+
+    for effect in committed["descriptives"]["categorical_effects"]:
+        retained = []
+        suppressed: dict[str, list[int]] = {}
+        for row in effect["counts"]:
+            count = row["companies"]
+            if 0 < count < minimum_count:
+                suppressed.setdefault(row["study_group"], []).append(count)
+            else:
+                retained.append(row)
+        for study_group, counts in suppressed.items():
+            suppressed_total = sum(counts)
+            retained.append(
+                {
+                    "study_group": study_group,
+                    "category": "__SUPPRESSED_CATEGORIES__",
+                    "companies": (
+                        suppressed_total if suppressed_total >= minimum_count else None
+                    ),
+                    "suppressed": True,
+                    "suppressed_category_count": len(counts),
+                }
+            )
+        effect["counts"] = retained
+
+    for effect in committed["descriptives"]["binary_effects"]:
+        count_fields = (
+            "adverse_observed",
+            "adverse_true",
+            "comparison_observed",
+            "comparison_true",
+        )
+        if any(0 < effect[field] < minimum_count for field in count_fields):
+            for field in count_fields:
+                if 0 < effect[field] < minimum_count:
+                    effect[field] = None
+            for field in (
+                "adverse_rate",
+                "comparison_rate",
+                "percentage_point_difference",
+                "prevalence_ratio",
+                "prevalence_ratio_ci95",
+                "odds_ratio",
+                "odds_ratio_ci95",
+                "p_value",
+                "fdr_q_value",
+            ):
+                effect[field] = None
+            effect["suppressed"] = True
+
+    for effect in committed["descriptives"]["numeric_effects"]:
+        if any(
+            0 < effect[group]["observed"] < minimum_count
+            for group in ("adverse", "comparison")
+        ):
+            for group in ("adverse", "comparison"):
+                if 0 < effect[group]["observed"] < minimum_count:
+                    effect[group] = {"observed": None, "suppressed": True}
+            for field in (
+                "mean_difference",
+                "standardised_mean_difference",
+                "standardised_mean_difference_ci95",
+                "rank_biserial_effect_weighted_sample",
+                "p_value",
+                "fdr_q_value",
+            ):
+                effect[field] = None
+            effect["suppressed"] = True
+
+    return committed

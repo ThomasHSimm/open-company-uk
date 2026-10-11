@@ -30,6 +30,13 @@ The audit log remains append-only; move items between sections here as work is v
   companies. This establishes case-only temporal availability and covered-case patterns, not
   specificity, precision or population performance. Results are in
   `validation-case-lead-time-results.md`.
+- **Contemporaneous company-attribute comparison complete (internal only):** compared the narrow
+  7,318-company recorded administration/receivership/voluntary-arrangement group with companies
+  without recorded adverse insolvency in the Handoff 10 register population. Ambiguous liquidation
+  was excluded. Weighted held-out structural, register, accounts, PSC, missingness and combined
+  logistic models plus predeclared cohort sensitivities are reported in
+  `company-comparison-study-results.md`. This is recorded-status association/classification, not
+  future insolvency prediction; no scores, rankings, rules or thresholds were produced.
 - Baseline Quarto methodology site under `docs/site/` (local build only).
 
 ## Blocked / on hold

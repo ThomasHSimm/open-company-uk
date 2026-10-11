@@ -1,8 +1,9 @@
 # Company-attribute comparison study plan
 
-**Status:** design only; no study has been run. This is a contemporaneous descriptive and
-classification study of registrar-recorded state. It is not a forecast, a causal study, a new rule,
-a company ranking or a production risk score.
+**Status:** implemented as approved; see the
+[aggregate results](company-comparison-study-results.md). This is a contemporaneous descriptive
+and classification study of registrar-recorded state. It is not a forecast, a causal study, a new
+rule, a company ranking or a production risk score.
 
 ## 1. Evidence inspected
 

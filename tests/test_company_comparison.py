@@ -11,11 +11,13 @@ from ukcompany.validation.company_comparison import (
     MODEL_NAMES,
     _build_pipeline,
     _prepare_features,
+    build_committed_company_comparison_aggregate,
     classify_status,
     run_company_comparison,
     sampling_plan,
     sha256_file,
     split_bucket,
+    validate_company_comparison_report,
     validate_predictor_whitelist,
 )
 
@@ -193,3 +195,16 @@ def test_synthetic_study_is_aggregate_only_and_reconciles(tmp_path: Path):
     assert '"00000000"' not in encoded
     assert '"00000001"' not in encoded
     assert "company_number" not in report["populations"]["primary"]
+    validation = validate_company_comparison_report(report, json.loads(spec_path.read_text()))
+    assert validation["status"] == "passed"
+    assert validation["cross_validation_fits_checked"] == 56
+    committed = build_committed_company_comparison_aggregate(
+        report, validation, source_sha256="abc", minimum_count=10
+    )
+    assert committed["source_aggregate_sha256"] == "abc"
+    assert any(
+        row.get("suppressed") is True
+        and row["category"] == "__SUPPRESSED_CATEGORIES__"
+        for effect in committed["descriptives"]["categorical_effects"]
+        for row in effect["counts"]
+    )

@@ -2991,3 +2991,39 @@ baseline, consistent full/intersection populations, company-separated splits, tr
 preprocessing and prevalence correction. This remains contemporaneous association/classification,
 not forecasting, causal inference, a new rule, ranking or score. No study, download or heavy scan
 was run; broader liquidation labels require separately approved point-in-time case-type data.
+
+## Company-attribute comparison study (2026-10-11)
+
+Completed the approved narrow contemporaneous study from the governed Handoff 10 join: 7,318
+companies with an explicit administration/receivership/voluntary-arrangement status versus
+5,589,063 `Active` or `Active - Proposal to Strike off` companies without recorded adverse
+insolvency. All 108,330 ambiguous `Liquidation` rows remained excluded. PSC is dated 2026-09-25,
+register 2026-10-01 and accounts `T=202609`; the six-day PSC difference is accepted and accounts
+registration month is not represented as ZIP publication time.
+
+The original diagnostic run at `303dd60` took 10,407.5 seconds / 5.84 GiB peak but every final
+`saga` fit warned on convergence and CV convergence was not certifiable, so none of its metrics was
+reported. Commit `a3b67db` switched to `newton-cholesky` at fixed tolerance `1e-6`, made every CV
+and final convergence warning fatal, removed unused calibration fitting from paired bootstrap
+replicates and added progress logging. Cohorts, features, regularisation grid, sampling, seeds,
+held-out split and metrics were unchanged; this was a numerical correction, not performance
+tuning. The corrected detached job `corrected-newton-cholesky-20261011` finished in 342.2 seconds
+at 5.80 GiB peak. All 252 CV fits passed the fail-fast gate and all 28 final fits recorded zero
+warnings; hashes, cohort closure, positive inclusion probabilities, weights and finite metrics
+were revalidated before promotion.
+
+Primary weighted held-out ROC AUC / average precision were 0.7395 / 0.0087 for missingness only,
+0.7924 / 0.0069 structural, 0.8622 / 0.0881 structural + missingness, 0.9708 / 0.3226 register,
+0.9266 / 0.0467 accounts, 0.8824 / 0.0804 PSC and 0.9719 / 0.4387 combined. Combined minus
+structural + missingness ROC AUC was 0.1091 (paired bootstrap 95% CI 0.1011–0.1180). The largest
+descriptive differences were already-current compliance and charge attributes: accounts overdue
+81.48% versus 6.06%, confirmation statement overdue 76.35% versus 10.90%, and median registered
+charges 3 versus 0. These may be consequences of an existing adverse process, not antecedent risk.
+
+Full denominators, effect sizes, complete-source/Active-only/private-limited sensitivities,
+provenance and limitations are in `docs/company-comparison-study-results.md`; the committed JSON is
+aggregate-only with sub-10 categorical cells pooled or suppressed. The private full aggregate,
+diagnostic output, persistent log and run metadata remain gitignored. No company scores, rules,
+thresholds, downloads, pushes or publication were produced. Validation: 283 tests passed, one was
+deselected, Ruff passed, and the committed aggregate reproduced byte-for-byte from the promoted
+private JSON.
