@@ -3054,3 +3054,34 @@ finite metrics. The full synthetic suite passed 285 tests with one deselected, R
 committed JSON reproduced exactly from the validated private aggregate. Committed outputs are
 aggregate-only; private run artifacts remain gitignored. No downloads, scores, rankings,
 thresholds, new rules, pushes or publication were produced.
+
+## Exploratory accounts ablation and feature importance (2026-10-11)
+
+Corrected paired-difference presentation in both company-comparison reports: point estimates now
+come directly from unrounded held-out metrics, while percentile intervals come from the paired
+bootstrap. The previous JSON `estimate` field is explicitly identified as the bootstrap-replicate
+mean. For primary register + accounts versus register, observed AP difference is 0.11135021 rather
+than the 0.10784981 bootstrap mean; the interval and underlying predictions are unchanged.
+
+Froze all 17 accounts predictors into financial position/scale, financial change,
+recency/history, or availability/reporting metadata before fitting. Reused the source-addition
+cohort, deterministic samples, split, weights, preprocessing, regularisation grid and convergence
+gates. In the primary population, financial content beyond the common metadata baseline improved
+ROC AUC by 0.00284 and AP by 0.06931; adding timing/history after financial content changed ROC AUC
+by -0.00018 but improved AP by 0.02318 and reduced log loss by 0.000083. Complete-source financial
+ROC AUC and log-loss gains persisted, with wider AP/Brier intervals.
+
+Extracted all regularised coefficients with scale/reference semantics and ran ten seeded held-out
+raw-feature permutations without refitting. Register compliance dominated all-three log-loss
+importance (0.009881), followed by charges (0.001156), accounts financial content (0.000938),
+availability/reporting (0.000638), PSC (0.000466) and accounts timing/history (0.000230).
+Working-capital/liquidity and employee scale were the leading financial blocks; PSC identity
+verification and record composition exceeded ownership/voting. Correlation, missingness and
+contemporaneous measurement prevent causal or stable feature-ranking interpretations.
+
+The run at commit `511a605` took 410.7 seconds and 2.33 GiB peak RSS. All 126 CV fits and 14 final
+fits passed convergence gates; validation checked ten paired contrasts, 1,698 coefficient rows and
+170 permutation blocks. Focused synthetic tests cover grouping, arithmetic, permutation integrity,
+weighted metrics and sample preservation; the full suite passed 289 tests with one deselected and
+Ruff passed. Outputs are aggregate-only; no downloads, company scores, rules, thresholds, pushes,
+publication or further model search occurred.

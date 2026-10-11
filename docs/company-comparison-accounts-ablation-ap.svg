@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="455" viewBox="0 0 920 455" role="img" aria-labelledby="title desc">
+  <title id="title">Observed held-out average-precision differences for accounts ablations</title>
+  <desc id="desc">Horizontal paired bars compare the primary and complete-source populations. Financial content has the largest gains.</desc>
+  <rect width="920" height="455" fill="#ffffff"/>
+  <style>
+    text { font-family: system-ui, sans-serif; fill: #1f2937; }
+    .title { font-size: 18px; font-weight: 700; }
+    .label { font-size: 13px; }
+    .value { font-size: 12px; }
+    .axis { stroke: #9ca3af; stroke-width: 1; }
+    .grid { stroke: #e5e7eb; stroke-width: 1; }
+  </style>
+  <text class="title" x="20" y="28">Observed weighted AP difference</text>
+  <rect x="625" y="15" width="14" height="14" fill="#2563eb"/><text class="label" x="645" y="27">Primary</text>
+  <rect x="730" y="15" width="14" height="14" fill="#f59e0b"/><text class="label" x="750" y="27">Complete source</text>
+  <line class="axis" x1="300" y1="52" x2="300" y2="425"/>
+  <line class="grid" x1="420" y1="52" x2="420" y2="425"/><text class="value" x="414" y="445">.02</text>
+  <line class="grid" x1="540" y1="52" x2="540" y2="425"/><text class="value" x="534" y="445">.04</text>
+  <line class="grid" x1="660" y1="52" x2="660" y2="425"/><text class="value" x="654" y="445">.06</text>
+  <line class="grid" x1="780" y1="52" x2="780" y2="425"/><text class="value" x="774" y="445">.08</text>
+  <line class="grid" x1="900" y1="52" x2="900" y2="425"/><text class="value" x="891" y="445">.10</text>
+  <text class="label" x="20" y="88">Financial vs metadata</text>
+  <rect x="300" y="68" width="416" height="16" fill="#2563eb"/><text class="value" x="722" y="81">.0693</text>
+  <rect x="300" y="88" width="126" height="16" fill="#f59e0b"/><text class="value" x="432" y="101">.0210</text>
+  <text class="label" x="20" y="158">History vs metadata</text>
+  <rect x="300" y="138" width="111" height="16" fill="#2563eb"/><text class="value" x="417" y="151">.0184</text>
+  <rect x="300" y="158" width="72" height="16" fill="#f59e0b"/><text class="value" x="378" y="171">.0120</text>
+  <text class="label" x="20" y="228">Both vs metadata</text>
+  <rect x="300" y="208" width="555" height="16" fill="#2563eb"/><text class="value" x="861" y="221">.0925</text>
+  <rect x="300" y="228" width="194" height="16" fill="#f59e0b"/><text class="value" x="500" y="241">.0324</text>
+  <text class="label" x="20" y="298">History beyond financial</text>
+  <rect x="300" y="278" width="139" height="16" fill="#2563eb"/><text class="value" x="445" y="291">.0232</text>
+  <rect x="300" y="298" width="68" height="16" fill="#f59e0b"/><text class="value" x="374" y="311">.0114</text>
+  <text class="label" x="20" y="368">Financial beyond history</text>
+  <rect x="300" y="348" width="444" height="16" fill="#2563eb"/><text class="value" x="750" y="361">.0740</text>
+  <rect x="300" y="368" width="122" height="16" fill="#f59e0b"/><text class="value" x="428" y="381">.0203</text>
+  <text class="value" x="20" y="420">Point estimates are observed differences from unrounded held-out metrics; bars do not show uncertainty.</text>
+</svg>

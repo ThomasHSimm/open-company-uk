@@ -43,6 +43,12 @@ The audit log remains append-only; move items between sections here as work is v
   incremental classification information; PSC content added little. Results are exploratory
   because the held-out partition had already been inspected and are reported in
   `company-comparison-source-additions-results.md`.
+- **Exploratory accounts ablation and model-importance follow-up complete (internal only):** kept
+  the frozen deterministic samples and separated accounts financial content from timing/history
+  and reporting metadata. Financial content added most of the incremental separation;
+  timing/history added smaller AP and loss improvements. Coefficients and repeated held-out grouped
+  permutation importance are reported in `company-comparison-accounts-importance-results.md`;
+  they are conditional exploratory explanations, not causal effects or production rankings.
 - Baseline Quarto methodology site under `docs/site/` (local build only).
 
 ## Blocked / on hold

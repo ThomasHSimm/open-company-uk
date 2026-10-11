@@ -29,6 +29,7 @@ from ukcompany.validation.company_comparison_followup import (
     ABLATION_MODEL_NAMES,
     EXPLAINED_MODEL_NAMES,
     accounts_ablation_definition,
+    permutation_blocks,
     permutation_importance,
     permute_frame_columns,
     run_company_comparison_accounts_importance,
@@ -316,6 +317,21 @@ def test_accounts_followup_groups_assign_every_column_once():
     assert "acc_equity" not in baseline["signed_log1p"]
     assert "acc_equity" in financial["signed_log1p"]
     assert "acc_accounts_category" in baseline["categorical"]
+    metadata = set(followup_spec["accounts_column_groups"]["availability_reporting_metadata"])
+    for model_name in ABLATION_MODEL_NAMES:
+        definition = accounts_ablation_definition(base_spec, followup_spec, model_name)
+        assert metadata <= set(sum(definition.values(), []))
+
+    blocks = permutation_blocks(
+        followup_spec, sum(accounts_ablation_definition(
+            base_spec, followup_spec, "accounts_financial_history"
+        ).values(), [])
+    )
+    equity_columns = blocks["logical"]["accounts_equity_position"]
+    assert "acc_equity" in equity_columns
+    assert "acc_negative_equity" in equity_columns
+    assert "missing__acc_equity" in equity_columns
+    assert "missing__acc_negative_equity" in equity_columns
 
 
 def test_paired_bootstrap_reports_observed_difference_not_bootstrap_mean():
