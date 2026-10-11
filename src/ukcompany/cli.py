@@ -384,6 +384,28 @@ def cmd_company_comparison_source_additions(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_company_comparison_accounts_importance(args: argparse.Namespace) -> int:
+    from .validation.company_comparison import write_aggregate_json
+    from .validation.company_comparison_followup import (
+        run_company_comparison_accounts_importance,
+    )
+
+    report = run_company_comparison_accounts_importance(
+        args.config,
+        memory_limit_gb=args.memory_limit_gb,
+        spill_dir=args.spill_dir,
+    )
+    output = write_aggregate_json(report, args.out)
+    print("-- exploratory accounts content, timing and feature importance --")
+    print("financial content versus timing/history; coefficients and permutation importance")
+    print(f"aggregate-only output={output}")
+    print(
+        f"runtime={report['runtime']['seconds']:.1f}s; "
+        f"peak_rss={report['runtime']['peak_rss_bytes'] / 1024**3:.2f} GiB"
+    )
+    return 0
+
+
 def _snapshot_cache_dir(args: argparse.Namespace) -> Path:
     if args.cache_dir:
         return Path(args.cache_dir)
@@ -586,6 +608,24 @@ def main(argv: list[str] | None = None) -> int:
         default="/tmp/ukcompany-company-comparison-source-additions-spill",
     )
     p_source_additions.set_defaults(func=cmd_company_comparison_source_additions)
+
+    p_accounts_importance = sub.add_parser(
+        "company-comparison-accounts-importance",
+        help="run exploratory accounts ablations and frozen-model importance",
+    )
+    p_accounts_importance.add_argument(
+        "--config", default="config/company-comparison-accounts-importance.json"
+    )
+    p_accounts_importance.add_argument(
+        "--out",
+        default="data/validation/company-comparison-accounts-importance-aggregate.json",
+    )
+    p_accounts_importance.add_argument("--memory-limit-gb", type=int, default=8)
+    p_accounts_importance.add_argument(
+        "--spill-dir",
+        default="/tmp/ukcompany-company-comparison-accounts-importance-spill",
+    )
+    p_accounts_importance.set_defaults(func=cmd_company_comparison_accounts_importance)
 
     p_snapshot = sub.add_parser("snapshot", help="manage monthly Companies House snapshots")
     snapshot_sub = p_snapshot.add_subparsers(dest="snapshot_command", required=True)

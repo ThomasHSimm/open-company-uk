@@ -528,7 +528,9 @@ def _feature_definition(spec: dict[str, Any], model_name: str) -> dict[str, list
     return definition
 
 
-def _build_pipeline(spec: dict[str, Any], model_name: str, c_value: float):
+def _build_pipeline_from_definition(
+    spec: dict[str, Any], definition: dict[str, list[str]], c_value: float
+):
     import numpy as np
     from sklearn.compose import ColumnTransformer
     from sklearn.impute import SimpleImputer
@@ -536,7 +538,14 @@ def _build_pipeline(spec: dict[str, Any], model_name: str, c_value: float):
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
 
-    definition = _feature_definition(spec, model_name)
+    definition = {kind: list(columns) for kind, columns in definition.items()}
+    for kind in definition:
+        if len(definition[kind]) != len(set(definition[kind])):
+            raise ValueError(f"duplicate predictor in {kind} feature definition")
+    predictors = sum(definition.values(), [])
+    if len(predictors) != len(set(predictors)):
+        raise ValueError("predictor appears in multiple transformation groups")
+    validate_predictor_whitelist(predictors, spec)
     transformers = []
     if definition["log1p"]:
         transformers.append(
@@ -631,6 +640,12 @@ def _build_pipeline(spec: dict[str, Any], model_name: str, c_value: float):
     return Pipeline([("preprocess", preprocessor), ("model", model)]), definition
 
 
+def _build_pipeline(spec: dict[str, Any], model_name: str, c_value: float):
+    return _build_pipeline_from_definition(
+        spec, _feature_definition(spec, model_name), c_value
+    )
+
+
 def _weighted_metrics(y_true, probability, weight) -> dict[str, float]:
     import numpy as np
     from scipy.optimize import minimize
@@ -675,14 +690,18 @@ def _weighted_core_metrics(y_true, probability, weight) -> dict[str, float]:
     }
 
 
-def _fit_model(frame, spec: dict[str, Any], model_name: str):
+def _fit_definition(
+    frame,
+    spec: dict[str, Any],
+    model_name: str,
+    definition: dict[str, list[str]],
+):
     import numpy as np
     from sklearn.base import clone
     from sklearn.exceptions import ConvergenceWarning
     from sklearn.metrics import log_loss
     from sklearn.model_selection import StratifiedKFold
 
-    definition = _feature_definition(spec, model_name)
     predictors = sum(definition.values(), [])
     train = frame[frame["split"] == "train"].reset_index(drop=True)
     test = frame[frame["split"] == "test"].reset_index(drop=True)
@@ -696,7 +715,7 @@ def _fit_model(frame, spec: dict[str, Any], model_name: str):
     )
     cv_rows = []
     for c_value in spec["modelling"]["c_grid"]:
-        pipeline, _ = _build_pipeline(spec, model_name, c_value)
+        pipeline, _ = _build_pipeline_from_definition(spec, definition, c_value)
         losses = []
         for fit_index, validation_index in folds.split(x_train, y_train):
             candidate = clone(pipeline)
@@ -724,7 +743,7 @@ def _fit_model(frame, spec: dict[str, Any], model_name: str):
             {"c": float(c_value), "weighted_log_loss": float(np.mean(losses))}
         )
     selected_c = min(cv_rows, key=lambda row: (row["weighted_log_loss"], row["c"]))["c"]
-    pipeline, _ = _build_pipeline(spec, model_name, selected_c)
+    pipeline, _ = _build_pipeline_from_definition(spec, definition, selected_c)
     convergence_warnings = 0
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always", category=ConvergenceWarning)
@@ -764,6 +783,19 @@ def _fit_model(frame, spec: dict[str, Any], model_name: str):
         "weight": w_test,
         "probability": probability,
     }
+    fitted = {
+        "pipeline": pipeline,
+        "test_frame": test,
+        "predictors": predictors,
+        "definition": definition,
+    }
+    return result, predictions, fitted
+
+
+def _fit_model(frame, spec: dict[str, Any], model_name: str):
+    result, predictions, _ = _fit_definition(
+        frame, spec, model_name, _feature_definition(spec, model_name)
+    )
     return result, predictions
 
 
@@ -802,8 +834,20 @@ def _paired_bootstrap(
         )
         deltas["log_loss"].append(ref_metrics["log_loss"] - candidate_metrics["log_loss"])
         deltas["brier"].append(ref_metrics["brier"] - candidate_metrics["brier"])
+    observed_reference = _weighted_core_metrics(
+        outcome, reference["probability"], reference["weight"]
+    )
+    observed_candidate = _weighted_core_metrics(
+        outcome, candidate["probability"], candidate["weight"]
+    )
     return {
         name: {
+            "observed_difference": float(
+                observed_candidate[name] - observed_reference[name]
+                if name in {"roc_auc", "average_precision"}
+                else observed_reference[name] - observed_candidate[name]
+            ),
+            "bootstrap_mean": float(np.mean(values)),
             "estimate": float(np.mean(values)),
             "ci95": [float(np.quantile(values, 0.025)), float(np.quantile(values, 0.975))],
             "orientation": (
