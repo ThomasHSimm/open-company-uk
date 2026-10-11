@@ -320,10 +320,20 @@ held-out results were inspected before these comparisons were specified. Reusing
 partition cannot provide a new confirmatory test, and paired intervals must not be interpreted as
 unbiased model-selection evidence.
 
-Keep the original cohort, labels, company-number split, uniform comparison sample, inverse-
-probability weights, transformations, regularisation grid and training-only cross-validation
-unchanged. Run only the primary population and the complete PSC-and-accounts intersection. The
-complete-source analysis is selection-conditioned and remains secondary.
+Keep the original cohort, labels, company-number split, uniform comparison sampling design,
+inverse-probability weights, transformations, regularisation grid and training-only cross-
+validation unchanged. Run only the primary population and the complete PSC-and-accounts
+intersection. The complete-source analysis is selection-conditioned and remains secondary.
+
+The first attempted follow-up stopped before writing a result because the original register model
+did not reproduce. Investigation established that the prior run retained only aggregate sampling
+records: DuckDB's seeded reservoir under `preserve_insertion_order=false` did not preserve sampled
+company identities across processes. Exact recovery of the original comparison subsample is
+therefore impossible. Before seeing any follow-up output, replace only that unrecoverable identity
+selection with a fixed-size deterministic company-number hash order inside each existing split.
+Eligible counts, sample sizes, positive inclusion probabilities and weights remain identical.
+Record aggregate train/test sample hashes so this exploratory sample is reproducible. This does not
+make the already-inspected test partition confirmatory.
 
 Fit these seven predeclared matrices on identical companies within each population:
 
@@ -341,8 +351,10 @@ Fit these seven predeclared matrices on identical companies within each populati
 Report paired bootstrap differences in weighted held-out ROC AUC, average precision, log loss and
 Brier score for each source-content model versus register, each source-content model versus its
 availability control, all three versus register and all-source availability, and all three versus
-each two-source model. Refit register and all-three and require exact reproduction of their frozen
-CV and held-out metrics before accepting any new comparison.
+each two-source model. Fit every model on the same newly frozen exploratory sample and require its
+identity hashes, cohort/split counts, sampling probabilities, weights and sample sizes to validate
+before accepting any comparison. Do not compare its absolute metrics with the original run as if
+they came from the same sampled companies.
 
 This asks whether accounts or PSC adds contemporaneous classification information beyond register
 attributes and how much apparent gain is explained by source availability. It does not determine

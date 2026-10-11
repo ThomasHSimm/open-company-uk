@@ -2,6 +2,7 @@
   "study_version": "v1-internal-202609-exploratory-source-additions",
   "exploratory": true,
   "reason": "The original held-out results were inspected before this source-addition analysis was specified, so all comparisons and intervals are exploratory.",
+  "sampling_resolution": "The original fixed-size reservoir identities were not retained and DuckDB reservoir sampling was not identity-reproducible with preserve_insertion_order=false. Keep the original cohort, split, eligible counts, sample sizes, probabilities and weights, but freeze a new deterministic company-number hash sample before fitting. Record only its train/test hashes.",
   "base_study_spec_path": "config/company-comparison-study.json",
   "base_study_spec_sha256": "6fd23b82cb221cab64caa80a094593f667713d90332cae2384cb6c449f20d70c",
   "baseline_aggregate_path": "data/validation/company-comparison-aggregate.json",

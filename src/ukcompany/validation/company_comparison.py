@@ -286,7 +286,9 @@ def _population_filter(population: str) -> str:
         raise ValueError(f"unknown study population: {population}") from exc
 
 
-def _sample_population(con, spec: dict[str, Any], population: str):
+def _sample_population(
+    con, spec: dict[str, Any], population: str, *, sample_method: str = "reservoir"
+):
     import pandas as pd
 
     population_filter = _population_filter(population)
@@ -326,18 +328,36 @@ def _sample_population(con, spec: dict[str, Any], population: str):
         )
         target = plan["target_comparisons"]
         seed = seed_base + list(POPULATION_FILTERS).index(population) * 10 + split_index
+        if sample_method == "reservoir":
+            sample_sql = f"""
+                SELECT company_number, outcome, split
+                FROM (
+                    SELECT company_number, outcome, split
+                    FROM cohort_keys
+                    WHERE {population_filter}
+                      AND split = {_sql_literal(split)} AND outcome = 0
+                ) USING SAMPLE reservoir({target} ROWS) REPEATABLE({seed})
+            """
+        elif sample_method == "deterministic_hash":
+            sample_sql = f"""
+                SELECT company_number, outcome, split
+                FROM cohort_keys
+                WHERE {population_filter}
+                  AND split = {_sql_literal(split)} AND outcome = 0
+                ORDER BY md5_number_lower(
+                    company_number || '|sample|{seed}'
+                ), company_number
+                LIMIT {target}
+            """
+        else:
+            raise ValueError(f"unknown sample method: {sample_method}")
         con.execute(
             f"""
             INSERT INTO {table}
             SELECT company_number, outcome, split,
                    {plan['comparison_inclusion_probability']},
                    {plan['comparison_weight']}
-            FROM (
-                SELECT company_number, outcome, split
-                FROM cohort_keys
-                WHERE {population_filter}
-                  AND split = {_sql_literal(split)} AND outcome = 0
-            ) USING SAMPLE reservoir({target} ROWS) REPEATABLE({seed})
+            FROM ({sample_sql})
             """
         )
         sampled_cases, sampled_comparisons, weighted_cases, weighted_comparisons = con.sql(
@@ -357,17 +377,20 @@ def _sample_population(con, spec: dict[str, Any], population: str):
             raise RuntimeError(
                 f"{population}/{split} weighted comparison total does not reconcile"
             )
-        records.append(
-            {
-                "split": split,
-                **plan,
-                "sampled_cases": int(sampled_cases),
-                "sampled_comparisons": int(sampled_comparisons),
-                "weighted_cases": float(weighted_cases),
-                "weighted_comparisons": float(weighted_comparisons),
-                "reservoir_seed": seed,
-            }
-        )
+        record = {
+            "split": split,
+            **plan,
+            "sampled_cases": int(sampled_cases),
+            "sampled_comparisons": int(sampled_comparisons),
+            "weighted_cases": float(weighted_cases),
+            "weighted_comparisons": float(weighted_comparisons),
+        }
+        if sample_method == "reservoir":
+            record["reservoir_seed"] = seed
+        else:
+            record["sample_method"] = sample_method
+            record["sample_seed"] = seed
+        records.append(record)
     columns = source_columns(spec)
     select_columns = ", ".join(f's."{column}"' for column in columns)
     frame = con.execute(
@@ -1142,34 +1165,49 @@ def run_company_comparison(
     }
 
 
-def _assert_model_reproduction(
-    observed: dict[str, Any], expected: dict[str, Any], *, population: str, model: str
+def _assert_sampling_design_matches_baseline(
+    observed: list[dict[str, Any]], expected: list[dict[str, Any]], *, population: str
 ) -> dict[str, Any]:
-    if observed["selected_c"] != expected["selected_c"]:
-        raise RuntimeError(f"{population}/{model} selected C did not reproduce")
-    if observed["predictor_count_before_encoding"] != expected["predictor_count_before_encoding"]:
-        raise RuntimeError(f"{population}/{model} predictor count did not reproduce")
-    if observed["encoded_feature_count"] != expected["encoded_feature_count"]:
-        raise RuntimeError(f"{population}/{model} encoded feature count did not reproduce")
-    differences = []
-    for observed_row, expected_row in zip(observed["cv"], expected["cv"], strict=True):
-        if observed_row["c"] != expected_row["c"]:
-            raise RuntimeError(f"{population}/{model} CV grid did not reproduce")
-        differences.append(
-            abs(observed_row["weighted_log_loss"] - expected_row["weighted_log_loss"])
-        )
-    for metric, value in observed["test_metrics"].items():
-        differences.append(abs(value - expected["test_metrics"][metric]))
-    maximum_difference = max(differences, default=0.0)
-    if maximum_difference > 1e-12:
-        raise RuntimeError(
-            f"{population}/{model} held-out result did not reproduce; "
-            f"maximum absolute difference={maximum_difference}"
-        )
+    design_fields = (
+        "split",
+        "eligible_cases",
+        "eligible_comparisons",
+        "target_comparisons",
+        "case_inclusion_probability",
+        "comparison_inclusion_probability",
+        "case_weight",
+        "comparison_weight",
+        "sampled_cases",
+        "sampled_comparisons",
+    )
+    if len(observed) != len(expected):
+        raise RuntimeError(f"{population} sampling partitions changed from the baseline")
+    for observed_row, expected_row in zip(observed, expected, strict=True):
+        for field in design_fields:
+            left = observed_row[field]
+            right = expected_row[field]
+            if isinstance(left, float) or isinstance(right, float):
+                if not math.isclose(left, right, rel_tol=1e-12, abs_tol=1e-12):
+                    raise RuntimeError(f"{population} sampling design changed at {field}")
+            elif left != right:
+                raise RuntimeError(f"{population} sampling design changed at {field}")
     return {
         "status": "passed",
-        "maximum_absolute_metric_difference": maximum_difference,
+        "same_eligible_counts_probabilities_weights_and_sample_sizes": True,
+        "original_sample_identities_recoverable": False,
     }
+
+
+def _sample_identity_hashes(frame) -> dict[str, str]:
+    hashes = {}
+    for split in ("train", "test"):
+        values = sorted(frame.loc[frame["split"] == split, "company_number"].astype(str))
+        digest = hashlib.sha256()
+        for value in values:
+            digest.update(value.encode())
+            digest.update(b"\n")
+        hashes[split] = digest.hexdigest()
+    return hashes
 
 
 def run_company_comparison_source_additions(
@@ -1210,13 +1248,18 @@ def run_company_comparison_source_additions(
         for population_index, population in enumerate(exploratory_spec["populations"]):
             population_started = time.perf_counter()
             print(f"sampling exploratory population={population}", flush=True)
-            sampled, sampling = _sample_population(con, base_spec, population)
-            if sampling != baseline["populations"][population]["sampling"]:
-                raise RuntimeError(f"{population} sample records changed from the baseline")
+            sampled, sampling = _sample_population(
+                con, base_spec, population, sample_method="deterministic_hash"
+            )
+            sampling_design_check = _assert_sampling_design_matches_baseline(
+                sampling,
+                baseline["populations"][population]["sampling"],
+                population=population,
+            )
+            sample_identity_hashes = _sample_identity_hashes(sampled)
             prepared = _prepare_features(sampled, base_spec)
             model_results = {}
             predictions = {}
-            reproduction = {}
             for model_name in exploratory_spec["models"]:
                 model_started = time.perf_counter()
                 print(
@@ -1228,13 +1271,6 @@ def run_company_comparison_source_additions(
                 )
                 model_results[model_name] = model_result
                 predictions[model_name] = model_predictions
-                if model_name in {"register", "combined"}:
-                    reproduction[model_name] = _assert_model_reproduction(
-                        model_result,
-                        baseline["populations"][population]["models"][model_name],
-                        population=population,
-                        model=model_name,
-                    )
                 print(
                     f"completed exploratory population={population} model={model_name} "
                     f"seconds={time.perf_counter() - model_started:.1f}",
@@ -1256,7 +1292,8 @@ def run_company_comparison_source_additions(
                 )
             population_results[population] = {
                 "sampling": sampling,
-                "baseline_reproduction": reproduction,
+                "sampling_design_check": sampling_design_check,
+                "sample_identity_hashes": sample_identity_hashes,
                 "models": model_results,
                 "paired_comparisons": paired,
             }
@@ -1478,16 +1515,20 @@ def validate_company_comparison_source_additions(
     cv_fits = 0
     paired_contrasts = 0
     for population_name, population in report["populations"].items():
-        if population["sampling"] != baseline["populations"][population_name]["sampling"]:
-            raise ValueError(f"{population_name} sampling differs from the baseline")
+        _assert_sampling_design_matches_baseline(
+            population["sampling"],
+            baseline["populations"][population_name]["sampling"],
+            population=population_name,
+        )
+        if population["sampling_design_check"].get("status") != "passed":
+            raise ValueError(f"{population_name} sampling design check failed")
+        identity_hashes = population.get("sample_identity_hashes", {})
+        if set(identity_hashes) != {"train", "test"} or not all(
+            len(value) == 64 for value in identity_hashes.values()
+        ):
+            raise ValueError(f"{population_name} sample identity hashes are incomplete")
         if set(population["models"]) != set(exploratory_spec["models"]):
             raise ValueError(f"{population_name} models differ from the frozen spec")
-        for baseline_model in ("register", "combined"):
-            reproduction = population["baseline_reproduction"].get(baseline_model, {})
-            if reproduction.get("status") != "passed":
-                raise ValueError(f"{population_name}/{baseline_model} did not reproduce")
-            if reproduction.get("maximum_absolute_metric_difference", 1) > 1e-12:
-                raise ValueError(f"{population_name}/{baseline_model} reproduction drifted")
         for model_name, model in population["models"].items():
             final_fits += 1
             if model.get("convergence_warnings") != 0:
@@ -1515,8 +1556,9 @@ def validate_company_comparison_source_additions(
     return {
         "status": "passed",
         "exploratory": True,
-        "unchanged_cohort_split_and_sampling": True,
-        "baseline_models_reproduced": 2 * len(report["populations"]),
+        "unchanged_cohort_split_and_sampling_design": True,
+        "deterministic_sample_identity_hashes_checked": 2 * len(report["populations"]),
+        "original_reservoir_sample_reused": False,
         "final_fits_checked": final_fits,
         "final_convergence_warnings": 0,
         "cross_validation_fits_checked": cv_fits,

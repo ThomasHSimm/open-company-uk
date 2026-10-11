@@ -273,9 +273,9 @@ def test_synthetic_source_additions_reproduce_baseline_and_pair_models(tmp_path:
         SOURCE_ADDITION_MODEL_NAMES
     )
     assert (
-        report["populations"]["primary"]["baseline_reproduction"]["register"][
-            "maximum_absolute_metric_difference"
-        ]
-        == 0
+        report["populations"]["primary"]["sampling_design_check"]["status"]
+        == "passed"
     )
+    assert validation["original_reservoir_sample_reused"] is False
+    assert len(report["populations"]["primary"]["sample_identity_hashes"]["test"]) == 64
     assert "company_number" not in report["populations"]["primary"]
