@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>PSC / ownership (status) – open-company-uk</title>
+<title>PSC / ownership – open-company-uk</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -125,7 +125,7 @@ ul.task-list li input[type="checkbox"] {
     <ul class="dropdown-menu" aria-labelledby="nav-menu-datasets">    
         <li>
     <a class="dropdown-item" href="../datasets/accounts.html">
- <span class="dropdown-text">Accounts (WIDE &amp; LONG)</span></a>
+ <span class="dropdown-text">Accounts (WIDE)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../datasets/accounts-validation.html">
@@ -218,10 +218,24 @@ ul.task-list li input[type="checkbox"] {
    
   <ul>
   <li><a href="#summary" id="toc-summary" class="nav-link active" data-scroll-target="#summary">Summary</a></li>
-  <li><a href="#details" id="toc-details" class="nav-link" data-scroll-target="#details">Details</a>
+  <li><a href="#coverage" id="toc-coverage" class="nav-link" data-scroll-target="#coverage">Coverage</a></li>
+  <li><a href="#figures" id="toc-figures" class="nav-link" data-scroll-target="#figures">Figures</a>
   <ul class="collapse">
-  <li><a href="#what-the-recon-found" id="toc-what-the-recon-found" class="nav-link" data-scroll-target="#what-the-recon-found">What the recon found</a></li>
-  <li><a href="#data-quality-traps-document-them-before-using" id="toc-data-quality-traps-document-them-before-using" class="nav-link" data-scroll-target="#data-quality-traps-document-them-before-using">Data-quality traps (document them before using)</a></li>
+  <li><a href="#records-by-kind" id="toc-records-by-kind" class="nav-link" data-scroll-target="#records-by-kind">Records by kind</a></li>
+  <li><a href="#active-vs-ceased" id="toc-active-vs-ceased" class="nav-link" data-scroll-target="#active-vs-ceased">Active vs ceased</a></li>
+  <li><a href="#nature-of-control-core-rights" id="toc-nature-of-control-core-rights" class="nav-link" data-scroll-target="#nature-of-control-core-rights">Nature-of-control core rights</a></li>
+  <li><a href="#psc-information-state-per-company" id="toc-psc-information-state-per-company" class="nav-link" data-scroll-target="#psc-information-state-per-company">PSC information state per company</a></li>
+  <li><a href="#control-start-year-active-vs-ceased" id="toc-control-start-year-active-vs-ceased" class="nav-link" data-scroll-target="#control-start-year-active-vs-ceased">Control start year, active vs ceased</a></li>
+  <li><a href="#active-statement-codes" id="toc-active-statement-codes" class="nav-link" data-scroll-target="#active-statement-codes">Active statement codes</a></li>
+  <li><a href="#eccta-identity-verification" id="toc-eccta-identity-verification" class="nav-link" data-scroll-target="#eccta-identity-verification">ECCTA identity verification</a></li>
+  <li><a href="#companies-per-person-banded" id="toc-companies-per-person-banded" class="nav-link" data-scroll-target="#companies-per-person-banded">Companies per person (banded)</a></li>
+  </ul></li>
+  <li><a href="#what-you-can-and-cant-answer" id="toc-what-you-can-and-cant-answer" class="nav-link" data-scroll-target="#what-you-can-and-cant-answer">What you can and can’t answer</a></li>
+  <li><a href="#data-governance" id="toc-data-governance" class="nav-link" data-scroll-target="#data-governance">Data governance</a></li>
+  <li><a href="#follow-ups" id="toc-follow-ups" class="nav-link" data-scroll-target="#follow-ups">Follow-ups</a></li>
+  <li><a href="#details-what-the-recon-found" id="toc-details-what-the-recon-found" class="nav-link" data-scroll-target="#details-what-the-recon-found">Details: what the recon found</a>
+  <ul class="collapse">
+  <li><a href="#data-quality-traps" id="toc-data-quality-traps" class="nav-link" data-scroll-target="#data-quality-traps">Data-quality traps</a></li>
   <li><a href="#design-decisions-that-follow" id="toc-design-decisions-that-follow" class="nav-link" data-scroll-target="#design-decisions-that-follow">Design decisions that follow</a></li>
   <li><a href="#prior-work-to-build-on" id="toc-prior-work-to-build-on" class="nav-link" data-scroll-target="#prior-work-to-build-on">Prior work to build on</a></li>
   <li><a href="#where-to-go-next" id="toc-where-to-go-next" class="nav-link" data-scroll-target="#where-to-go-next">Where to go next</a></li>
@@ -234,7 +248,7 @@ ul.task-list li input[type="checkbox"] {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">PSC / ownership (status)</h1>
+<h1 class="title">PSC / ownership</h1>
 </div>
 
 
@@ -257,53 +271,280 @@ ul.task-list li input[type="checkbox"] {
 <i class="callout-icon"></i>
 </div>
 <div class="callout-body-container">
-<p><strong>Status: In progress.</strong> Reconnaissance of the PSC bulk snapshot is complete; the extractor is in design. No PSC dataset is published, and — by decision — only <strong>code</strong> will be, never the data. This page describes what the recon found and the design that follows from it.</p>
+<p><strong>Status: loader built; code published, data not.</strong> The bulk PSC loader is built and merged (Stage 1 and the companies-per-person usability check are done). By decision the project publishes <strong>code and these aggregate summaries only</strong> — never the PSC data itself, which is personal data you download from Companies House yourself. The figures below are static, pre-computed summaries written by <code>scripts/psc_site_summaries.py</code>; this page runs no code and renders with no raw or Parquet data present.</p>
 </div>
 </div>
 </div>
 <section id="summary" class="level2">
 <h2 class="anchored" data-anchor-id="summary">Summary</h2>
-<p>“PSC” means <em>persons with significant control</em> — broadly, the people and entities that own or control a UK company. Companies House publishes a daily bulk snapshot of this register, and this project has analysed it end to end to decide what can responsibly be built from it. The short version: the snapshot is large (about 16 million records), it retains history back to 2016, and it is rich enough to support company-level ownership features — but it is personal data, it has no stable identifier for a person, and its internal structure is full of traps. So the plan is to publish <strong>code and company-level aggregates only</strong>, keep any person-level table private, and state match confidence honestly rather than imply a clean ownership graph.</p>
-<p>This is deliberately a <strong>status page</strong>, not a dataset. It records the measured findings and the design decisions; it does not publish results.</p>
-</section>
-<section id="details" class="level2">
-<h2 class="anchored" data-anchor-id="details">Details</h2>
-<section id="what-the-recon-found" class="level3">
-<h3 class="anchored" data-anchor-id="what-the-recon-found">What the recon found</h3>
-<p>The recon ran over <strong>all 32 parts of the 2026-09-18 snapshot — 15,952,486 records, 0 bad lines</strong>, in 404 seconds, joined against the 2026-08-01 Basic Company Data (5,695,465 live companies). Every figure below traces to <code>docs/recon-psc-results.md</code> / <code>docs/recon-psc-results.json</code>; the full write-up is <code>docs/recon-psc.md</code>. <strong>[Checked]</strong> (project measurement).</p>
+<p>“PSC” means <em>persons with significant control</em> — the people or entities that own or control a UK company. “Significant” means, roughly, <strong>more than 25%</strong> of the shares or votes, or the right to appoint most of the board. The register began in <strong>April 2016</strong>. Companies House publishes a daily bulk snapshot; this project analysed the 2026-09-18 snapshot (about 16 million records) end to end. It is rich enough to support company-level ownership features, but it is personal data, has <strong>no stable identifier for a person</strong>, and its structure is full of traps — so the project ships code and company-level aggregates only, keeps any person-level table private, and states match confidence honestly rather than imply a clean ownership graph.</p>
+<p><strong>Two populations — the figures below are shown for both, because the counts differ:</strong></p>
 <ul>
-<li><strong>History is reconstructable from 2016-04-06.</strong> Ceased PSC records are retained — 2,655,316 records (16.6%) carry a <code>ceased_on</code> date, and every notified-on year since 2016 keeps a ceased cohort. The product spans <strong>10,917,257 distinct companies — nearly double the live register</strong> — so it holds PSC history for companies no longer live. 62,986 companies appear only as ceased records. Point-in-time control reconstruction is therefore feasible.</li>
-<li><strong>Statements exist, segregated at the tail.</strong> 922,564 records (5.8%) are <code>persons-with-significant-control-statement</code> records (e.g.&nbsp;“no PSC identified”), all in parts 31–32. The one-part probe that preceded the full recon wrongly concluded there were none — because parts 1–30 genuinely contain none.</li>
-<li><strong>Partitioning is meaningless.</strong> The ~32 parts are neither random samples nor company-number ranges — every part spans essentially the whole register, statements are segregated into 31–32, and recent years cluster in parts 25–30. <strong>No per-part rate is usable; stream all parts.</strong></li>
-<li><strong>Composition.</strong> Individual PSCs 87.1%, corporate 6.7%, statements 5.8%, legal-person 0.1%, overseas-entity beneficial-owner variants ~0.3%, plus 545 super-secure records and 108 exemptions.</li>
-<li><strong>Individuals.</strong> Date of birth (year and month) present on 100%; identity-verification details on 50.6% (ECCTA rollout, start years 2025–2026); <code>is_sanctioned</code> present on 34,444, true on 17.</li>
-<li><strong>Corporate PSCs.</strong> A registration number is present on 91.0%, of which 77.9% resolve to a live company — a usable company-to-company ownership edge.</li>
-<li><strong>Natures of control.</strong> 35,169,887 assertions over 15,029,053 records; 55 distinct base rights once suffix families (<code>-as-firm</code>, <code>-as-trust</code>, <code>-limited-liability-partnership</code>, <code>-registered-overseas-entity</code>) are stripped.</li>
+<li><strong>All records in the product (an “ever” view).</strong> Every PSC line ever filed, including <em>ceased</em> control and companies now dissolved. Good for history; it roughly doubles “how many” counts. The product holds <strong>10,917,257 distinct companies — nearly twice the live register.</strong></li>
+<li><strong>Live companies only (as of 2026-09-01).</strong> Records whose company is on the Basic Company Data register. There is no mid-month register product, so the nearest monthly register to the 2026-09-18 PSC snapshot is <strong>2026-09-01 — 17 days earlier</strong>; the live figures carry that gap. <strong>[Checked]</strong></li>
+</ul>
+<p>Companies-per-person is shown <strong>only as banded aggregates, never as a person identity</strong> (see below).</p>
+</section>
+<section id="coverage" class="level2">
+<h2 class="anchored" data-anchor-id="coverage">Coverage</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 42%">
+<col style="width: 57%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>metric</th>
+<th style="text-align: right;">value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>PSC snapshot date</td>
+<td style="text-align: right;">2026-09-18</td>
+</tr>
+<tr class="even">
+<td>register used for “live” figures</td>
+<td style="text-align: right;">2026-09-01 (17 days earlier)</td>
+</tr>
+<tr class="odd">
+<td>lines in the snapshot</td>
+<td style="text-align: right;">15,952,486</td>
+</tr>
+<tr class="even">
+<td>PSC records (excluding the totals line)</td>
+<td style="text-align: right;">15,952,485</td>
+</tr>
+<tr class="odd">
+<td>distinct companies in the product (ever)</td>
+<td style="text-align: right;">10,917,257</td>
+</tr>
+<tr class="even">
+<td>companies with an active PSC or statement</td>
+<td style="text-align: right;">10,854,237</td>
+</tr>
+<tr class="odd">
+<td>live companies on the register</td>
+<td style="text-align: right;">5,689,366</td>
+</tr>
+<tr class="even">
+<td>live companies matched in the product</td>
+<td style="text-align: right;">5,536,905 (97.3% of the live register)</td>
+</tr>
+<tr class="odd">
+<td>totals line — PSCs / statements / exemptions</td>
+<td style="text-align: right;">15,029,813 / 922,564 / 108</td>
+</tr>
+</tbody>
+</table>
+<p>The totals line (Companies House’s own counts) <strong>reconciles exactly</strong> with the parsed counts. Source: <code>docs/site/datasets/psc-assets/coverage.csv</code> (from the loader’s <code>load_report.json</code> and <code>psc_totals.json</code>); <code>docs/AUDIT.md</code> (PSC loader Stage-1). <strong>[Checked]</strong></p>
+<p><strong>2.7% of live companies have no PSC record</strong> (152,461 of 5,689,366 live companies are not matched in the product). The cause is <strong>not verified</strong> — it could be genuine “no registrable person” cases, exempt company types, or filing gaps. <strong>[Not verified]</strong></p>
+</section>
+<section id="figures" class="level2">
+<h2 class="anchored" data-anchor-id="figures">Figures</h2>
+<p>Static summaries in <code>psc-assets/</code>, aggregates only, small counts (&lt;10) rendered <code>&lt;10</code> in the CSVs and never drawn.</p>
+<section id="records-by-kind" class="level3">
+<h3 class="anchored" data-anchor-id="records-by-kind">Records by kind</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="psc-assets/01_records_by_kind.png" class="img-fluid figure-img"></p>
+<figcaption>PSC records by kind (log scale).</figcaption>
+</figure>
+</div>
+<p><code>bo_*</code> are <strong>overseas-entity beneficial owners</strong> — the separate Register of Overseas Entities regime, not the ordinary PSC regime. Source: <code>psc-assets/01_records_by_kind.csv</code>. <strong>[Checked]</strong></p>
+</section>
+<section id="active-vs-ceased" class="level3">
+<h3 class="anchored" data-anchor-id="active-vs-ceased">Active vs ceased</h3>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="psc-assets/02_active_vs_ceased.png" class="img-fluid figure-img"></p>
+<figcaption>All records (ever).</figcaption>
+</figure>
+</div>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="psc-assets/02_active_vs_ceased_live.png" class="img-fluid figure-img"></p>
+<figcaption>Live companies (as of 2026-09-01).</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p>16.6% of all records are ceased; restricting to live companies removes dead-company history. Source: <code>psc-assets/02_active_vs_ceased.csv</code>, <code>..._live.csv</code>. <strong>[Checked]</strong></p>
+</section>
+<section id="nature-of-control-core-rights" class="level3">
+<h3 class="anchored" data-anchor-id="nature-of-control-core-rights">Nature-of-control core rights</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="psc-assets/03_noc_cores.png" class="img-fluid figure-img"></p>
+<figcaption>Assertions by core right (log scale).</figcaption>
+</figure>
+</div>
+<p>A single record can hold <strong>several</strong> rights, so assertions (35,169,887) far exceed records. Core rights are counted after stripping entity-type suffixes (trust / firm / LLP / overseas-entity and their compounds). “empty nature value” is a null array element (<strong>1 category suppressed, &lt;10</strong>). Source: <code>psc-assets/03_noc_cores.csv</code>. <strong>[Checked]</strong></p>
+</section>
+<section id="psc-information-state-per-company" class="level3">
+<h3 class="anchored" data-anchor-id="psc-information-state-per-company">PSC information state per company</h3>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="psc-assets/04_info_state_per_company.png" class="img-fluid figure-img"></p>
+<figcaption>All companies in the product.</figcaption>
+</figure>
+</div>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="psc-assets/04_info_state_per_company_live.png" class="img-fluid figure-img"></p>
+<figcaption>Live companies (as of 2026-09-01).</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p>Per company: <em>identified</em> (≥1 active person/corporate PSC), <em>statement_only</em> (no active PSC but an active statement), or <em>ceased-only / none active</em>. Source: <code>psc-assets/04_info_state_per_company.csv</code>, <code>..._live.csv</code>. <strong>[Checked]</strong></p>
+</section>
+<section id="control-start-year-active-vs-ceased" class="level3">
+<h3 class="anchored" data-anchor-id="control-start-year-active-vs-ceased">Control start year, active vs ceased</h3>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="psc-assets/08_control_start_year.png" class="img-fluid figure-img"></p>
+<figcaption>All records (ever).</figcaption>
+</figure>
+</div>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="psc-assets/08_control_start_year_live.png" class="img-fluid figure-img"></p>
+<figcaption>Live companies (as of 2026-09-01).</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p>The 2016 spike is the regime start (existing companies declaring control at once). Source: <code>psc-assets/08_control_start_year.csv</code>, <code>..._live.csv</code>. <strong>[Checked]</strong></p>
+</section>
+<section id="active-statement-codes" class="level3">
+<h3 class="anchored" data-anchor-id="active-statement-codes">Active statement codes</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="psc-assets/09_active_statement_codes.png" class="img-fluid figure-img"></p>
+<figcaption>Active statement codes (log scale).</figcaption>
+</figure>
+</div>
+<p>Codes are reproduced <strong>verbatim</strong> — <code>no-individual-or-entity-with-signficant-control</code> is Companies House’s own spelling of “significant” (not a typo on this page). <strong>4 rare codes suppressed (&lt;10).</strong> The three unresolved-owner codes (<code>psc-details-not-confirmed</code>, <code>steps-to-find-psc-not-yet-completed</code>, <code>psc-exists-but-not-identified</code>) are what the <code>PSC_UNRESOLVED</code> indicator keys off. Source: <code>psc-assets/09_active_statement_codes.csv</code>. <strong>[Checked]</strong></p>
+</section>
+<section id="eccta-identity-verification" class="level3">
+<h3 class="anchored" data-anchor-id="eccta-identity-verification">ECCTA identity verification</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="psc-assets/07_eccta_verification.png" class="img-fluid figure-img"></p>
+<figcaption>Identity-verification counts among individual records.</figcaption>
+</figure>
+</div>
+<p>Counts are <strong>as of the snapshot; the ECCTA identity-verification rollout is ongoing</strong>, so these are lower bounds that will rise. Source: <code>psc-assets/07_eccta_verification.csv</code>. <strong>[Checked]</strong></p>
+</section>
+<section id="companies-per-person-banded" class="level3">
+<h3 class="anchored" data-anchor-id="companies-per-person-banded">Companies per person (banded)</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="psc-assets/06_companies_per_person_bands.png" class="img-fluid figure-img"></p>
+<figcaption>Share of person-keys on ≥11 companies, by name-frequency band, under both keys and both scopes.</figcaption>
+</figure>
+</div>
+<p>This is shown <strong>only as banded aggregates, never as a person identity.</strong> There is no stable person id, so a “person” is a fuzzy key: a <em>baseline</em> key (forename + surname + birth year + month) or a <em>strict</em> key that also includes the middle name. From the usability check (<code>docs/psc-checks-results.md</code>):</p>
+<ul>
+<li><strong>≤2.07% of baseline keys (4.91% of records) show a detectable split</strong> — a baseline key resolving into more than one strict key (a bound on detectable splits, not on all collisions).</li>
+<li><strong>the strict key’s 53% coverage is a non-random subset</strong> (middle-name recording correlates with record vintage), so strict figures are a precision check, not a population rate.</li>
+<li><strong>“active-only” and “ever” are shown separately</strong> (the chart plots both), because “ever” accumulates dissolved shells — 51% of the companies behind the high-count tail are dissolved.</li>
+</ul>
+<p>Source: <code>docs/psc-checks-results.md</code>, <code>psc-assets/06_companies_per_person_bands.csv</code>. <strong>[Checked]</strong></p>
+</section>
+</section>
+<section id="what-you-can-and-cant-answer" class="level2">
+<h2 class="anchored" data-anchor-id="what-you-can-and-cant-answer">What you can and can’t answer</h2>
+<p><strong>You can</strong> (read straight from the file, reliable):</p>
+<ul>
+<li>Does the company name a controller, or file a statement instead (e.g.&nbsp;“no one has more than 25%”)?</li>
+<li>How is control shaped — one 75–100% owner, several people, another company? (bands only)</li>
+<li>Is it owned by another company, and is that parent live? <strong>77.9%</strong> of corporate owners with a registration number link to a live company. <strong>[Checked]</strong> (<code>docs/recon-psc-results.md</code>; measured against the 2026-08-01 register, ~7 weeks older than the snapshot).</li>
+</ul>
+<p><strong>You can’t:</strong></p>
+<ul>
+<li>exact ownership percentages (only bands such as 25–50%), or owners below 25%</li>
+<li>full dates of birth, or home addresses</li>
+<li>who the legal shareholders are</li>
+<li>what the file looked like on a day nobody saved</li>
+</ul>
+<p><strong>Only with honest uncertainty:</strong> whether a company’s controllers also control many others (companies-per-person) — reported banded, with the split bound above, never as a person identity.</p>
+</section>
+<section id="data-governance" class="level2">
+<h2 class="anchored" data-anchor-id="data-governance">Data governance</h2>
+<p><em>Reproduced verbatim from <code>docs/psc-data-guide.md</code> §5.</em></p>
+<p>This project publishes <strong>code, not PSC data</strong>. Anyone who runs the code downloads the file from Companies House themselves and is responsible for how they use it. The points below are there so users know what they are handling.</p>
+<ul>
+<li><strong>It is personal data.</strong> The file holds names, month and year of birth, nationality, country of residence and a correspondence address for about 14 million people.
+<ul>
+<li>Public availability on Companies House does not remove data-protection duties.</li>
+<li>Under UK GDPR, anyone storing or analysing it needs a lawful basis and a sensible retention period.</li>
+</ul></li>
+<li><strong>Nationality and age are sensitive.</strong> This project does not use nationality as a feature, because it risks discriminatory outcomes (Equality Act principles). Age is kept only as 5-year bands in private tables and is never an indicator. Users building their own features should think hard before doing otherwise.</li>
+<li><strong>Aggregates can identify people.</strong> “The controller of this company also controls 40 others” points at a named person when the company has a single PSC. The same applies to small counts in a breakdown, such as 3 PSCs resident in a given country in a given sector.</li>
+<li><strong>Some records are protected.</strong> Super-secure records are withheld to protect people at risk. Do not try to fill them in from other sources.</li>
+<li><strong>Matching creates new information.</strong> Linking records into “likely the same person” produces a profile that no single Companies House record contains. Treat matched outputs as more sensitive than the source.</li>
+<li><strong>In this project’s docs</strong>, all examples are invented or obfuscated, and published breakdowns suppress small counts.</li>
 </ul>
 </section>
-<section id="data-quality-traps-document-them-before-using" class="level3">
-<h3 class="anchored" data-anchor-id="data-quality-traps-document-them-before-using">Data-quality traps (document them before using)</h3>
+<section id="follow-ups" class="level2">
+<h2 class="anchored" data-anchor-id="follow-ups">Follow-ups</h2>
 <ul>
-<li><strong>No stable person ID.</strong> Linking the same person across companies is a fuzzy join. On a conservative key — (forename, surname, birth year, birth month) — <strong>28.8%</strong> of keys appear on ≥2 records and <strong>28.0%</strong> on ≥2 distinct companies: cross-company linkage is common, but the method’s confidence must be stated, not assumed. See <a href="../guide/pitfalls.html">person matching in pitfalls</a>.</li>
-<li><strong>Dirty dates.</strong> 14,554 records have <code>ceased_on</code> before <code>notified_on</code>; 23,916 <code>notified_on</code> dates predate the 2016 regime (min <code>1083-01-01</code>); <strong>272</strong> <code>ceased_on</code> dates fall outside 2016–2026 (269 before 2016; 3 after: <code>2924</code>, <code>9998</code>, <code>9999</code>). 17,729 individuals imply an age under 16 at notification, 55 over 110. A cleaning rule is required before any time-series use. Source: <code>docs/recon-psc-results.json</code> (<code>overall.ceased_on.years</code>), corroborated by the loader’s <code>f_ceased_out_of_range</code> (see <code>docs/AUDIT.md</code>, “PSC loader Stage-1”). An earlier draft said 97, which was the 2016 ceased-date count (97,485) mis-transcribed. <strong>[Checked]</strong></li>
+<li><strong>Notification lag is deferred this pass.</strong> The meaning of <code>notified_on</code> (date control <em>began</em> vs date the company <em>told</em> Companies House) is unsettled and needs the API documentation, so the lag figure is not shown here. The script still emits <code>psc-assets/05_notification_lag.csv</code> for when the semantics are resolved. <strong>[Not verified]</strong></li>
+<li><strong>Live figures use the 2026-09-01 register</strong> (17 days before the snapshot); production should pair same-day snapshots or state the gap.</li>
+</ul>
+</section>
+<section id="details-what-the-recon-found" class="level2">
+<h2 class="anchored" data-anchor-id="details-what-the-recon-found">Details: what the recon found</h2>
+<p>The recon ran over <strong>all 32 parts of the 2026-09-18 snapshot — 15,952,486 records, 0 bad lines</strong>, in 404 seconds, joined against the 2026-08-01 Basic Company Data. Every figure here traces to <code>docs/recon-psc-results.md</code> / <code>docs/recon-psc-results.json</code>; the full write-up is <code>docs/recon-psc.md</code>. <strong>[Checked]</strong> (project measurement).</p>
+<ul>
+<li><strong>History is reconstructable from 2016-04-06.</strong> Ceased PSC records are retained — 2,655,316 records (16.6%) carry a <code>ceased_on</code> date. 62,986 companies appear only as ceased records.</li>
+<li><strong>Statements exist, segregated at the tail.</strong> 922,564 records (5.8%) are statement records, all in parts 31–32. Parts 1–30 genuinely contain none.</li>
+<li><strong>Partitioning is meaningless.</strong> Every part spans essentially the whole register. <strong>Stream all parts.</strong></li>
+<li><strong>Corporate PSCs.</strong> A registration number is present on 91.0%, of which 77.9% resolve to a live company — a usable company-to-company ownership edge.</li>
+<li><strong>Natures of control.</strong> 35,169,887 assertions. The authoritative enumeration has <strong>86 codes</strong>, which reduce to <strong>7 core rights / 24 suffix-stripped bases</strong> once the full suffix set (including compound suffixes) is removed — the recon’s earlier “55” used a single-suffix definition. Source: <code>docs/psc-checks-results.md</code>, <code>tests/fixtures/psc_descriptions_natures.yml</code>. <strong>[Checked]</strong></li>
+</ul>
+<section id="data-quality-traps" class="level3">
+<h3 class="anchored" data-anchor-id="data-quality-traps">Data-quality traps</h3>
+<ul>
+<li><strong>No stable person ID.</strong> Linking the same person across companies is a fuzzy join (see the banded companies-per-person figure). On the baseline key, <strong>28.8%</strong> of keys appear on ≥2 records and <strong>28.0%</strong> on ≥2 distinct companies (an “ever” figure). See <a href="../guide/pitfalls.html">pitfalls</a>.</li>
+<li><strong>Dirty dates.</strong> 14,554 records have <code>ceased_on</code> before <code>notified_on</code>; 23,916 <code>notified_on</code> dates predate the 2016 regime (min <code>1083-01-01</code>); <strong>272</strong> <code>ceased_on</code> dates fall outside 2016–2026 (269 before 2016; 3 after: <code>2924</code>, <code>9998</code>, <code>9999</code>); 17,729 individuals imply an age under 16 at notification. Source: <code>docs/recon-psc-results.json</code>; loader <code>f_ceased_out_of_range</code> agrees (<code>docs/AUDIT.md</code>). <strong>[Checked]</strong></li>
 <li><strong>One-shot snapshot.</strong> Only today’s file is served; corrections over time are lost unless you archive snapshots yourself.</li>
 </ul>
 </section>
 <section id="design-decisions-that-follow" class="level3">
 <h3 class="anchored" data-anchor-id="design-decisions-that-follow">Design decisions that follow</h3>
 <ul>
-<li><strong>Code only, never the data.</strong> PSC records are personal data, and users can download the snapshot directly from Companies House, so there is nothing to gain and real risk in republishing it. The repository will ship the extractor and methodology only. Source: <code>docs/recon-psc.md</code>, deck slide 17 notes.</li>
-<li><strong>Private person table, public per-company aggregates.</strong> Any person-level linkage table stays private. What could be published (as code producing them, not as a shipped dataset) are <strong>company-level</strong> features: PSC counts, corporate ownership chains, how many companies a person controls (with honest match confidence), and unresolved-ownership statement flags — none of which name an individual.</li>
-<li><strong>Nationality excluded.</strong> Nationality is present on 100% of individual records (4,666 distinct raw values) but is <strong>measured for data-quality documentation only and excluded from any product</strong> — a deliberate scope decision. Source: <code>docs/recon-psc.md</code>.</li>
-<li><strong>Honest match confidence.</strong> Because there is no stable person ID, any companies-per-person statistic is reported with its matching method and confidence, never as a settled fact.</li>
+<li><strong>Code only, never the data.</strong> The repository ships the extractor and methodology only.</li>
+<li><strong>Private person table, public per-company aggregates.</strong> Any person-level linkage table stays private; only company-level aggregates (like those above) are published.</li>
+<li><strong>Nationality excluded.</strong> Measured for data-quality documentation only, excluded from any product.</li>
+<li><strong>Honest match confidence.</strong> Any companies-per-person statistic carries its matching method and confidence, never a settled fact.</li>
 </ul>
 </section>
 <section id="prior-work-to-build-on" class="level3">
 <h3 class="anchored" data-anchor-id="prior-work-to-build-on">Prior work to build on</h3>
-<p>This is well-trodden ground, and the plan is to reuse and benchmark against existing work rather than reinvent it (full summaries on <a href="../evidence/prior-work.html">the prior-work page</a>):</p>
 <ul>
 <li><strong>Global Witness + DataKind UK</strong>, “The Companies We Keep” (2018) — matched people on name + birth month/year + address; the natural benchmark for this project’s person matching.</li>
-<li><strong>Open Ownership</strong> — its <code>bods-uk-psc-pipeline</code> publishes UK ownership in the Beneficial Ownership Data Standard, and has been combined with procurement and sanctions data.</li>
+<li><strong>Open Ownership</strong> — its <code>bods-uk-psc-pipeline</code> publishes UK ownership in the Beneficial Ownership Data Standard.</li>
 <li><strong>OpenSanctions</strong> — its <code>gb-coh-psc</code> converter turns Companies House ownership data into a standard graph format.</li>
 </ul>
 </section>
@@ -311,7 +552,7 @@ ul.task-list li input[type="checkbox"] {
 <h3 class="anchored" data-anchor-id="where-to-go-next">Where to go next</h3>
 <ul>
 <li><a href="../guide/sources-map.html">How the sources join</a> — where PSC sits among the UK sources.</li>
-<li><a href="../guide/pitfalls.html">Pitfalls</a> — the PSC-specific traps (one-shot snapshots, person matching).</li>
+<li><a href="../guide/pitfalls.html">Pitfalls</a> — the PSC-specific traps.</li>
 <li><a href="../evidence/prior-work.html">Prior work</a> — what others have built with PSC data.</li>
 </ul>
 

@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Accounts dataset (WIDE &amp; LONG, 2014–2026) – open-company-uk</title>
+<title>Accounts dataset (WIDE, 2014–2026) – open-company-uk</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -160,7 +160,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <ul class="dropdown-menu" aria-labelledby="nav-menu-datasets">    
         <li>
     <a class="dropdown-item" href="../datasets/accounts.html">
- <span class="dropdown-text">Accounts (WIDE &amp; LONG)</span></a>
+ <span class="dropdown-text">Accounts (WIDE)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../datasets/accounts-validation.html">
@@ -255,7 +255,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#summary" id="toc-summary" class="nav-link active" data-scroll-target="#summary">Summary</a></li>
   <li><a href="#details" id="toc-details" class="nav-link" data-scroll-target="#details">Details</a>
   <ul class="collapse">
-  <li><a href="#the-two-tables" id="toc-the-two-tables" class="nav-link" data-scroll-target="#the-two-tables">The two tables</a></li>
+  <li><a href="#the-wide-table" id="toc-the-wide-table" class="nav-link" data-scroll-target="#the-wide-table">The WIDE table</a></li>
   <li><a href="#the-wide-columns" id="toc-the-wide-columns" class="nav-link" data-scroll-target="#the-wide-columns">The WIDE columns</a></li>
   <li><a href="#as_first_reported-vs-latest" id="toc-as_first_reported-vs-latest" class="nav-link" data-scroll-target="#as_first_reported-vs-latest"><code>as_first_reported</code> vs <code>latest</code></a></li>
   <li><a href="#quickstart" id="toc-quickstart" class="nav-link" data-scroll-target="#quickstart">Quickstart</a></li>
@@ -271,7 +271,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Accounts dataset (WIDE &amp; LONG, 2014–2026)</h1>
+<h1 class="title">Accounts dataset (WIDE, 2014–2026)</h1>
 </div>
 
 
@@ -290,13 +290,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="summary" class="level2">
 <h2 class="anchored" data-anchor-id="summary">Summary</h2>
-<p>This is an open, analysis-ready version of twelve years of UK company accounts, built from Companies House’s free monthly bulk archives. It comes in two tables. <strong>WIDE</strong> is one row per company per accounting period, with the core balance-sheet figures as columns — the table most people want for modelling. <strong>LONG</strong> is a fuller, <strong>personal-data-removed</strong> table — one row per fact, reaching the concepts the curated columns leave out — for anyone who needs more than WIDE. Coverage is continuous from January 2014 to August 2026 (152 monthly archives, no gaps), and both published tables contain <strong>financial facts and company numbers only</strong> — no names, addresses or other personal data. The complete as-filed archive (which <em>does</em> contain director names, addresses and loans) is kept private and <strong>never published</strong>; what you can download is the filtered subset described under <em>Licence</em> below.</p>
+<p>This is an open, analysis-ready version of twelve years of UK company accounts, built from Companies House’s free monthly bulk archives. The published table is <strong>WIDE</strong>: one row per company per accounting period, with the core balance-sheet figures as columns — the table most people want for modelling. Coverage is continuous from January 2014 to August 2026 (152 monthly archives, no gaps), and WIDE contains <strong>financial facts and company numbers only</strong> — no names, addresses or other personal data. The complete as-filed archive (which <em>does</em> contain director names, addresses and loans) is kept private and <strong>never published</strong>.</p>
+<div class="callout callout-style-simple callout-important">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><strong>The per-fact LONG table has been withdrawn from Kaggle</strong> pending a dimension-aware privacy filter. A LONG table was briefly published, then deleted when a review found its filter screened concept names but not dimensional contexts. Only <strong>WIDE</strong> is currently published, and WIDE is unaffected — its values come only from non-dimensional totals and four reviewed members (see <em>The WIDE table</em> below). LONG will return once the filter screens dimensional contexts too.</p>
+</div>
+</div>
+</div>
 <p>The one decision you must make before using WIDE is <strong>which pivot</strong> to read: <code>as_first_reported</code> (what was known at the time — use this for anything predictive) or <code>latest</code> (includes later restatements — do not use it for prediction). Everything else on this page is about using the tables correctly: the columns, the known limitations, and the licence.</p>
 </section>
 <section id="details" class="level2">
 <h2 class="anchored" data-anchor-id="details">Details</h2>
-<section id="the-two-tables" class="level3">
-<h3 class="anchored" data-anchor-id="the-two-tables">The two tables</h3>
+<section id="the-wide-table" class="level3">
+<h3 class="anchored" data-anchor-id="the-wide-table">The WIDE table</h3>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 25%">
@@ -309,34 +319,25 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <th>Table</th>
 <th>Grain</th>
 <th>Contents</th>
-<th>Size</th>
+<th>Status</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><strong>WIDE</strong></td>
 <td>one row per (company, period-end)</td>
-<td>nine core balance-sheet concepts + equity and creditors splits + helper columns</td>
-<td>~2.6 GB Parquet</td>
+<td>nine core balance-sheet concepts + equity and creditors splits + helper columns (~2.6 GB Parquet)</td>
+<td><strong>published</strong></td>
 </tr>
 <tr class="even">
-<td><strong>LONG</strong> (public subset)</td>
+<td><strong>LONG</strong></td>
 <td>one row per fact</td>
-<td>the full concept set (~4,593 concepts) <strong>with person-related and free-text concepts removed</strong> — <em>not</em> the raw as-filed archive</td>
-<td>~9.2 GB Parquet, one file per year</td>
+<td>a fuller per-fact table across the full concept set</td>
+<td><strong>withdrawn</strong> pending a dimension-aware filter; not currently downloadable</td>
 </tr>
 </tbody>
 </table>
-<div class="callout callout-style-simple callout-important">
-<div class="callout-body d-flex">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-body-container">
-<p><strong>“LONG” here means the published, personal-data-removed subset.</strong> The full LONG archive used <em>internally</em> to build these tables contains personal data — director names, addresses, the signing director, director loans and remuneration — and is <strong>never published</strong>. Only the filtered subset (numeric person-concept denylist + structured-field allowlist, described under <em>Licence</em>) is downloadable. The Kaggle “LONG” dataset is that subset, not the raw archive.</p>
-</div>
-</div>
-</div>
+<p>WIDE is built from genuine non-dimensional totals plus four reviewed dimensional members (the equity and creditors splits). It <strong>never</strong> includes related-party, officer, director or key-management contexts — the pivot only admits a dimensionless total or one of those four reviewed (concept, dimension, member) members, so a dimensional note fact has no WIDE column to land in. The withdrawn LONG held one row per fact; it returns when its filter screens dimensional contexts, not only concept names.</p>
 <p>Coverage: <strong>152 monthly archives, continuous 2014-01 → 2026-08, 0 gaps.</strong> WIDE has <strong>33,513,017</strong> rows in <code>as_first_reported</code> mode and <strong>36,710,673</strong> in <code>latest</code> mode. Source: <code>docs/accounts-wide-rebuild-verification.md</code>, <code>docs/accounts-limitations.md</code>. <strong>[Checked]</strong> (project measurement).</p>
 <blockquote class="blockquote">
 <p><strong>Why it starts in 2014, not 2008.</strong> The format WIDE reads (iXBRL) was adopted gradually — ~0% of filings in 2010, ~97% by 2014 — so 2014 is where tagged coverage becomes near-universal, not where Companies House’s data stops. Pre-2014 would be a separate, much lower-fill-rate extraction. <strong>Coverage gaps within the span are non-random</strong> — they correlate with filing regime, exemption status and company size, so do not treat non-appearance as a random exclusion. Source: <code>docs/accounts-limitations.md</code>.</p>
@@ -503,36 +504,35 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Balance-sheet only</strong> for most companies (filleted filing): no turnover or profit.</li>
 <li><strong>Starts in 2014</strong> — earlier bulk data is barely machine-tagged.</li>
 <li><strong>Some breakdowns skipped</strong> — facts in multi-member or custom (typed-member) dimensional contexts are not captured; ~38% of filings contain at least one such context (these are mostly detailed notes, not the balance-sheet totals WIDE uses).</li>
-<li><strong>Nine core concepts validated</strong> — the other ~4,580 concepts in LONG are captured as filed but <strong>not</strong> validated; check the source filing before relying on a rare one.</li>
+<li><strong>Nine core concepts validated</strong> — the other ~4,580 concepts (held in the internal, not-currently-published LONG) are captured as filed but <strong>not</strong> validated.</li>
 <li><strong>Restatements (~9%)</strong> and an <strong>employee reporting break around 2020–2021</strong>.</li>
 <li><strong>Non-random gaps</strong> — e.g.&nbsp;equity fill-rate varies by more than 10 percentage points across months.</li>
-<li><strong>GBP only in WIDE</strong> — non-sterling filers are excluded (kept in LONG), not converted.</li>
+<li><strong>GBP only in WIDE</strong> — non-sterling filers are excluded (kept in the internal LONG), not converted.</li>
 </ul>
 <p>Full detail and every reconciliation: <code>docs/accounts-limitations.md</code>. Source: deck slide 17.</p>
 </section>
 <section id="licence-and-personal-data-policy" class="level3">
 <h3 class="anchored" data-anchor-id="licence-and-personal-data-policy">Licence and personal-data policy</h3>
 <p>Contains public sector information from Companies House, licensed under the <strong>Open Government Licence v3.0</strong>, free to reuse with attribution. Companies House and the UK Government do not endorse this dataset, and a derived dataset is not a complete or official representation of any company.</p>
-<p>Both published tables are <strong>financial facts and company numbers only</strong>. WIDE carries no names, addresses or director figures. LONG applies a maintainer-approved filter: a 95-concept numeric <strong>denylist</strong> (director/officer/key-management/related-party remuneration, loans and advances) and a 17-concept non-numeric <strong>allowlist</strong> of structured fields only (dates, the registered number, filing-software name, and categorical flags) — every other non-numeric concept, including all free text, is dropped. The private, unfiltered archive that includes personal data is <strong>never published</strong>. The OGL does not cover personal data, which is part of why this split exists. Source: <code>docs/accounts-public-long-concepts.md</code>, <code>docs/accounts-limitations.md</code>.</p>
+<p>The published <strong>WIDE</strong> table is <strong>financial facts and company numbers only</strong> — no names, addresses or director figures (guaranteed by the pivot, which admits only non-dimensional totals and four reviewed members). The per-fact <strong>LONG</strong> table is <strong>withdrawn from Kaggle</strong> pending a dimension-aware filter and is not currently downloadable; the private, unfiltered archive that includes personal data is <strong>never published</strong>. The OGL does not cover personal data. Source: <code>docs/accounts-public-long-concepts.md</code>, <code>docs/accounts-limitations.md</code>.</p>
 </section>
 <section id="get-the-data" class="level3">
 <h3 class="anchored" data-anchor-id="get-the-data">Get the data</h3>
-<div class="callout callout-style-default callout-tip callout-titled" title="Kaggle links">
+<div class="callout callout-style-default callout-tip callout-titled" title="Kaggle link">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Tip</span>Kaggle links
+<span class="screen-reader-only">Tip</span>Kaggle link
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Both tables are published on Kaggle under the Open Government Licence v3.0. Both are the <strong>personal-data-removed</strong> datasets — neither is the private, full as-filed archive.</p>
+<p><strong>WIDE</strong> is published on Kaggle under the Open Government Licence v3.0 (financial facts and company numbers only — not the private as-filed archive):</p>
 <ul>
 <li><strong>WIDE</strong> — <a href="https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026">kaggle.com/datasets/thomassimm/uk-company-accounts-wide-2014-2026</a></li>
-<li><strong>LONG</strong> (personal-data-removed public subset) — <a href="https://www.kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026">kaggle.com/datasets/thomassimm/uk-company-accounts-long-2014-2026</a></li>
 </ul>
-<p>Each dataset ships its own <code>column-dictionary.md</code> / <code>dataset-metadata.json</code>; those files are generated in the gitignored <code>kaggle*/</code> staging directories and travel with the download, not the git repo.</p>
+<p>The per-fact <strong>LONG</strong> table has been <strong>withdrawn</strong> pending a dimension-aware privacy filter and is not currently available. WIDE ships its own <code>column-dictionary.md</code> / <code>dataset-metadata.json</code> in the gitignored <code>kaggle*/</code> staging directory, travelling with the download.</p>
 </div>
 </div>
 <p>The pipeline that builds these tables is on <a href="https://github.com/ThomasHSimm/open-company-uk">GitHub</a>. See <a href="../datasets/accounts-validation.html">how we know the data is right</a> for the parser comparison and cross-checks.</p>

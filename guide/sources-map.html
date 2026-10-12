@@ -125,7 +125,7 @@ ul.task-list li input[type="checkbox"] {
     <ul class="dropdown-menu" aria-labelledby="nav-menu-datasets">    
         <li>
     <a class="dropdown-item" href="../datasets/accounts.html">
- <span class="dropdown-text">Accounts (WIDE &amp; LONG)</span></a>
+ <span class="dropdown-text">Accounts (WIDE)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../datasets/accounts-validation.html">
@@ -280,7 +280,7 @@ ul.task-list li input[type="checkbox"] {
 <li><em>Join key / match:</em> company number, inside each filing. <strong>[Checked]</strong></li>
 <li><em>Access &amp; licence:</em> free daily/monthly ZIPs back to 2008; OGL v3.0. The financial facts are not personal data, so a derived financials dataset can be published.</li>
 <li><em>Known problems:</em> electronically filed only; mostly balance sheets; the API returns no parsed numbers, so you must parse the filings yourself.</li>
-<li><em>Our status:</em> <strong>Done</strong> — the published <a href="../datasets/accounts.html">2014–2026 accounts dataset</a>.</li>
+<li><em>Our status:</em> <strong>Done</strong> — the published <a href="../datasets/accounts.html">2014–2026 accounts <strong>WIDE</strong> dataset</a> (the per-fact LONG table is withdrawn pending a dimension-aware privacy filter).</li>
 </ul>
 <p><strong>PSC (persons with significant control)</strong></p>
 <ul>
@@ -288,7 +288,7 @@ ul.task-list li input[type="checkbox"] {
 <li><em>Join key / match:</em> company number; person-level linkage is fuzzy (no stable person ID — see <a href="../datasets/psc.html">the PSC page</a>). <strong>[Checked]</strong></li>
 <li><em>Access &amp; licence:</em> free daily JSON snapshot; OGL v3.0, but it contains personal data, so this project publishes <strong>code only</strong>.</li>
 <li><em>Known problems:</em> only today’s snapshot is served; corrections over time are lost unless you archive. One-shot snapshot, not an event log.</li>
-<li><em>Our status:</em> <strong>In progress</strong> — recon complete, extractor in design.</li>
+<li><em>Our status:</em> <strong>Done (loader built; code + aggregates published, data not)</strong> — the bulk loader is merged, Stage 1 and the companies-per-person usability check are done, and the <a href="../datasets/psc.html">PSC page</a> publishes company-level aggregate summaries (never the PSC data).</li>
 </ul>
 <p><strong>Officers (directors and secretaries)</strong></p>
 <ul>
