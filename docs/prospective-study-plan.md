@@ -32,7 +32,7 @@ snapshot, and accounts available in registration month **≤ 2026-09**. It carri
 `BasicCompanyData` product) across 63 feature columns. Both source snapshots are
 irreplaceable — see `docs/data-retention.md`.
 
-### 1.1 The frozen study sample (done)
+### 1.1 The frozen study sample (done — v2, risk-stratified)
 
 Fetching the whole register at two horizons is infeasible, so a sample is frozen.
 It was produced by `scripts/freeze_prospective_sample.py` (deterministic: fixed
@@ -40,24 +40,49 @@ seed `20260912`, reproducible from the join hash above):
 
 | Artefact | Path | sha256 |
 |---|---|---|
-| Sample (company numbers + weights) | `data/prospective/study-sample.csv` | `68e92c3a9642fc9833d7bdd2fc28e28fc7891e9867ebe29f976e98b8a75880c8` |
-| Sample sidecar (strata, seed, weights) | `data/prospective/study-sample.strata.json` | `fe531f1fb2db3f1d5956e2faa80c2a6a1a645eb73b133aeba27f8530fbaf72af` |
+| Sample (company numbers + weights) | `data/prospective/study-sample.csv` | `9d6926b62dff526748f39b1fd71dac92ab5a24e3e8a4311def4019918fd74cf7` |
+| Sample sidecar (strata, seed, weights, rates) | `data/prospective/study-sample.strata.json` | `93985b408af50dce826639812d7728702830587c5279e0e26395630d9f1b522b` |
 
 Both files are **private and gitignored** (`data/`); only the hashes are
-committed. The sample is **100,318** companies in four baseline-status strata:
+committed. (This supersedes a v1 status-only sample — see `docs/AUDIT.md` for the
+retired hash and the reason.)
 
-| Stratum | Baseline register status | Population | Sampled | Weight (pop/sampled) |
-|---|---|---:|---:|---:|
-| A live insolvency process | administration / receivership / voluntary arrangement (all spellings) | 7,318 | 7,318 (all) | 1.00 |
-| B liquidation | liquidation (solvency unknown until fetched) | 108,330 | 15,000 | 7.22 |
-| C strike-off proposal | active – proposal to strike off | 423,006 | 30,000 | 14.10 |
-| D active | active | 5,166,057 | 48,000 | 107.63 |
+**The target is *incident* adverse insolvency** — a company *entering* a
+non-solvent liquidation / administration / receivership / voluntary arrangement
+within a horizon, having not already been in one at baseline. So the budget is
+concentrated where incident events can actually occur. Strata A and B are
+**already in an insolvency state at baseline**: they cannot produce incident
+events and are kept only as **small descriptive samples** — A to describe how
+in-process companies progress (resolution to dissolution / MVL / CVL), B as the
+ground-truth set for the members'- vs creditors'-voluntary-liquidation case-type
+classifier (§4.3). They are **excluded from the incident numerator and
+denominator**. The remaining budget goes to the at-risk population,
+sub-stratified by baseline compliance markers whose adverse-transition rate was
+**measured on the Aug-2026 → Oct-2026 governed register snapshots** (two-month
+rate × 6):
 
-The take-all A stratum keeps the rare live-process companies from being lost to
-sampling noise; B is the ground-truth set for the members'-vs-creditors'
-classifier (§4.3); C is the fast-moving strike-off population; D is the bulk
-at-risk population. Each company's `sampling_weight` lets a weighted analysis
-reproduce the true population prevalence (§6).
+| Cell | Baseline definition | Population | Sampled | Weight | Measured rate/yr | Role |
+|---|---|---:|---:|---:|---:|---|
+| A live insolvency process | administration / receivership / VA (all spellings) | 7,318 | 2,000 | 3.66 | — | descriptive (progression) |
+| B liquidation | liquidation (solvency unknown until fetched) | 108,330 | 2,000 | 54.16 | — | descriptive (classifier validation) |
+| C strike-off proposal | active – proposal to strike off | 423,006 | 20,000 | 21.15 | 1.13 % | incident + dissolution outcome |
+| D1 accounts overdue | active, `accounts.overdue` | 93,785 | 38,000 | 2.47 | **5.40 %** | incident (dominant source) |
+| D2 CS overdue | active, not D1, `confirmation_statement.overdue` | 245,631 | 10,000 | 24.56 | 0.83 % | incident |
+| D3 charges | active, not D1/D2, charges outstanding | 595,358 | 10,000 | 59.54 | 0.75 % | incident |
+| D4 base | active, no marker | 4,231,283 | 33,000 | 128.22 | 0.35 % | incident (population anchor) |
+
+Total **115,000** companies. The cells are **disjoint** (precedence D1 → D2 → D3
+→ D4), so inclusion probabilities are exact and `sampling_weight =
+population / sampled` recovers the true population prevalence for average
+precision at the base rate (§6). The allocation maximises expected incident
+positives (§5) while keeping the base cell D4 large enough (33k) to anchor the
+population-weighted metrics and keeping D2/D3 estimable.
+
+Markers `accounts.overdue` and `confirmation_statement.overdue` are also partly
+*consequences* of an adverse process (§6); selecting on them is legitimate —
+inclusion probability depends only on observed baseline features, so weighted
+estimates stay unbiased — and the leakage concern is handled in the analysis by
+the with/without-compliance contrast, not in the sampling.
 
 **The frozen rule.** Once the first outcome fetch (§3) is run, nothing about the
 baseline join or the sample may change — not the sample, not the strata, not the
@@ -89,14 +114,25 @@ For every sampled company fetch only:
 2. **`/company/{number}/insolvency`** where the profile's `links.insolvency` is
    present.
 
-No officers or PSC endpoints. **Note:** `ukcompany run` (via
-`fetch_companies`) also fetches officers, PSC and PSC-statements, which would
-multiply the request budget four- to five-fold. The horizon runs must therefore
-use a **profile-and-insolvency-only** fetch. That path does not exist yet; adding
-it (a `--only profile,insolvency` option on `run`, or a small
-`ukcompany prospective-fetch`) is a one-off, pre-registered addition to make
-**before** the first horizon run. It changes only the fetch surface, never the
-baseline.
+No officers or PSC endpoints. `ukcompany run` (via `fetch_companies`) also fetches
+officers, PSC and PSC-statements, which would multiply the request budget four- to
+five-fold, so the study uses a dedicated **profile-and-insolvency-only** path,
+`ukcompany prospective-fetch` (`fetch.fetch_profile_insolvency`). It is built and
+unit-tested (`tests/test_prospective_fetch.py`): the tests assert that officers
+and PSC endpoints are **never** called and that `/insolvency` is called only when
+the profile carries `links.insolvency`. It writes into a horizon-specific cache
+directory (so it cannot overwrite the baseline or other runs), resumes for free on
+interruption, and reports per-endpoint request counts for budget accounting.
+
+**Invalid-number caveat (found in the dry run).** 232 of the 115,000 sampled
+numbers (~0.20 %) are registered-society / royal-charter / other non-standard
+forms (`IP…C`, `R…`, `SP…`, `SL…`) that the pipeline's strict validator rejects
+because they are not 8-digit or 2-letter+6-digit. They are legitimate register
+entries. The horizon fetch runs with `--allow-invalid` to proceed with the valid
+subset; these 232 are then **dropped non-randomly** (specific legal forms) and are
+excluded from both numerator and denominator. The effect is negligible for
+incidence but is recorded here so the drop is not silent. (Widening the validator
+to accept these prefixes is a separate, out-of-scope change.)
 
 ### 3.2 Counting an adverse outcome
 
@@ -122,9 +158,11 @@ strike-off outcome.
 
 **Recommendation:** make **12 months the primary and required** fetch. The
 6-month fetch on the full sample is not worth its cost for incident insolvency;
-if run at all, restrict it to strata **A + C** (the fast-moving ~37k companies,
-roughly half the budget) to observe strike-off resolution timing. The analysis
-below is specified on the 12-month fetch.
+if run at all, restrict it to the fast-moving cells **C (strike-off) + D1
+(accounts overdue)** (~58k companies, about half the budget) — strike-off
+resolution and the highest-rate incident cell are where a 6-month look adds the
+most — and skip the slow base cells. The analysis below is specified on the
+12-month fetch.
 
 ### 3.4 Dissolution without insolvency, and unfetchable companies
 
@@ -196,23 +234,32 @@ active-at-baseline companies agree:
 - **The maintainer's own data** (Aug-2026 → Oct-2026 governed register snapshots):
   `active → liquidation/administration/VA` at **0.485 %/year** annualised.
 
-Using ≈ **0.5 %/year** incident adverse insolvency, the expected **raw** positive
-counts in the sample (positives arise almost entirely from strata C and D; A and B
-are prevalent at baseline and excluded from the incident numerator):
+Applying the **per-cell measured rates** (the `annual_adverse_rate` recorded in
+the sidecar) to each cell's sampled count gives the expected **raw** incident
+adverse-insolvency positives at 12 months (A and B are prevalent at baseline and
+excluded from the incident numerator):
 
-| Source | Sampled | 12-month incident positives | 6-month |
-|---|---:|---:|---:|
-| D active (0.485 %/yr) | 48,000 | ≈ 230 | ≈ 100–115 |
-| C strike-off proposal (elevated insolvency conversion on top of mostly non-insolvency dissolution) | 30,000 | ≈ 50–150 | ≈ 30–80 |
-| **Total adverse-insolvency positives** | | **≈ 280–380** | **≈ 130–195** |
-| Dissolution-without-insolvency outcome (mostly from C) | | tens of thousands | ~20k+ |
+| Cell | Sampled | Rate/yr | 12-month incident positives | 6-month (≈45 %) |
+|---|---:|---:|---:|---:|
+| D1 accounts overdue | 38,000 | 5.40 % | **≈ 2,053** | ≈ 920 |
+| C strike-off proposal | 20,000 | 1.13 % | ≈ 226 | ≈ 100 |
+| D4 base | 33,000 | 0.35 % | ≈ 114 | ≈ 50 |
+| D2 CS overdue | 10,000 | 0.83 % | ≈ 83 | ≈ 37 |
+| D3 charges | 10,000 | 0.75 % | ≈ 75 | ≈ 34 |
+| **Total adverse-insolvency positives** | 111,000 | | **≈ 2,550** | **≈ 1,150** |
+| Dissolution-without-insolvency outcome (mostly from C) | | | tens of thousands | ~20k+ |
 
-So the **binding constraint on power is the adverse-insolvency positive count
-(~300 at 12 months)**; the separate dissolution outcome is abundant. If stronger
-incident-insolvency power is wanted, the cheapest lever is to move budget into
-stratum D (each +10,000 active companies ≈ +48 positives/year) before the freeze
-is final; the current split deliberately also buys classifier-validation coverage
-of the prevalent strata A/B and full coverage of the dissolution outcome.
+The risk-stratified allocation lifts the expected 12-month incident count to
+**≈ 2,550** — roughly **9× the ~300** a status-only / uniform sample of the same
+size would yield — because 38,000 of the budget sits in the 5.4 %/yr
+accounts-overdue cell, which alone contributes ~2,050 positives. Weighting (§6)
+restores the true population prevalence for the headline metric, so the enrichment
+buys power without biasing the estimate. The base cell D4 (33,000) keeps the
+dominant clean-active population segment estimable. The separate
+dissolution-without-insolvency outcome remains abundant. Caveat: the per-cell rates
+are measured over one two-month window and annualised linearly; the 12-month figure
+assumes that rate holds and does not model seasonality or the petition-to-order lag,
+so treat ≈ 2,550 as a design estimate, not a forecast.
 
 ## 6. Pre-registered analysis
 
@@ -251,28 +298,36 @@ confirmation-statement-overdue are partly **consequences** of an adverse process
 already under way (a company heading into insolvency stops filing), so including
 them risks outcome leakage. The **primary model excludes block 2**; a secondary
 model includes it, and the AP gap between them is reported as the
-leakage-prone optimistic ceiling, not as predictive performance.
+leakage-prone optimistic ceiling, not as predictive performance. Note the sample
+is deliberately enriched on block-2 fields (cells D1/D2); because the inclusion
+probability depends only on those observed baseline fields, the weighted
+with/without-block-2 estimates remain unbiased for the population, but most
+positives sit in the overdue cell, so the leakage-free (without-block-2) model is
+being asked to recover them from other features — a deliberately demanding test.
 
 ## 7. The exact future work
 
-Everything below is the study's only remaining work. Build the profile-and-
-insolvency-only fetch (§3.1) first.
+The fetch path (`ukcompany prospective-fetch`) is built. Everything below is the
+study's only remaining work; the two commands are exactly what the maintainer
+runs, with the dates.
 
 ```bash
 # --- +12 months: PRIMARY. Run on or after 2027-10-05. ---
 # Profile + /insolvency only, into a horizon-specific cache so it cannot
-# overwrite the baseline or other runs:
+# overwrite the baseline or other runs. --allow-invalid proceeds past the 232
+# registered-society numbers the validator rejects (§3.1).
 ukcompany prospective-fetch \
   --input data/prospective/study-sample.csv \
-  --cache-dir data/prospective/raw-2027-10
-# (equivalently, once implemented: ukcompany run --only profile,insolvency
-#  --input data/prospective/study-sample.csv --settings config/prospective-2027-10.yaml)
+  --cache-dir data/prospective/raw-2027-10 \
+  --allow-invalid
 
-# --- +6 months: OPTIONAL, strata A+C only. Run on or after 2027-04-05. ---
-#   Pre-filter the sample to strata A and C, then:
+# --- +6 months: OPTIONAL, cells C + D1 only. Run on or after 2027-04-05. ---
+#   Pre-filter the sample to cells C_strike_off_proposal and D1_accounts_overdue
+#   (the `cell` column), write study-sample-CD1.csv, then:
 ukcompany prospective-fetch \
-  --input data/prospective/study-sample-AC.csv \
-  --cache-dir data/prospective/raw-2027-04
+  --input data/prospective/study-sample-CD1.csv \
+  --cache-dir data/prospective/raw-2027-04 \
+  --allow-invalid
 
 # --- Analysis (after the 12-month fetch) ---
 #   Extract per-company outcomes (adverse-insolvency / dissolution / censored)
@@ -282,9 +337,17 @@ ukcompany prospective-fetch \
 #   (no company numbers), consistent with the repo's publication policy.
 ```
 
-**Expected API time per horizon** (profile for all 100,318 + `/insolvency` for
-the ~24,000 companies with an insolvency link ≈ **124,000 requests**): at the
-project-conservative 500 requests / 300 s ≈ **~21 hours**; at the published 600 /
-300 s ≈ **~17 hours**. The 12-month fetch alone is the primary cost; the optional
-A+C 6-month fetch is roughly half of one horizon. These are long unattended runs —
-the cache resumes on interruption.
+**Expected API time per horizon.** The fetch is one profile per company
+(114,768 valid) plus one `/insolvency` call only where the profile links to it.
+The insolvency-link share across the sample is dominated by cells A and B
+(~4,000, nearly all linked) plus a low single-digit percent of C/D, so
+≈ **6,000–8,000** insolvency calls → ≈ **121,000–123,000 requests** total.
+
+A 100-company dry run (2026-10-12) fetched 100 profiles + 27 insolvency = **127
+requests in 2.9 s (43 req/s)** — but that is the *unthrottled* burst while the
+token bucket is full, and the 27 % insolvency rate is inflated (the lowest
+company numbers are old and insolvency-heavy). The binding constraint is the
+client's conservative rate limit of **500 requests / 300 s (1.67 req/s
+sustained)**, so a full horizon ≈ 122,000 / 6,000 per hour ≈ **~20 hours**. The
+optional C+D1 6-month fetch (~58k companies) is roughly half that. These are long
+unattended runs; the cache resumes on interruption.

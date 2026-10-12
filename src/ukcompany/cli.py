@@ -455,6 +455,47 @@ def cmd_snapshot_info(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_prospective_fetch(args: argparse.Namespace) -> int:
+    """Profile + /insolvency only, for a prospective-study horizon fetch.
+
+    Writes into a horizon-specific cache directory so it cannot overwrite the
+    baseline or other runs; resumes for free. `--limit` runs a small trial (the
+    plan's 100-company dry run) and reports request counts and wall time.
+    """
+    import time
+
+    numbers = read_input_numbers(args.input)
+    report = validate_input(numbers)
+    if report.invalid and not args.allow_invalid:
+        print(report.summary(), file=sys.stderr)
+        print("Invalid company numbers; pass --allow-invalid to proceed.", file=sys.stderr)
+        return 2
+    numbers = report.numbers
+    if args.limit:
+        numbers = numbers[: args.limit]
+    cache = cache_mod.RawCache(args.cache_dir)
+    client = CHClient()
+    print(f"-- prospective fetch: profile + /insolvency only, {len(numbers)} companies --")
+    print(f"cache: {args.cache_dir}")
+    started = time.monotonic()
+    stats = fetch_mod.fetch_profile_insolvency(
+        client, cache, numbers, max_age_days=float(args.max_age_days)
+    )
+    elapsed = time.monotonic() - started
+    total_requests = stats.profile_requests + stats.insolvency_requests
+    print(stats.summary())
+    print(
+        f"requests: profile={stats.profile_requests}, insolvency={stats.insolvency_requests}, "
+        f"total={total_requests}"
+    )
+    print(f"wall time: {elapsed:.1f}s", end="")
+    if total_requests and elapsed > 0:
+        print(f" ({total_requests / elapsed:.1f} req/s)")
+    else:
+        print()
+    return 0
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     from .status import collect_inventory, format_inventory
 
@@ -649,6 +690,25 @@ def main(argv: list[str] | None = None) -> int:
     p_snapshot_info.add_argument("--cache-dir")
     p_snapshot_info.add_argument("--settings", default="config/settings.yaml")
     p_snapshot_info.set_defaults(func=cmd_snapshot_info)
+
+    p_prospective = sub.add_parser(
+        "prospective-fetch",
+        help="fetch ONLY profile + /insolvency (prospective-study horizon outcome fetch)",
+    )
+    p_prospective.add_argument("--input", required=True, help="CSV with a company_number column")
+    p_prospective.add_argument(
+        "--cache-dir", required=True, help="horizon-specific cache directory (kept separate)"
+    )
+    p_prospective.add_argument(
+        "--limit", type=int, help="fetch only the first N companies (trial / dry run)"
+    )
+    p_prospective.add_argument(
+        "--max-age-days",
+        default=36500,
+        help="re-fetch only if cached entry older than this (default: effectively never)",
+    )
+    p_prospective.add_argument("--allow-invalid", action="store_true")
+    p_prospective.set_defaults(func=cmd_prospective_fetch)
 
     p_status = sub.add_parser(
         "status", help="list register, PSC and accounts snapshots held locally"

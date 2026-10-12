@@ -3140,3 +3140,77 @@ All new code passes Ruff; full suite 294 passed, 1 deselected. Pre-existing Ruff
 errors remain in untouched `notebooks/` and `docs/source-material/` files (not in
 this diff's scope). No network calls in tests; no publication; no company numbers in
 committed files.
+
+## Handoff 11 revision — risk-stratified sample, fetch path, Parts C & D (2026-10-12)
+
+Same branch. Revised the frozen sample before any outcome exists, built the fetch
+path, and completed Parts C and D.
+
+**Sample re-freeze (SUPERSEDES the v1 status-only sample).**
+- Retired v1 hashes: `study-sample.csv` `68e92c3a…5880c8`; `study-sample.strata.json`
+  `fe531f1f…72af` (100,318 companies; take-all A + status strata). Reason for
+  supersession: A (live insolvency process) and B (liquidation) are already in an
+  insolvency state at baseline and cannot contribute *incident* events, so spending
+  budget on them did not serve incident prediction; and stratum D was not
+  sub-stratified by risk, leaving expected incident positives at only ~300.
+- New v2 hashes (`scripts/freeze_prospective_sample.py`, design v2, seed 20260912):
+  `study-sample.csv` `9d6926b6…74cf7`; `study-sample.strata.json` `93985b40…1b522b`.
+  115,000 companies. A and B cut to 2,000 each (descriptive only: A progression,
+  B members'-vs-creditors' classifier validation; excluded from the incident
+  numerator). Budget reallocated to active cells sub-stratified by baseline markers
+  with disjoint membership and known inclusion probabilities: D1 accounts-overdue
+  (38,000 of 93,785), D2 CS-overdue (10,000), D3 charges (10,000), D4 base (33,000),
+  plus C strike-off (20,000).
+- Allocation driven by MEASURED transition rates from the Aug-2026 -> Oct-2026
+  governed register snapshots (two-month Active->liquidation/admin/receiver/VA,
+  annualised): acc-overdue 5.40%/yr, CS-overdue 0.83%, charges 0.75%, base 0.35%,
+  strike-off 1.13%. Overall Active->adverse 0.485%/yr, matching the Insolvency
+  Service 2024 liquidation rate (0.524%/yr) — cross-check. Expected incident
+  adverse-insolvency positives at 12 months ~2,550 (~9x the v1 ~300); recorded in
+  the sidecar per cell. Design estimate, not a forecast (one two-month window,
+  annualised linearly).
+
+**Fetch path (built, tested).** `fetch.fetch_profile_insolvency` +
+`ukcompany prospective-fetch` fetch ONLY profile + /insolvency (where linked),
+into a horizon-specific cache, resumable, with per-endpoint request counts.
+`tests/test_prospective_fetch.py` (5 tests, no network) assert officers/PSC are
+never called and insolvency only when linked. Needed because `fetch_companies`
+also pulls officers/PSC/PSC-statements (~4-5x the budget).
+
+**Live dry run (2026-10-12, real API, first 100 valid sampled companies):** 100
+profiles + 27 insolvency = 127 requests in 2.9 s (43 req/s). That rate is the
+unthrottled burst (token bucket full) and the 27% insolvency share is inflated
+(lowest company numbers are old/insolvency-heavy); the binding constraint is the
+client's 500 req/300 s, so a full horizon (~122k requests) ~20 hours. **Finding:**
+232/115,000 sampled numbers (~0.20%) are registered-society/royal-charter forms
+(IP../R../SP../SL..) that the strict validator rejects though they are real
+register entries; horizon runs use --allow-invalid and drop them (non-random,
+negligible). Dry-run cache was deleted after measuring.
+
+**Part C — `notified_on` [VERIFIED 2026-10-12].** It is the statutory "date the
+person became a registrable person in relation to the company" (6 April 2016 for
+pre-regime PSCs), not the filing-receipt date. API spec exposes only the bare
+label "Notified on"; meaning established from the statutory required-particulars
+(gov.uk + Addleshaw Goddard PSC guidance) plus the data's 2016-04-06 spike.
+Updated `docs/psc-data-guide.md` §4 trap 4 and follow-up item 7 (both now
+verified, with citations). Verdict on figure 5 (notified_on - incorporation): now
+publishable, retitled "Time from incorporation to a PSC becoming registrable",
+with the pre-2016-04-06-incorporation cohort excluded/separated (regime artefact).
+Not added to the site.
+
+**Part D — WIDE Kaggle card.** Drafted `docs/source-material/kaggle-wide-card-v2-revised.md`:
+changelog moved below "What this is" / "Which file to use"; "no look-ahead" claim
+replaced with the excludes-restatements / period-not-filing-dates /
+lag-by-`row_available_yyyymm` framing; LONG mentions removed and one neutral
+"withdrawn" line added; row counts (33,513,017 / 36,710,673) and ~6.8M companies
+and repo/site/Kaggle links added. **Column mismatch reported:** the shipped v2
+column set matches `config/accounts-wide-columns.json` but
+`docs/accounts-wide-columns.md` still describes the two creditors-maturity members
+as gated/not-yet-approved though they are published in v2 (noted in the card's
+maintainer section and recommended for a doc refresh).
+
+**Added to `docs/data-retention.md`:** the frozen sample file as top-priority
+off-laptop backup; pinned-environment/lockfile guidance; API-key procedure.
+
+All new code passes Ruff; suite 299 passed, 1 deselected. No pushes, no
+publication, no company numbers in committed files.
