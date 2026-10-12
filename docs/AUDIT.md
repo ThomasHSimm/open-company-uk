@@ -3085,3 +3085,58 @@ fits passed convergence gates; validation checked ten paired contrasts, 1,698 co
 weighted metrics and sample preservation; the full suite passed 289 tests with one deselected and
 Ruff passed. Outputs are aggregate-only; no downloads, company scores, rules, thresholds, pushes,
 publication or further model search occurred.
+
+## Handoff 11 — snapshot inventory + prospective-study plan (Parts A, B) (2026-10-12)
+
+Branch `handoff-11-monthly-refresh`. No monthly collection or scheduler was built
+(revised handoff dropped that). Stopped after Part B for review; Parts C and D not
+started.
+
+**Part A — inventory and retention.**
+- Added `ukcompany status` (`src/ukcompany/status.py`, wired in `cli.py`): read-only
+  scan of the data directory reporting register, PSC and accounts snapshots held.
+  Synthetic-fixture tests in `tests/test_status.py` (5 tests) cover register/PSC/
+  accounts listing, the unmanifested-PSC-dir flag, empty-root and malformed-manifest
+  degradation. Ran live against real data; output recorded below.
+- Register snapshots held: 2026-08 (5,695,466 rows, downloaded 2026-08-06) and
+  2026-10 (5,704,712 rows, downloaded 2026-10-05). No September register snapshot.
+- PSC snapshots held: 2026-09-25 (manifested, 32 parts, downloaded 2026-09-25) and
+  derived-only dirs 2026-09-18, 2026-09-18-stage1, 2026-09-25-sample.
+  **No first-of-September or first-of-October PSC snapshot exists; earliest PSC held
+  = 2026-09-18, and no earlier day can now be obtained** (daily file, no archive).
+- Accounts: 153 extracted long-table months, 2014-01 through 2026-09; one raw ZIP on
+  disk (September2026). Accounts archives are re-downloadable; register/PSC are not.
+- Wrote `docs/data-retention.md`: irreplaceable (register, PSC) vs re-downloadable
+  (accounts), with a prioritised backup recommendation for project wind-down.
+
+**Part B — prospective-study plan (`docs/prospective-study-plan.md`).**
+- Froze the baseline = governed join `v1-internal-202609` (T=2026-09). Recorded
+  hashes: joined parquet `909414cb…e098e031`; governed manifest `d93c82f3…74ef1`;
+  root manifest `6a3b44bc…476a5`.
+- Froze a 100,318-company study sample via `scripts/freeze_prospective_sample.py`
+  (deterministic, seed 20260912; private/gitignored under `data/prospective/`).
+  Hashes recorded: `study-sample.csv` `68e92c3a…5880c8`;
+  `study-sample.strata.json` `fe531f1f…72af`. Strata A live-process (7,318, all),
+  B liquidation (15,000/108,330), C strike-off (30,000/423,006), D active
+  (48,000/5,166,057); sampling weights reproduce population prevalence.
+- Outcome = profile + `/insolvency` per horizon. **Assumption needing live use:**
+  the horizon fetch must be profile-and-insolvency-only; `fetch_companies` currently
+  also fetches officers/PSC/PSC-statements, so a `--only`/`prospective-fetch` path
+  must be added before the first horizon run. Flagged in the plan; not built here.
+- Case types verified against `companieshouse/api-enumerations` constants.yml
+  (accessed 2026-10-12): `members-voluntary-liquidation` solvent vs
+  `creditors-voluntary-liquidation`/`compulsory-liquidation` adverse — liquidation
+  disambiguated at the outcome fetch. Dissolved-company API retention ≈ 20 years
+  (destruction paused per a review announced May 2026); gov.uk + secondary sources
+  cited, accessed 2026-10-12.
+- Expected adverse-insolvency positives ≈ 300 at 12 months (binding power
+  constraint), from a ~0.5 %/yr incidence cross-checked two ways: Insolvency Service
+  2024 (52.4 per 10,000 ≈ 0.524 %/yr) and the maintainer's own Aug→Oct 2026 register
+  transition (0.485 %/yr annualised). Dissolution-without-insolvency is abundant.
+  Recommended 12 months as primary; 6 months optional, strata A+C only. Estimated
+  API time ≈ 17–21 h per horizon (~124k requests).
+
+All new code passes Ruff; full suite 294 passed, 1 deselected. Pre-existing Ruff
+errors remain in untouched `notebooks/` and `docs/source-material/` files (not in
+this diff's scope). No network calls in tests; no publication; no company numbers in
+committed files.

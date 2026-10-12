@@ -455,6 +455,14 @@ def cmd_snapshot_info(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_status(args: argparse.Namespace) -> int:
+    from .status import collect_inventory, format_inventory
+
+    inventory = collect_inventory(args.data_root)
+    print(format_inventory(inventory))
+    return 0
+
+
 def cmd_join(args: argparse.Namespace) -> int:
     from .join import JOIN_VERSION, build_join_tiers
 
@@ -641,6 +649,12 @@ def main(argv: list[str] | None = None) -> int:
     p_snapshot_info.add_argument("--cache-dir")
     p_snapshot_info.add_argument("--settings", default="config/settings.yaml")
     p_snapshot_info.set_defaults(func=cmd_snapshot_info)
+
+    p_status = sub.add_parser(
+        "status", help="list register, PSC and accounts snapshots held locally"
+    )
+    p_status.add_argument("--data-root", default="data", help="data directory to inventory")
+    p_status.set_defaults(func=cmd_status)
 
     p_join = sub.add_parser("join", help="build internal point-in-time joined feature tables")
     p_join.add_argument("--t", required=True, help="end-of-month reference YYYYMM")
