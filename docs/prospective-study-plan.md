@@ -127,12 +127,14 @@ interruption, and reports per-endpoint request counts for budget accounting.
 **Invalid-number caveat (found in the dry run).** 232 of the 115,000 sampled
 numbers (~0.20 %) are registered-society / royal-charter / other non-standard
 forms (`IP…C`, `R…`, `SP…`, `SL…`) that the pipeline's strict validator rejects
-because they are not 8-digit or 2-letter+6-digit. They are legitimate register
-entries. The horizon fetch runs with `--allow-invalid` to proceed with the valid
-subset; these 232 are then **dropped non-randomly** (specific legal forms) and are
-excluded from both numerator and denominator. The effect is negligible for
-incidence but is recorded here so the drop is not silent. (Widening the validator
-to accept these prefixes is a separate, out-of-scope change.)
+because they are not 8-digit or 2-letter+6-digit. They are legitimate, fetchable
+register entries, so `ukcompany prospective-fetch` **explicitly allows exactly
+these registered-society / royal-charter prefixes** (`is_registered_society_number`)
+and fetches them — rather than a blanket `--allow-invalid` that would also swallow
+genuinely malformed numbers. Any *other* invalid number still hard-fails the run,
+so no non-random slice is dropped silently. (Widening the main pipeline's strict
+validator to accept these prefixes is a separate, out-of-scope change; the
+allowance is scoped to this command.)
 
 ### 3.2 Counting an adverse outcome
 
@@ -261,6 +263,27 @@ are measured over one two-month window and annualised linearly; the 12-month fig
 assumes that rate holds and does not model seasonality or the petition-to-order lag,
 so treat ≈ 2,550 as a design estimate, not a forecast.
 
+**Limitation — the signal is concentrated in overdue-accounts companies.** About
+**80 %** of the expected positives (≈ 2,053 of ≈ 2,550) come from the single D1
+accounts-overdue cell. The on-time-filer cells contribute only ≈ **270** combined
+(D2–D4), and the companies with *no* overdue marker at all (D3 + D4) only ≈ **190**.
+Two consequences follow, and both are pre-registered as caveats rather than fixed
+by changing the design:
+
+- **Subgroup results for on-time filers are underpowered and strictly
+  exploratory.** Any AP / recall figure computed on the D3+D4 (clean, on-time)
+  subset rests on ~190 positives and will have wide confidence intervals; it must
+  be reported as exploratory, not as a headline result.
+- This is also where it bites hardest analytically: the headline metric is the
+  **leakage-free** (without-compliance) model (§6), yet most positives sit in the
+  very cell selected *on* a compliance field. So the population-weighted leakage-free
+  AP is driven by a subgroup in which the leakage-free features are, by
+  construction, weakest. The weighting keeps the estimate unbiased, but its
+  precision for on-time filers is limited — the study can say whether a leakage-free
+  signal exists in the overdue population far more confidently than in the on-time
+  population. If stronger on-time power is wanted, the lever is to move budget from
+  D1 into D3/D4 at the next (pre-outcome) re-freeze.
+
 ## 6. Pre-registered analysis
 
 **Unit:** one company. **Weights:** the frozen `sampling_weight`, so every
@@ -314,20 +337,18 @@ runs, with the dates.
 ```bash
 # --- +12 months: PRIMARY. Run on or after 2027-10-05. ---
 # Profile + /insolvency only, into a horizon-specific cache so it cannot
-# overwrite the baseline or other runs. --allow-invalid proceeds past the 232
-# registered-society numbers the validator rejects (§3.1).
+# overwrite the baseline or other runs. The 232 registered-society / royal-charter
+# numbers are allowed automatically; any other invalid number hard-fails (§3.1).
 ukcompany prospective-fetch \
   --input data/prospective/study-sample.csv \
-  --cache-dir data/prospective/raw-2027-10 \
-  --allow-invalid
+  --cache-dir data/prospective/raw-2027-10
 
 # --- +6 months: OPTIONAL, cells C + D1 only. Run on or after 2027-04-05. ---
 #   Pre-filter the sample to cells C_strike_off_proposal and D1_accounts_overdue
 #   (the `cell` column), write study-sample-CD1.csv, then:
 ukcompany prospective-fetch \
   --input data/prospective/study-sample-CD1.csv \
-  --cache-dir data/prospective/raw-2027-04 \
-  --allow-invalid
+  --cache-dir data/prospective/raw-2027-04
 
 # --- Analysis (after the 12-month fetch) ---
 #   Extract per-company outcomes (adverse-insolvency / dissolution / censored)

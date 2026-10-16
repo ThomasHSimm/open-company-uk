@@ -17,9 +17,9 @@ inside a related-party, director or key-management breakdown has no column here
 and is never included.
 
 - **Coverage:** 152 monthly archives, continuous **2014-01 → 2026-08, no gaps.**
-- **Size:** **33,513,017 rows** (flagship `as_first_reported` file);
-  **36,710,673 rows** in the `latest` file. About **6.8 million distinct
-  companies.**
+- **Size:** **33,733,097 rows** (flagship `as_first_reported` file);
+  **36,931,122 rows** in the `latest` file. **6,849,384 distinct companies**
+  (as_first_reported).
 - **Scope:** balance-sheet only for most companies — filleted small-company
   filings rarely carry turnover or profit. Most rows are deliberately sparse: a
   company that filed only `Equity` and `CurrentAssets` genuinely filed only those.
@@ -121,17 +121,16 @@ available.
 
 *Not part of the card — notes for the maintainer*
 
-- **Confirm the site URL** before pasting: I used the conventional GitHub Pages URL
-  `https://thomashsimm.github.io/open-company-uk/datasets/accounts.html`; swap it
-  for the real published location if different.
-- **Company count** (~6.8M) is from local measurement of the as_first_reported file
-  (6,849,384 distinct `company`); confirm it matches the published, Kaggle-filtered
-  file, which may differ marginally.
-- **Column-list check vs `docs/accounts-wide-columns.md`:** the published column set
-  matches `config/accounts-wide-columns.json` (9 totals + 4 members + helpers), but
-  it is **out of sync with `docs/accounts-wide-columns.md`**, which still describes
-  the two creditors-maturity members as *gated / not yet approved* ("Creditors
-  members are gated", "If Creditors members are later approved…"). They are in fact
-  shipped in v2. The PP&E *total* is shipped; PP&E *members* remain excluded, which
-  the doc's "deferred to v2" text still (correctly) reflects. Recommend regenerating
-  / updating `docs/accounts-wide-columns.md` to show the creditors splits as shipped.
+- **Counts are from the published v2 parquet, verified.** Row counts 33,733,097
+  (as_first_reported) / 36,931,122 (latest) and 6,849,384 distinct companies were
+  computed directly from `data/accounts/v2/accounts-wide-{mode}.parquet`, whose
+  identity was confirmed by sha256 and matching row count before counting:
+  as_first_reported `b2fe4eeae3e9e95dfaf7c18ef8bd53d40cb834375deae2b0fb6341026fadbbc3`,
+  latest `ce62def86287001a7c8fc136c207f3736f4ec8a0104d7a783ed9beab79a5e37a`. These
+  replace earlier pre-parser-v2 figures (e.g. 33,513,017) still present in some docs.
+- **Site URL confirmed** (`https://thomashsimm.github.io/open-company-uk/datasets/accounts.html`).
+- **Column-list check:** the published column set matches
+  `config/accounts-wide-columns.json` (9 totals + 4 members + helpers).
+  `docs/accounts-wide-columns.md` has been refreshed in this change to show the two
+  creditors-maturity splits as shipped; PP&E *members* remain excluded (the total is
+  shipped), which that doc still correctly reflects.

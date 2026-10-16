@@ -3214,3 +3214,45 @@ off-laptop backup; pinned-environment/lockfile guidance; API-key procedure.
 
 All new code passes Ruff; suite 299 passed, 1 deselected. No pushes, no
 publication, no company numbers in committed files.
+
+## Handoff 11 follow-up — verified counts, power caveat, scoped prefix allowance (2026-10-12)
+
+Same branch. Responses to review feedback; no re-freeze of the sample (hashes
+unchanged: `9d6926b6…74cf7` / `93985b40…1b522b`).
+
+- **Kaggle WIDE card counts corrected to published v2.** Replaced the stale
+  pre-parser-v2 figures (33,513,017 / 36,710,673) with the published v2 counts and
+  a company count computed from the published parquet after verifying file
+  identity by sha256 + matching row count:
+  `accounts-wide-as_first_reported.parquet` sha256
+  `b2fe4eeae3e9e95dfaf7c18ef8bd53d40cb834375deae2b0fb6341026fadbbc3`,
+  33,733,097 rows, **6,849,384 distinct companies**; `latest` sha256
+  `ce62def86287001a7c8fc136c207f3736f4ec8a0104d7a783ed9beab79a5e37a`, 36,931,122
+  rows, 6,849,655 companies. (The v2 files under `data/accounts/v2/` carry no
+  pre-recorded hash of their own; `output-files.sha256` records the
+  `v2-internal-202609` build, so identity here is established by sha + the
+  authoritative row count supplied in review.)
+- **Prospective plan power limitation added (§5).** ~80 % of expected 12-month
+  positives (≈ 2,053 of ≈ 2,550) come from the single D1 accounts-overdue cell;
+  the on-time-filer cells contribute ≈ 270 combined (D2–D4) and ≈ 190 for the
+  fully on-time D3+D4. On-time-filer subgroup results are therefore underpowered
+  and exploratory, and the leakage-free headline metric is driven by a cell
+  selected on a compliance field — stated as a pre-registered caveat.
+- **Scoped prefix allowance replaces blanket `--allow-invalid`.** Added
+  `validate.is_registered_society_number` / `society_fetch_key` (narrow: 8-char
+  alphanumeric with a registered-society/royal-charter prefix — IP/SP/NP/RS/SL/R/
+  RC/SR/NR); it does not change `normalise_company_number`/`validate_input`, so the
+  main pipeline stays strict. `ukcompany prospective-fetch` now allows exactly
+  those forms (the 232 in the sample: IP 206, SP 22, R 3, SL 1) and hard-fails on
+  any other invalid; the `--allow-invalid` flag was removed. Live `--limit 3`
+  confirmed "allowing 232 …" and a clean fetch; added recogniser + CLI tests.
+- **`docs/accounts-wide-columns.md` refreshed:** the two Creditors maturity columns
+  are shown as published in v2 (with their weaker-reconciliation caveat), not gated;
+  PP&E members and the Creditors financial-instrument members remain excluded; the
+  publication-gates list updated accordingly. This clears the card's reported
+  mismatch.
+
+New code passes Ruff; suite 301 passed, 1 deselected. No pushes, no publication,
+no company numbers in committed files. (Unrelated: the claude.ai "Running Workout"
+MCP connector is unauthenticated this session; it needs authorising in claude.ai
+connector settings and was not used.)

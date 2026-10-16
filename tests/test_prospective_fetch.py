@@ -8,8 +8,10 @@ that /insolvency is called only when the profile links to it.
 from __future__ import annotations
 
 from ukcompany.cache import RawCache
+from ukcompany.cli import main
 from ukcompany.client import APIResponse
 from ukcompany.fetch import fetch_profile_insolvency
+from ukcompany.validate import is_registered_society_number
 
 
 class RecordingClient:
@@ -85,6 +87,39 @@ def test_resumes_from_cache_without_refetch(tmp_path):
     assert second.profile_requests == 0
     assert second.from_cache == 1
     assert client2.calls == []
+
+
+def test_registered_society_recogniser():
+    # Observed real forms accepted.
+    for good in ("IP00120C", "SP3COLLS", "R0000173", "SL01002A", "SP0006CU"):
+        assert is_registered_society_number(good), good
+    # Ordinary / malformed forms rejected.
+    for bad in ("01234567", "SC123456", "not-a-number", "IP0012", "1234567.0", "ZZ000001"):
+        assert not is_registered_society_number(bad), bad
+
+
+def _write_sample(path, numbers):
+    path.write_text("company_number\n" + "\n".join(numbers) + "\n", encoding="utf-8")
+
+
+def test_cli_allows_society_numbers_but_rejects_other_invalid(tmp_path, monkeypatch, capsys):
+    """prospective-fetch allows IP/SP/R/SL forms; any other invalid hard-fails."""
+    # With a genuinely malformed number present -> hard fail (rc 2), no --allow-invalid.
+    bad = tmp_path / "bad.csv"
+    _write_sample(bad, ["01234567", "IP00120C", "not-a-number"])
+    rc = main(["prospective-fetch", "--input", str(bad), "--cache-dir", str(tmp_path / "c1")])
+    assert rc == 2
+    assert "refusing to drop" in capsys.readouterr().err
+
+    # Society numbers only alongside valid ones, limit 0 network via --limit 0.
+    ok = tmp_path / "ok.csv"
+    _write_sample(ok, ["01234567", "IP00120C", "SP3COLLS"])
+    rc = main(
+        ["prospective-fetch", "--input", str(ok), "--cache-dir", str(tmp_path / "c2"), "--limit", "0"]
+    )
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "allowing 2 registered-society/royal-charter number(s)" in out
 
 
 def test_one_bad_company_does_not_kill_the_run(tmp_path):

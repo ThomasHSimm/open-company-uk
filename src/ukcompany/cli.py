@@ -464,15 +464,31 @@ def cmd_prospective_fetch(args: argparse.Namespace) -> int:
     """
     import time
 
-    numbers = read_input_numbers(args.input)
-    report = validate_input(numbers)
-    if report.invalid and not args.allow_invalid:
+    from .validate import is_registered_society_number, society_fetch_key
+
+    report = validate_input(read_input_numbers(args.input))
+    # Registered-society / royal-charter numbers (IP/SP/R/… forms) fail the strict
+    # validator but are real, fetchable register entries - allow EXACTLY those.
+    # Any other invalid is genuinely malformed and still hard-fails (no blanket
+    # --allow-invalid): silently dropping a non-random slice would bias the study.
+    society = [r for r in report.invalid if is_registered_society_number(r.raw)]
+    other_invalid = [r for r in report.invalid if not is_registered_society_number(r.raw)]
+    if other_invalid:
         print(report.summary(), file=sys.stderr)
-        print("Invalid company numbers; pass --allow-invalid to proceed.", file=sys.stderr)
+        print(
+            f"{len(other_invalid)} company number(s) are invalid and are not "
+            "registered-society/royal-charter forms; refusing to drop them silently.",
+            file=sys.stderr,
+        )
         return 2
-    numbers = report.numbers
-    if args.limit:
+    numbers = report.numbers + [society_fetch_key(r.raw) for r in society]
+    if society:
+        print(f"allowing {len(society)} registered-society/royal-charter number(s)")
+    if args.limit is not None:
         numbers = numbers[: args.limit]
+    if not numbers:
+        print("nothing to fetch")
+        return 0
     cache = cache_mod.RawCache(args.cache_dir)
     client = CHClient()
     print(f"-- prospective fetch: profile + /insolvency only, {len(numbers)} companies --")
@@ -707,7 +723,6 @@ def main(argv: list[str] | None = None) -> int:
         default=36500,
         help="re-fetch only if cached entry older than this (default: effectively never)",
     )
-    p_prospective.add_argument("--allow-invalid", action="store_true")
     p_prospective.set_defaults(func=cmd_prospective_fetch)
 
     p_status = sub.add_parser(
