@@ -44,6 +44,48 @@ KNOWN_PREFIXES = {
 _DIGITS = re.compile(r"^\d{1,8}$")
 _PREFIXED = re.compile(r"^([A-Z]{2})(\d{1,6})$")
 
+# Registered-society and royal-charter bodies have 8-character company numbers
+# whose tail can contain LETTERS (e.g. IP00120C, R0000173, SP3COLLS) and so do
+# not match the strict 8-digit / 2-letter+6-digit forms above. They are
+# legitimate register entries and are retrievable through the API, but the main
+# pipeline keeps rejecting them (widening the strict validator is out of scope).
+# `is_registered_society_number` is an EXPLICIT, narrow allow-list used only
+# where these bodies must be fetched (the prospective study), so genuinely
+# malformed numbers still hard-fail. The prefix is the maximal leading A-Z run.
+REGISTERED_SOCIETY_ROYAL_CHARTER_PREFIXES = {
+    "IP",  # registered society (industrial & provident society), England & Wales
+    "SP",  # registered society, Scotland
+    "NP",  # registered society, Northern Ireland
+    "RS",  # registered society (post-2014 designation)
+    "SL",  # Scottish registered-society / mutual 8-char form (not the SL+6-digit SLP)
+    "R",   # royal charter / mutual series (R + 7 characters)
+    "RC",  # royal charter body, England & Wales
+    "SR",  # royal charter body, Scotland
+    "NR",  # royal charter body, Northern Ireland
+}
+
+_SOCIETY_SHAPE = re.compile(r"^([A-Z]{1,2})[0-9A-Z]+$")
+
+
+def is_registered_society_number(raw: object) -> bool:
+    """True if `raw` is an 8-char registered-society / royal-charter number.
+
+    Narrow by design: exactly 8 characters, alphanumeric, with a recognised
+    society/charter prefix. Does not touch `normalise_company_number`.
+    """
+    if raw is None:
+        return False
+    s = str(raw).strip().upper().replace(" ", "")
+    if len(s) != 8:
+        return False
+    m = _SOCIETY_SHAPE.match(s)
+    return bool(m) and m.group(1) in REGISTERED_SOCIETY_ROYAL_CHARTER_PREFIXES
+
+
+def society_fetch_key(raw: object) -> str:
+    """Normalised fetch string for a society/charter number (upper, no spaces)."""
+    return str(raw).strip().upper().replace(" ", "")
+
 
 @dataclass(frozen=True)
 class NormalisedNumber:

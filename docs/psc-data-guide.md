@@ -241,11 +241,35 @@ strict key covers a non-random ~53% subset, not everyone. **[Checked]** Source:
 - *Effect:* a naive "active on date X" test gets these wrong silently. Each needs an explicit rule
   and a count.
 
-**4. What `notified_on` means is unclear.** It may be the date the person *became* a controller, or
-the date the company *told* Companies House. Many records sit exactly on 2016-04-06, the regime
-start, which suggests the first meaning, at least for early records **[Not verified]** (needs the API
-documentation — not resolved by the loader or Task C). This matters for any "how recent was the
-change" feature.
+**4. What `notified_on` means — now settled. [Verified 2026-10-12]** `notified_on` is **the date the
+person became a *registrable person* in relation to the company** — the statutory "date on which the
+individual became a registrable person" that a company must record in its PSC register among the
+required particulars. It is **not** the date Companies House received the filing, and **not** simply
+the date someone first acquired control.
+
+Evidence (triangulated — the API spec's own field description is only the bare label "Notified on"):
+
+- **Statutory register content.** The PSC regime (Companies Act 2006 Part 21A / Small Business,
+  Enterprise and Employment Act 2015) makes the "date on which the person became a registrable person
+  in relation to the company" a required particular of the PSC register, and **for a person who was
+  already a PSC when the regime began the date recorded is 6 April 2016**, regardless of when the
+  filing was actually made. Sources accessed 2026-10-12:
+  gov.uk *Register of People with Significant Control*
+  (<https://assets.publishing.service.gov.uk/media/691c2c0c84a267da57d70645/register-of-people-with-significant-control.pdf>);
+  Addleshaw Goddard, *Registers of People with Significant Control* (June 2017)
+  (<https://www.addleshawgoddard.com/globalassets/insights/corporate/psc-regime-and-guidance-registers-of-people-with-significant-control.pdf>).
+- **API spec.** Companies House Public Data API, persons-with-significant-control reference — the
+  field is exposed verbatim as `notified_on`, labelled "Notified on", with no further semantics
+  (<https://developer-specs.company-information.service.gov.uk/companies-house-public-data-api/reference/persons-with-significant-control>,
+  accessed 2026-10-12). The meaning therefore comes from the statutory register content the API
+  mirrors, not from the field label.
+- **The data agrees.** The large spike of records sitting exactly on 2016-04-06 is precisely what the
+  statutory rule predicts for pre-regime PSCs — it would not appear if `notified_on` were the filing
+  receipt date.
+
+*Consequence for features.* A "how recently did control change" feature is only meaningful for PSCs
+who became registrable **after** the regime bedded in; the 2016-04-06 cohort is a regime-start
+artefact and must be excluded or flagged, not read as a real event date.
 
 **5. Super-secure is not missing.** These 545 records are legally withheld. Treating them as "no
 PSC reported" would flag people protected for their safety.
@@ -335,7 +359,19 @@ users know what they are handling.
    reported banded by name frequency, active-only and ever separately (`docs/psc-checks-results.md`).
 6. Measure the zipped size of today's full set of parts. **[Not verified]** (uncompressed parts are
    ~395 MB each × 32 ≈ 12.6 GB).
-7. Settle the meaning of `notified_on` from the API documentation. **[Not verified]**
+7. ~~Settle the meaning of `notified_on` from the API documentation.~~ **Done [Verified 2026-10-12]:**
+   it is the statutory "date the person became a registrable person" (6 April 2016 for pre-regime
+   PSCs), not the filing-receipt date — see §4, trap 4, with citations.
+
+   *Figure 5 (the "notification lag", `notified_on` − incorporation date, in
+   `scripts/psc_site_summaries.py`) could now be published* — but under an accurate title and scope,
+   not as a "notification to Companies House" lag. It measures the gap from incorporation to a PSC
+   becoming registrable, so: (a) a suitable title is **"Time from incorporation to a PSC becoming
+   registrable (`notified_on` − incorporation date)"**; (b) companies incorporated on or before
+   6 April 2016 must be excluded or shown separately, because their `notified_on` is pinned to the
+   regime-start date and their "lag" is a mechanical artefact, not behaviour; (c) the negative
+   "before incorporation (dirty)" bin stays a data-quality category. **Not added to the site here**
+   (per the task); this records only that it is now publishable and how.
 
 ---
 

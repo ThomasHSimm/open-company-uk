@@ -3085,3 +3085,174 @@ fits passed convergence gates; validation checked ten paired contrasts, 1,698 co
 weighted metrics and sample preservation; the full suite passed 289 tests with one deselected and
 Ruff passed. Outputs are aggregate-only; no downloads, company scores, rules, thresholds, pushes,
 publication or further model search occurred.
+
+## Handoff 11 — snapshot inventory + prospective-study plan (Parts A, B) (2026-10-12)
+
+Branch `handoff-11-monthly-refresh`. No monthly collection or scheduler was built
+(revised handoff dropped that). Stopped after Part B for review; Parts C and D not
+started.
+
+**Part A — inventory and retention.**
+- Added `ukcompany status` (`src/ukcompany/status.py`, wired in `cli.py`): read-only
+  scan of the data directory reporting register, PSC and accounts snapshots held.
+  Synthetic-fixture tests in `tests/test_status.py` (5 tests) cover register/PSC/
+  accounts listing, the unmanifested-PSC-dir flag, empty-root and malformed-manifest
+  degradation. Ran live against real data; output recorded below.
+- Register snapshots held: 2026-08 (5,695,466 rows, downloaded 2026-08-06) and
+  2026-10 (5,704,712 rows, downloaded 2026-10-05). No September register snapshot.
+- PSC snapshots held: 2026-09-25 (manifested, 32 parts, downloaded 2026-09-25) and
+  derived-only dirs 2026-09-18, 2026-09-18-stage1, 2026-09-25-sample.
+  **No first-of-September or first-of-October PSC snapshot exists; earliest PSC held
+  = 2026-09-18, and no earlier day can now be obtained** (daily file, no archive).
+- Accounts: 153 extracted long-table months, 2014-01 through 2026-09; one raw ZIP on
+  disk (September2026). Accounts archives are re-downloadable; register/PSC are not.
+- Wrote `docs/data-retention.md`: irreplaceable (register, PSC) vs re-downloadable
+  (accounts), with a prioritised backup recommendation for project wind-down.
+
+**Part B — prospective-study plan (`docs/prospective-study-plan.md`).**
+- Froze the baseline = governed join `v1-internal-202609` (T=2026-09). Recorded
+  hashes: joined parquet `909414cb…e098e031`; governed manifest `d93c82f3…74ef1`;
+  root manifest `6a3b44bc…476a5`.
+- Froze a 100,318-company study sample via `scripts/freeze_prospective_sample.py`
+  (deterministic, seed 20260912; private/gitignored under `data/prospective/`).
+  Hashes recorded: `study-sample.csv` `68e92c3a…5880c8`;
+  `study-sample.strata.json` `fe531f1f…72af`. Strata A live-process (7,318, all),
+  B liquidation (15,000/108,330), C strike-off (30,000/423,006), D active
+  (48,000/5,166,057); sampling weights reproduce population prevalence.
+- Outcome = profile + `/insolvency` per horizon. **Assumption needing live use:**
+  the horizon fetch must be profile-and-insolvency-only; `fetch_companies` currently
+  also fetches officers/PSC/PSC-statements, so a `--only`/`prospective-fetch` path
+  must be added before the first horizon run. Flagged in the plan; not built here.
+- Case types verified against `companieshouse/api-enumerations` constants.yml
+  (accessed 2026-10-12): `members-voluntary-liquidation` solvent vs
+  `creditors-voluntary-liquidation`/`compulsory-liquidation` adverse — liquidation
+  disambiguated at the outcome fetch. Dissolved-company API retention ≈ 20 years
+  (destruction paused per a review announced May 2026); gov.uk + secondary sources
+  cited, accessed 2026-10-12.
+- Expected adverse-insolvency positives ≈ 300 at 12 months (binding power
+  constraint), from a ~0.5 %/yr incidence cross-checked two ways: Insolvency Service
+  2024 (52.4 per 10,000 ≈ 0.524 %/yr) and the maintainer's own Aug→Oct 2026 register
+  transition (0.485 %/yr annualised). Dissolution-without-insolvency is abundant.
+  Recommended 12 months as primary; 6 months optional, strata A+C only. Estimated
+  API time ≈ 17–21 h per horizon (~124k requests).
+
+All new code passes Ruff; full suite 294 passed, 1 deselected. Pre-existing Ruff
+errors remain in untouched `notebooks/` and `docs/source-material/` files (not in
+this diff's scope). No network calls in tests; no publication; no company numbers in
+committed files.
+
+## Handoff 11 revision — risk-stratified sample, fetch path, Parts C & D (2026-10-12)
+
+Same branch. Revised the frozen sample before any outcome exists, built the fetch
+path, and completed Parts C and D.
+
+**Sample re-freeze (SUPERSEDES the v1 status-only sample).**
+- Retired v1 hashes: `study-sample.csv` `68e92c3a…5880c8`; `study-sample.strata.json`
+  `fe531f1f…72af` (100,318 companies; take-all A + status strata). Reason for
+  supersession: A (live insolvency process) and B (liquidation) are already in an
+  insolvency state at baseline and cannot contribute *incident* events, so spending
+  budget on them did not serve incident prediction; and stratum D was not
+  sub-stratified by risk, leaving expected incident positives at only ~300.
+- New v2 hashes (`scripts/freeze_prospective_sample.py`, design v2, seed 20260912):
+  `study-sample.csv` `9d6926b6…74cf7`; `study-sample.strata.json` `93985b40…1b522b`.
+  115,000 companies. A and B cut to 2,000 each (descriptive only: A progression,
+  B members'-vs-creditors' classifier validation; excluded from the incident
+  numerator). Budget reallocated to active cells sub-stratified by baseline markers
+  with disjoint membership and known inclusion probabilities: D1 accounts-overdue
+  (38,000 of 93,785), D2 CS-overdue (10,000), D3 charges (10,000), D4 base (33,000),
+  plus C strike-off (20,000).
+- Allocation driven by MEASURED transition rates from the Aug-2026 -> Oct-2026
+  governed register snapshots (two-month Active->liquidation/admin/receiver/VA,
+  annualised): acc-overdue 5.40%/yr, CS-overdue 0.83%, charges 0.75%, base 0.35%,
+  strike-off 1.13%. Overall Active->adverse 0.485%/yr, matching the Insolvency
+  Service 2024 liquidation rate (0.524%/yr) — cross-check. Expected incident
+  adverse-insolvency positives at 12 months ~2,550 (~9x the v1 ~300); recorded in
+  the sidecar per cell. Design estimate, not a forecast (one two-month window,
+  annualised linearly).
+
+**Fetch path (built, tested).** `fetch.fetch_profile_insolvency` +
+`ukcompany prospective-fetch` fetch ONLY profile + /insolvency (where linked),
+into a horizon-specific cache, resumable, with per-endpoint request counts.
+`tests/test_prospective_fetch.py` (5 tests, no network) assert officers/PSC are
+never called and insolvency only when linked. Needed because `fetch_companies`
+also pulls officers/PSC/PSC-statements (~4-5x the budget).
+
+**Live dry run (2026-10-12, real API, first 100 valid sampled companies):** 100
+profiles + 27 insolvency = 127 requests in 2.9 s (43 req/s). That rate is the
+unthrottled burst (token bucket full) and the 27% insolvency share is inflated
+(lowest company numbers are old/insolvency-heavy); the binding constraint is the
+client's 500 req/300 s, so a full horizon (~122k requests) ~20 hours. **Finding:**
+232/115,000 sampled numbers (~0.20%) are registered-society/royal-charter forms
+(IP../R../SP../SL..) that the strict validator rejects though they are real
+register entries; horizon runs use --allow-invalid and drop them (non-random,
+negligible). Dry-run cache was deleted after measuring.
+
+**Part C — `notified_on` [VERIFIED 2026-10-12].** It is the statutory "date the
+person became a registrable person in relation to the company" (6 April 2016 for
+pre-regime PSCs), not the filing-receipt date. API spec exposes only the bare
+label "Notified on"; meaning established from the statutory required-particulars
+(gov.uk + Addleshaw Goddard PSC guidance) plus the data's 2016-04-06 spike.
+Updated `docs/psc-data-guide.md` §4 trap 4 and follow-up item 7 (both now
+verified, with citations). Verdict on figure 5 (notified_on - incorporation): now
+publishable, retitled "Time from incorporation to a PSC becoming registrable",
+with the pre-2016-04-06-incorporation cohort excluded/separated (regime artefact).
+Not added to the site.
+
+**Part D — WIDE Kaggle card.** Drafted `docs/source-material/kaggle-wide-card-v2-revised.md`:
+changelog moved below "What this is" / "Which file to use"; "no look-ahead" claim
+replaced with the excludes-restatements / period-not-filing-dates /
+lag-by-`row_available_yyyymm` framing; LONG mentions removed and one neutral
+"withdrawn" line added; row counts (33,513,017 / 36,710,673) and ~6.8M companies
+and repo/site/Kaggle links added. **Column mismatch reported:** the shipped v2
+column set matches `config/accounts-wide-columns.json` but
+`docs/accounts-wide-columns.md` still describes the two creditors-maturity members
+as gated/not-yet-approved though they are published in v2 (noted in the card's
+maintainer section and recommended for a doc refresh).
+
+**Added to `docs/data-retention.md`:** the frozen sample file as top-priority
+off-laptop backup; pinned-environment/lockfile guidance; API-key procedure.
+
+All new code passes Ruff; suite 299 passed, 1 deselected. No pushes, no
+publication, no company numbers in committed files.
+
+## Handoff 11 follow-up — verified counts, power caveat, scoped prefix allowance (2026-10-12)
+
+Same branch. Responses to review feedback; no re-freeze of the sample (hashes
+unchanged: `9d6926b6…74cf7` / `93985b40…1b522b`).
+
+- **Kaggle WIDE card counts corrected to published v2.** Replaced the stale
+  pre-parser-v2 figures (33,513,017 / 36,710,673) with the published v2 counts and
+  a company count computed from the published parquet after verifying file
+  identity by sha256 + matching row count:
+  `accounts-wide-as_first_reported.parquet` sha256
+  `b2fe4eeae3e9e95dfaf7c18ef8bd53d40cb834375deae2b0fb6341026fadbbc3`,
+  33,733,097 rows, **6,849,384 distinct companies**; `latest` sha256
+  `ce62def86287001a7c8fc136c207f3736f4ec8a0104d7a783ed9beab79a5e37a`, 36,931,122
+  rows, 6,849,655 companies. (The v2 files under `data/accounts/v2/` carry no
+  pre-recorded hash of their own; `output-files.sha256` records the
+  `v2-internal-202609` build, so identity here is established by sha + the
+  authoritative row count supplied in review.)
+- **Prospective plan power limitation added (§5).** ~80 % of expected 12-month
+  positives (≈ 2,053 of ≈ 2,550) come from the single D1 accounts-overdue cell;
+  the on-time-filer cells contribute ≈ 270 combined (D2–D4) and ≈ 190 for the
+  fully on-time D3+D4. On-time-filer subgroup results are therefore underpowered
+  and exploratory, and the leakage-free headline metric is driven by a cell
+  selected on a compliance field — stated as a pre-registered caveat.
+- **Scoped prefix allowance replaces blanket `--allow-invalid`.** Added
+  `validate.is_registered_society_number` / `society_fetch_key` (narrow: 8-char
+  alphanumeric with a registered-society/royal-charter prefix — IP/SP/NP/RS/SL/R/
+  RC/SR/NR); it does not change `normalise_company_number`/`validate_input`, so the
+  main pipeline stays strict. `ukcompany prospective-fetch` now allows exactly
+  those forms (the 232 in the sample: IP 206, SP 22, R 3, SL 1) and hard-fails on
+  any other invalid; the `--allow-invalid` flag was removed. Live `--limit 3`
+  confirmed "allowing 232 …" and a clean fetch; added recogniser + CLI tests.
+- **`docs/accounts-wide-columns.md` refreshed:** the two Creditors maturity columns
+  are shown as published in v2 (with their weaker-reconciliation caveat), not gated;
+  PP&E members and the Creditors financial-instrument members remain excluded; the
+  publication-gates list updated accordingly. This clears the card's reported
+  mismatch.
+
+New code passes Ruff; suite 301 passed, 1 deselected. No pushes, no publication,
+no company numbers in committed files. (Unrelated: the claude.ai "Running Workout"
+MCP connector is unauthenticated this session; it needs authorising in claude.ai
+connector settings and was not used.)

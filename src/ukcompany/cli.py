@@ -455,6 +455,71 @@ def cmd_snapshot_info(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_prospective_fetch(args: argparse.Namespace) -> int:
+    """Profile + /insolvency only, for a prospective-study horizon fetch.
+
+    Writes into a horizon-specific cache directory so it cannot overwrite the
+    baseline or other runs; resumes for free. `--limit` runs a small trial (the
+    plan's 100-company dry run) and reports request counts and wall time.
+    """
+    import time
+
+    from .validate import is_registered_society_number, society_fetch_key
+
+    report = validate_input(read_input_numbers(args.input))
+    # Registered-society / royal-charter numbers (IP/SP/R/… forms) fail the strict
+    # validator but are real, fetchable register entries - allow EXACTLY those.
+    # Any other invalid is genuinely malformed and still hard-fails (no blanket
+    # --allow-invalid): silently dropping a non-random slice would bias the study.
+    society = [r for r in report.invalid if is_registered_society_number(r.raw)]
+    other_invalid = [r for r in report.invalid if not is_registered_society_number(r.raw)]
+    if other_invalid:
+        print(report.summary(), file=sys.stderr)
+        print(
+            f"{len(other_invalid)} company number(s) are invalid and are not "
+            "registered-society/royal-charter forms; refusing to drop them silently.",
+            file=sys.stderr,
+        )
+        return 2
+    numbers = report.numbers + [society_fetch_key(r.raw) for r in society]
+    if society:
+        print(f"allowing {len(society)} registered-society/royal-charter number(s)")
+    if args.limit is not None:
+        numbers = numbers[: args.limit]
+    if not numbers:
+        print("nothing to fetch")
+        return 0
+    cache = cache_mod.RawCache(args.cache_dir)
+    client = CHClient()
+    print(f"-- prospective fetch: profile + /insolvency only, {len(numbers)} companies --")
+    print(f"cache: {args.cache_dir}")
+    started = time.monotonic()
+    stats = fetch_mod.fetch_profile_insolvency(
+        client, cache, numbers, max_age_days=float(args.max_age_days)
+    )
+    elapsed = time.monotonic() - started
+    total_requests = stats.profile_requests + stats.insolvency_requests
+    print(stats.summary())
+    print(
+        f"requests: profile={stats.profile_requests}, insolvency={stats.insolvency_requests}, "
+        f"total={total_requests}"
+    )
+    print(f"wall time: {elapsed:.1f}s", end="")
+    if total_requests and elapsed > 0:
+        print(f" ({total_requests / elapsed:.1f} req/s)")
+    else:
+        print()
+    return 0
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    from .status import collect_inventory, format_inventory
+
+    inventory = collect_inventory(args.data_root)
+    print(format_inventory(inventory))
+    return 0
+
+
 def cmd_join(args: argparse.Namespace) -> int:
     from .join import JOIN_VERSION, build_join_tiers
 
@@ -641,6 +706,30 @@ def main(argv: list[str] | None = None) -> int:
     p_snapshot_info.add_argument("--cache-dir")
     p_snapshot_info.add_argument("--settings", default="config/settings.yaml")
     p_snapshot_info.set_defaults(func=cmd_snapshot_info)
+
+    p_prospective = sub.add_parser(
+        "prospective-fetch",
+        help="fetch ONLY profile + /insolvency (prospective-study horizon outcome fetch)",
+    )
+    p_prospective.add_argument("--input", required=True, help="CSV with a company_number column")
+    p_prospective.add_argument(
+        "--cache-dir", required=True, help="horizon-specific cache directory (kept separate)"
+    )
+    p_prospective.add_argument(
+        "--limit", type=int, help="fetch only the first N companies (trial / dry run)"
+    )
+    p_prospective.add_argument(
+        "--max-age-days",
+        default=36500,
+        help="re-fetch only if cached entry older than this (default: effectively never)",
+    )
+    p_prospective.set_defaults(func=cmd_prospective_fetch)
+
+    p_status = sub.add_parser(
+        "status", help="list register, PSC and accounts snapshots held locally"
+    )
+    p_status.add_argument("--data-root", default="data", help="data directory to inventory")
+    p_status.set_defaults(func=cmd_status)
 
     p_join = sub.add_parser("join", help="build internal point-in-time joined feature tables")
     p_join.add_argument("--t", required=True, help="end-of-month reference YYYYMM")

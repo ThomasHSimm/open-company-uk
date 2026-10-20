@@ -53,6 +53,10 @@ class FetchStats:
     from_cache: int = 0
     not_found: list[str] = field(default_factory=list)
     errors: list[tuple[str, str]] = field(default_factory=list)
+    # Per-endpoint network request counts (set by fetch_profile_insolvency, for
+    # the prospective study's request-budget accounting).
+    profile_requests: int = 0
+    insolvency_requests: int = 0
 
     def summary(self) -> str:
         lines = [
@@ -125,6 +129,50 @@ def _fetch_paginated(
     data["total_results"] = total
     cache.write(number, endpoint, first.status_code, first.url, data, etag=first.etag)
     return True, data
+
+
+def fetch_profile_insolvency(
+    client: CHClient,
+    cache: RawCache,
+    numbers: list[str],
+    max_age_days: float = 36500.0,
+) -> FetchStats:
+    """Fetch ONLY the profile and (where linked) the insolvency resource.
+
+    This is the prospective study's outcome fetch (docs/prospective-study-plan.md):
+    it deliberately does NOT touch officers / PSC / PSC-statements, so the request
+    budget is one profile per company plus one insolvency call only for companies
+    whose profile carries `links.insolvency`. The default `max_age_days` is
+    effectively infinite so that a horizon run, pointed at its own cache directory,
+    fetches each company once and resumes for free on interruption rather than
+    re-fetching. `profile_requests` / `insolvency_requests` record the actual
+    network calls for budget accounting.
+
+    Fail-soft per company, exactly like `fetch_companies`: one bad number must not
+    kill the run; errors are collected and reported.
+    """
+    stats = FetchStats()
+    for i, number in enumerate(numbers, 1):
+        try:
+            was_fetch, profile = _fetch_one(client, cache, number, PROFILE, max_age_days)
+            stats.fetched += int(was_fetch)
+            stats.from_cache += int(not was_fetch)
+            stats.profile_requests += int(was_fetch)
+            if profile is None:
+                stats.not_found.append(number)
+                continue
+            links = profile.get("links") or {}
+            if links.get("insolvency"):
+                was_fetch_i, _ = _fetch_one(client, cache, number, INSOLVENCY, max_age_days)
+                stats.fetched += int(was_fetch_i)
+                stats.from_cache += int(not was_fetch_i)
+                stats.insolvency_requests += int(was_fetch_i)
+        except Exception as exc:  # noqa: BLE001 - collected and reported, run continues
+            log.warning("fetch failed for %s: %s", number, exc)
+            stats.errors.append((number, str(exc)))
+        if i % 50 == 0:
+            log.info("progress: %d/%d", i, len(numbers))
+    return stats
 
 
 def _fetch_officers(
