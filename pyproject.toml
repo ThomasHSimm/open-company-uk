@@ -28,6 +28,12 @@ dev = [
     "ixbrlparse>=0.11",
 ]
 snapshot = ["polars>=1.0"]
+remote = [
+    "duckdb>=1.0",
+    "fsspec>=2024.6",
+    "s3fs>=2024.6",
+    "aiohttp>=3.9",
+]
 analysis = [
     "duckdb>=1.0",
     "numpy>=1.24",

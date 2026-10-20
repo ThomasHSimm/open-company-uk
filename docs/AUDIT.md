@@ -3256,3 +3256,30 @@ New code passes Ruff; suite 301 passed, 1 deselected. No pushes, no publication,
 no company numbers in committed files. (Unrelated: the claude.ai "Running Workout"
 MCP connector is unauthenticated this session; it needs authorising in claude.ai
 connector settings and was not used.)
+
+## Optional DuckDB + fsspec remote backend (2026-10-20)
+
+Added an explicit `native`/`fsspec` choice without changing the native default. The shared
+connection helper registers `s3fs` or an aiohttp-backed HTTP filesystem on the exact connection
+that runs each query. In fsspec mode DuckDB extension auto-install and autoload are disabled at
+connection construction; built-in/installed JSON and Parquet support is checked explicitly and
+`httpfs` is asserted not loaded. Dependencies are lazy and live in the `remote` extra.
+
+Threaded the choice through PSC loading/features; all accounts out-of-core readers and their
+secondary connections; public-LONG generation; accounts feature/register reconciliation and WIDE
+extension audit; and the small DuckDB analysis scripts. URI inputs no longer pass through `Path` or
+local glob expansion. Outputs and spill directories remain explicitly local.
+
+Audit boundaries: snapshot archive loading, joins, validation and prospective-study code remain
+local-only because they verify local manifests, hashes, frozen inputs or ZIP members. The PSC
+walkthrough remains local for the same reason; its subprocess only renders a local aggregate figure.
+Hard-coded Phase-E comparisons, PSC site generation and the Kaggle staging guard also remain local:
+they are one-off local-corpus or pre-publication-directory checks, not remote input entry points.
+The referenced `docs/no_duckdv_options.md` was not present in the working tree or Git history, so
+the operational guidance is recorded in `docs/remote-duckdb-access.md` instead.
+
+Offline verification includes native/local compatibility, actionable missing-dependency and invalid
+backend errors, a real registered fsspec HTTP filesystem, range requests against a localhost
+range-capable server, output parity with the local Parquet, and assertions that both automatic
+extension settings and `httpfs.loaded` remain false. Live S3 credentials/endpoints were not tested.
+Final checks in `env1`: scoped Ruff passed; pytest reported 310 passed and 1 deselected.

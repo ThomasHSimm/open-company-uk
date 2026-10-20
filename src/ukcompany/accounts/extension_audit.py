@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
-import duckdb
+from ukcompany.duckdb_backend import (
+    PathInput,
+    connect_duckdb,
+    duckdb_path_sql,
+    require_local_path,
+)
+
+from .ooc import DEFAULT_SPILL_DIR
 
 KEY_COLUMNS = ("company", "period_end")
 SUMMARY_COLUMNS = ("n_concepts_present", "n_source_filings", "row_available_yyyymm")
@@ -16,27 +24,26 @@ def _quote(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'
 
 
-def _literal(value: str | Path) -> str:
-    return "'" + str(value).replace("'", "''") + "'"
-
-
-def _schema(connection: duckdb.DuckDBPyConnection, path: str | Path) -> list[str]:
+def _schema(connection: Any, path: PathInput) -> list[str]:
     return [
         row[0]
         for row in connection.execute(
-            "DESCRIBE SELECT * FROM read_parquet(?)", [str(path)]
+            f"DESCRIBE SELECT * FROM read_parquet({duckdb_path_sql(path)})"
         ).fetchall()
     ]
 
 
 def compare_wide_extension(
-    baseline_path: str | Path,
-    candidate_path: str | Path,
+    baseline_path: PathInput,
+    candidate_path: PathInput,
     *,
     mode: str,
     output_path: str | Path | None = None,
     value_columns: Sequence[str] | None = None,
     memory_limit_gb: int = 12,
+    spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict:
     """Compare a WIDE extension and fail on first-reported value regressions."""
     if mode not in {"as_first_reported", "latest"}:
@@ -44,10 +51,15 @@ def compare_wide_extension(
     if memory_limit_gb <= 0:
         raise ValueError("memory_limit_gb must be positive")
 
-    connection = duckdb.connect()
+    connection = connect_duckdb(
+        memory_limit_gb=memory_limit_gb,
+        spill_dir=spill_dir,
+        backend=duckdb_backend,
+        input_paths=(baseline_path, candidate_path),
+        filesystem_options=fsspec_options,
+        preserve_insertion_order=False,
+    )
     try:
-        connection.execute(f"SET memory_limit='{memory_limit_gb}GB'")
-        connection.execute("SET preserve_insertion_order=false")
         baseline_columns = _schema(connection, baseline_path)
         candidate_columns = _schema(connection, candidate_path)
         if baseline_columns != candidate_columns:
@@ -68,10 +80,12 @@ def compare_wide_extension(
                 raise RuntimeError(f"WIDE inputs are missing audited columns: {missing_values}")
 
         connection.execute(
-            f"CREATE VIEW baseline AS SELECT * FROM read_parquet({_literal(baseline_path)})"
+            "CREATE VIEW baseline AS SELECT * FROM "
+            f"read_parquet({duckdb_path_sql(baseline_path)})"
         )
         connection.execute(
-            f"CREATE VIEW candidate AS SELECT * FROM read_parquet({_literal(candidate_path)})"
+            "CREATE VIEW candidate AS SELECT * FROM "
+            f"read_parquet({duckdb_path_sql(candidate_path)})"
         )
         for view in ("baseline", "candidate"):
             rows, distinct_keys, null_keys = connection.execute(
@@ -124,6 +138,7 @@ def compare_wide_extension(
         "mode": mode,
         "baseline_path": str(baseline_path),
         "candidate_path": str(candidate_path),
+        "duckdb_backend": duckdb_backend,
         "row_counts": {
             "baseline": row[0],
             "candidate": row[1],
@@ -155,7 +170,7 @@ def compare_wide_extension(
         "newly_null": sum(item["newly_null"] for item in report["by_column"].values()),
     }
     if output_path is not None:
-        destination = Path(output_path)
+        destination = require_local_path(output_path, "extension audit report output")
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(json.dumps(report, indent=2), encoding="utf-8")
 

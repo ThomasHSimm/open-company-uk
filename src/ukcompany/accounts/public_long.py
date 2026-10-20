@@ -9,7 +9,11 @@ re-extracts from source archives; only filters the existing `data/accounts/long/
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
+
+from ukcompany.duckdb_backend import PathInput, duckdb_path_sql, require_local_path
 
 from .ooc import DEFAULT_MEMORY_LIMIT_GB, DEFAULT_SPILL_DIR, _connect, _sql_literal
 
@@ -146,23 +150,25 @@ NON_NUMERIC_ALLOWLIST = frozenset(
 
 
 def build_public_long_duckdb(
-    parts: str | Path,
+    parts: PathInput,
     output_dir: str | Path,
     years: range,
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[int, int]:
     """Write one filtered Parquet per year to `output_dir`, via `COPY ... TO ...` (never
     materialised in Python memory). Filters over the existing per-month Parquets only — never
     re-extracts. Returns `{year: rows_written}` (0 for a year with no matching source months,
     e.g. before the archive's start or after its end; no file is written for those years).
     """
-    output_dir = Path(output_dir)
+    output_dir = require_local_path(output_dir, "public LONG output directory")
     output_dir.mkdir(parents=True, exist_ok=True)
     numeric_list_sql = ", ".join(_sql_literal(c) for c in sorted(NUMERIC_DENYLIST))
     allow_list_sql = ", ".join(_sql_literal(c) for c in sorted(NON_NUMERIC_ALLOWLIST))
-    parts_sql = _sql_literal(str(parts))
+    parts_sql = duckdb_path_sql(parts)
     written = {}
     for year in years:
         output_path = output_dir / f"accounts-long-public-{year}.parquet"
@@ -176,7 +182,13 @@ def build_public_long_duckdb(
                 OR (fact_kind = 'non-numeric' AND concept IN ({allow_list_sql}))
               )
         """
-        connection = _connect(memory_limit_gb, spill_dir)
+        connection = _connect(
+            memory_limit_gb,
+            spill_dir,
+            duckdb_backend=duckdb_backend,
+            input_paths=(parts,),
+            fsspec_options=fsspec_options,
+        )
         try:
             count = connection.sql(f"SELECT COUNT(*) FROM ({query})").fetchone()[0]
             if count:

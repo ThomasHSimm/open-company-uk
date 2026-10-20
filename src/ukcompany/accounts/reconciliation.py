@@ -4,30 +4,51 @@ from __future__ import annotations
 
 import glob
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
-from ukcompany.psc.loader import DEFAULT_MEMORY_LIMIT_GB, DEFAULT_SPILL_DIR, _connect, _sql_literal
+from ukcompany.duckdb_backend import (
+    PathInput,
+    duckdb_path_sql,
+    require_local_path,
+    uri_scheme,
+)
+from ukcompany.psc.loader import DEFAULT_MEMORY_LIMIT_GB, DEFAULT_SPILL_DIR, _connect
 
 
 def reconcile_accounts_register(
-    features_path: str | Path,
-    register_glob: str,
+    features_path: PathInput,
+    register_glob: PathInput,
     *,
     t_yyyymm: int,
     register_snapshot_date: str,
     output_path: str | Path | None = None,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict:
     """Compare latest account period ends with register ``Accounts.LastMadeUpDate``."""
-    register_paths = sorted(glob.glob(register_glob))
-    if not register_paths:
-        raise FileNotFoundError(f"no register parts matched {register_glob}")
-    register_list = "[" + ", ".join(_sql_literal(path) for path in register_paths) + "]"
-    register_sql = f"read_csv({register_list}, header=true, all_varchar=true, ignore_errors=true)"
-    features_sql = f"read_parquet({_sql_literal(str(features_path))})"
+    if isinstance(register_glob, (str, Path)) and not uri_scheme(register_glob):
+        register_paths: PathInput = sorted(glob.glob(str(register_glob)))
+        if not register_paths:
+            raise FileNotFoundError(f"no register parts matched {register_glob}")
+    else:
+        register_paths = register_glob
+    register_sql = (
+        f"read_csv({duckdb_path_sql(register_paths)}, header=true, all_varchar=true, "
+        "ignore_errors=true)"
+    )
+    features_sql = f"read_parquet({duckdb_path_sql(features_path)})"
 
-    connection = _connect(memory_limit_gb, spill_dir)
+    connection = _connect(
+        memory_limit_gb,
+        spill_dir,
+        duckdb_backend=duckdb_backend,
+        input_paths=(features_path, register_paths),
+        fsspec_options=fsspec_options,
+    )
     try:
         names = {
             row[0].strip(): row[0]
@@ -110,7 +131,8 @@ def reconcile_accounts_register(
         "reference_month_T": t_yyyymm,
         "register_snapshot_date": register_snapshot_date,
         "features_path": str(features_path),
-        "register_glob": register_glob,
+        "register_glob": str(register_glob),
+        "duckdb_backend": duckdb_backend,
         "register_rows": register_rows,
         "feature_rows": feature_rows,
         "feature_companies_outside_register": outside_register,
@@ -123,7 +145,7 @@ def reconcile_accounts_register(
             f"reconciliation buckets do not close: {sum(buckets.values())} != {register_rows}"
         )
     if output_path is not None:
-        destination = Path(output_path)
+        destination = require_local_path(output_path, "accounts reconciliation report output")
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(json.dumps(report, indent=2), encoding="utf-8")
     return report

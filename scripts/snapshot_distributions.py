@@ -17,9 +17,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
-from ukcompany.psc.loader import _connect, _sql_literal
+from ukcompany.duckdb_backend import duckdb_path_sql, require_local_path
+from ukcompany.psc.loader import _connect
 
 # Concentration bands (number of companies sharing a postcode / address).
 BANDS = (
@@ -41,10 +41,15 @@ def main() -> int:
     ap.add_argument("--features", required=True)
     ap.add_argument("--snapshot-date", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--duckdb-backend", choices=("native", "fsspec"), default="native")
     args = ap.parse_args()
 
-    con = _connect(8)
-    feat = f"read_parquet({_sql_literal(args.features)})"
+    con = _connect(
+        8,
+        duckdb_backend=args.duckdb_backend,
+        input_paths=(args.features,),
+    )
+    feat = f"read_parquet({duckdb_path_sql(args.features)})"
     try:
         columns = [r[0] for r in con.sql(f"DESCRIBE SELECT * FROM {feat}").fetchall()]
         total = con.sql(f"SELECT COUNT(*) FROM {feat}").fetchone()[0]
@@ -131,7 +136,9 @@ def main() -> int:
         lines += _band_table(ad_bands)
     lines.append("")
 
-    Path(args.out).write_text("\n".join(lines), encoding="utf-8")
+    require_local_path(args.out, "snapshot distributions report output").write_text(
+        "\n".join(lines), encoding="utf-8"
+    )
     print(f"distributions: {total:,} companies; wrote {args.out}")
     print(f"  postcode concentration p99/max: {pc_pcts[2]:.0f}/{pc_pcts[4]:,}")
     if has_addr:

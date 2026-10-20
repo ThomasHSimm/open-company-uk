@@ -17,9 +17,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
-from ukcompany.psc.loader import _connect, _sql_literal
+from ukcompany.duckdb_backend import duckdb_path_sql, require_local_path
+from ukcompany.psc.loader import _connect
 
 
 def _find_column(describe_rows, *needles) -> str:
@@ -40,12 +40,17 @@ def main() -> int:
     ap.add_argument("--snapshot-date", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--duckdb-memory-gb", type=int, default=8)
+    ap.add_argument("--duckdb-backend", choices=("native", "fsspec"), default="native")
     args = ap.parse_args()
 
-    con = _connect(args.duckdb_memory_gb)
+    con = _connect(
+        args.duckdb_memory_gb,
+        duckdb_backend=args.duckdb_backend,
+        input_paths=(args.features, args.register),
+    )
     try:
         reg_csv = (
-            f"read_csv({_sql_literal(str(Path(args.register).expanduser()))}, "
+            f"read_csv({duckdb_path_sql(args.register)}, "
             f"header=true, all_varchar=true, ignore_errors=true)"
         )
         describe = con.sql(f"DESCRIBE SELECT * FROM {reg_csv}").fetchall()
@@ -65,7 +70,7 @@ def main() -> int:
         )
         con.execute(
             f"CREATE TEMP TABLE feat AS SELECT DISTINCT company_number "
-            f"FROM read_parquet({_sql_literal(args.features)})"
+            f"FROM read_parquet({duckdb_path_sql(args.features)})"
         )
 
         n_register = con.sql("SELECT COUNT(*) FROM reg").fetchone()[0]
@@ -140,7 +145,7 @@ def main() -> int:
         "",
     ]
 
-    out = Path(args.out)
+    out = require_local_path(args.out, "PSC coverage report output")
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"coverage: {covered:,}/{n_register:,} ({cov_pct:.2f}%); "
           f"active {active_covered:,}/{active_total:,} ({act_pct:.2f}%); wrote {out}")

@@ -7,6 +7,8 @@ from pathlib import Path
 
 import yaml
 
+from ukcompany.duckdb_backend import uri_scheme
+
 from .backfill import DEFAULT_BASE_URL, parse_month, run_backfill
 from .extract import (
     archive_recorded_complete,
@@ -49,6 +51,8 @@ DEFAULTS = {
     "member_histogram": "docs/accounts-member-frequency.csv",
     "reconciliation_output": "docs/accounts-component-reconciliation.csv",
     "qa_report": "docs/accounts-qa.md",
+    "duckdb_backend": "native",
+    "fsspec_options": {},
 }
 
 
@@ -63,6 +67,16 @@ def load_accounts_settings(path: str | Path) -> dict[str, object]:
 
 def setting_path(value: object) -> Path:
     return Path(str(value)).expanduser()
+
+
+def setting_input(value: object) -> str:
+    """Expand local home paths without passing remote URIs through ``Path``."""
+    text = str(value)
+    return text if uri_scheme(text) else str(Path(text).expanduser())
+
+
+def selected_duckdb_backend(args: argparse.Namespace, settings: dict[str, object]) -> str:
+    return args.duckdb_backend or str(settings["duckdb_backend"])
 
 
 def format_bytes(value: int) -> str:
@@ -176,7 +190,8 @@ def cmd_export_manifest(args: argparse.Namespace) -> int:
 def cmd_pivot(args: argparse.Namespace) -> int:
     settings = load_accounts_settings(args.settings)
     mapping = load_column_map(str(args.column_map or settings["column_map"]))
-    long_path = setting_path(args.long or settings["long_input"])
+    long_value = args.long or settings["long_input"]
+    long_path = setting_input(long_value) if args.engine == "duckdb" else setting_path(long_value)
     wide = setting_path(args.output or settings["wide_output"])
     provenance = setting_path(args.provenance_output or settings["wide_provenance_output"])
     if args.engine == "duckdb":
@@ -190,6 +205,8 @@ def cmd_pivot(args: argparse.Namespace) -> int:
                 wide,
                 provenance,
                 memory_limit_gb=args.duckdb_memory_gb,
+                duckdb_backend=selected_duckdb_backend(args, settings),
+                fsspec_options=settings.get("fsspec_options"),
             )
         peak = peak_fn()
     else:
@@ -205,7 +222,8 @@ def cmd_qa(args: argparse.Namespace) -> int:
     (--engine polars) or an out-of-core DuckDB group-by (--engine duckdb, required at
     full-history scale — the Polars pass OOM'd at a 25 GB cgroup cap over 152 archives)."""
     settings = load_accounts_settings(args.settings)
-    long_path = setting_path(args.long or settings["long_input"])
+    long_value = args.long or settings["long_input"]
+    long_path = setting_input(long_value) if args.engine == "duckdb" else setting_path(long_value)
     histogram = setting_path(args.histogram or settings["member_histogram"])
     reconciliation = setting_path(args.reconciliation or settings["reconciliation_output"])
     report = setting_path(args.report or settings["qa_report"])
@@ -216,6 +234,8 @@ def cmd_qa(args: argparse.Namespace) -> int:
             write_qa_duckdb(
                 long_path, histogram, reconciliation, report,
                 memory_limit_gb=args.duckdb_memory_gb,
+                duckdb_backend=selected_duckdb_backend(args, settings),
+                fsspec_options=settings.get("fsspec_options"),
             )
         peak = peak_fn()
     else:
@@ -231,13 +251,18 @@ def cmd_restatement(args: argparse.Namespace) -> int:
     """Decision 6: restatement rate over a CONTINUOUS month range, via a running tally
     (--engine python) or an out-of-core DuckDB window function (--engine duckdb, required
     at full-history scale — the Python dict tally needed 17.8 GB over 24 months alone)."""
+    settings = load_accounts_settings(args.settings)
     report_output = setting_path(args.report)
     with track_peak_rss() as peak:
         if args.engine == "duckdb":
             from .ooc import restatement_rate_duckdb
 
             result = restatement_rate_duckdb(
-                args.long, scope_label=args.scope_label, memory_limit_gb=args.duckdb_memory_gb
+                setting_input(args.long),
+                scope_label=args.scope_label,
+                memory_limit_gb=args.duckdb_memory_gb,
+                duckdb_backend=selected_duckdb_backend(args, settings),
+                fsspec_options=settings.get("fsspec_options"),
             )
         else:
             result = restatement_rate_over_parts(args.long, scope_label=args.scope_label)
@@ -368,12 +393,14 @@ def cmd_build_public_long(args: argparse.Namespace) -> int:
     from .public_long import build_public_long_duckdb
 
     settings = load_accounts_settings(args.settings)
-    long_path = setting_path(args.long or settings["long_input"])
+    long_path = setting_input(args.long or settings["long_input"])
     written = build_public_long_duckdb(
         long_path,
         args.output_dir,
         range(args.from_year, args.to_year + 1),
         memory_limit_gb=args.duckdb_memory_gb,
+        duckdb_backend=selected_duckdb_backend(args, settings),
+        fsspec_options=settings.get("fsspec_options"),
     )
     total = 0
     for year, count in sorted(written.items()):
@@ -476,6 +503,7 @@ def build_parser() -> argparse.ArgumentParser:
     build_public_long.add_argument("--from-year", type=int, required=True)
     build_public_long.add_argument("--to-year", type=int, required=True)
     build_public_long.add_argument("--duckdb-memory-gb", type=int, default=8)
+    build_public_long.add_argument("--duckdb-backend", choices=("native", "fsspec"))
     build_public_long.set_defaults(func=cmd_build_public_long)
     pivot = commands.add_parser("pivot", help="create WIDE and cell provenance Parquets")
     pivot.add_argument("--long")
@@ -494,6 +522,7 @@ def build_parser() -> argparse.ArgumentParser:
         "'polars' (default) matches prior tested behaviour at sample scale",
     )
     pivot.add_argument("--duckdb-memory-gb", type=int, default=8)
+    pivot.add_argument("--duckdb-backend", choices=("native", "fsspec"))
     pivot.set_defaults(func=cmd_pivot)
     qa = commands.add_parser("qa", help="write member histogram and reconciliation QA")
     qa.add_argument("--long")
@@ -508,6 +537,7 @@ def build_parser() -> argparse.ArgumentParser:
         "'polars' (default) matches prior tested behaviour at sample scale",
     )
     qa.add_argument("--duckdb-memory-gb", type=int, default=8)
+    qa.add_argument("--duckdb-backend", choices=("native", "fsspec"))
     qa.set_defaults(func=cmd_qa)
     restatement = commands.add_parser(
         "restatement",
@@ -528,6 +558,7 @@ def build_parser() -> argparse.ArgumentParser:
         "'python' (default) matches prior tested behaviour at sample scale",
     )
     restatement.add_argument("--duckdb-memory-gb", type=int, default=8)
+    restatement.add_argument("--duckdb-backend", choices=("native", "fsspec"))
     restatement.set_defaults(func=cmd_restatement)
     return parser
 

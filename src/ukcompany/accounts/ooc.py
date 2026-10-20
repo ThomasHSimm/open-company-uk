@@ -12,7 +12,17 @@ module only changes the execution engine.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
+
+from ukcompany.duckdb_backend import (
+    PathInput,
+    connect_duckdb,
+    duckdb_path_sql,
+    require_local_path,
+    sql_literal,
+)
 
 from .core import EMPLOYEE_CONCEPT, NIL_RAW_VALUES, TARGET_CONCEPTS
 from .pivot import WideColumnMap, require_polars
@@ -22,15 +32,14 @@ DEFAULT_MEMORY_LIMIT_GB = 8
 DEFAULT_SPILL_DIR = "data/accounts/.duckdb-spill"
 
 
-def require_duckdb():
-    try:
-        import duckdb
-    except ImportError as exc:
-        raise RuntimeError("out-of-core accounts outputs require the duckdb package") from exc
-    return duckdb
-
-
-def _connect(memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB, spill_dir: str = DEFAULT_SPILL_DIR):
+def _connect(
+    memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
+    spill_dir: str = DEFAULT_SPILL_DIR,
+    *,
+    duckdb_backend: str = "native",
+    input_paths: tuple[PathInput, ...] = (),
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
+):
     """A dedicated, explicitly bounded connection — not the implicit default connection.
 
     DuckDB's default `memory_limit` is a large fraction of system RAM, so an unconfigured
@@ -39,27 +48,30 @@ def _connect(memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB, spill_dir: str = DE
     despite DuckDB's out-of-core design, because nothing told it to stay under that cap or
     where to spill. Setting both explicitly is what makes this genuinely out-of-core.
     """
-    duckdb = require_duckdb()
-    Path(spill_dir).mkdir(parents=True, exist_ok=True)
-    connection = duckdb.connect(":memory:")
-    connection.execute(f"SET memory_limit = '{int(memory_limit_gb)}GB'")
-    connection.execute(f"SET temp_directory = {_sql_literal(spill_dir)}")
-    return connection
+    return connect_duckdb(
+        memory_limit_gb=memory_limit_gb,
+        spill_dir=spill_dir,
+        backend=duckdb_backend,
+        input_paths=input_paths,
+        filesystem_options=fsspec_options,
+    )
 
 
 def _sql_literal(value: str) -> str:
-    return "'" + value.replace("'", "''") + "'"
+    return sql_literal(value)
 
 
 _NIL_RAW_VALUES_SQL = "(" + ", ".join(_sql_literal(v) for v in NIL_RAW_VALUES) + ")"
 
 
 def restatement_rate_duckdb(
-    parts: str | Path,
+    parts: PathInput,
     *,
     scope_label: str,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> RestatementRateResult:
     """Same definition as `qa.restatement_rate_over_parts` (panel check's 7.94%, validated
     at sample scale as 7.93%), computed via a DuckDB window function instead of a Python
@@ -69,9 +81,15 @@ def restatement_rate_duckdb(
     different scale-normalised value than the first one seen. A bare dash
     (`NIL_RAW_VALUES`) is treated as a genuine value of 0, not excluded.
     """
-    connection = _connect(memory_limit_gb, spill_dir)
+    connection = _connect(
+        memory_limit_gb,
+        spill_dir,
+        duckdb_backend=duckdb_backend,
+        input_paths=(parts,),
+        fsspec_options=fsspec_options,
+    )
     concepts_sql = ", ".join(_sql_literal(concept) for concept in TARGET_CONCEPTS)
-    parts_sql = _sql_literal(str(parts))
+    parts_sql = duckdb_path_sql(parts)
     query = f"""
         WITH facts AS (
             SELECT company, period_end, concept, source_year, source_month,
@@ -148,7 +166,7 @@ def _members_values_sql(mapping: WideColumnMap) -> str:
     return "VALUES " + ", ".join(rows)
 
 
-def _cells_with_sql(parts: str | Path, mapping: WideColumnMap, mode: str) -> str:
+def _cells_with_sql(parts: PathInput, mapping: WideColumnMap, mode: str) -> str:
     """The `WITH ... ranked AS (...)` prefix shared by both output queries below.
 
     A numeric fact filed as a bare dash (`NIL_RAW_VALUES`) means nil and is coalesced to `'0'`
@@ -173,7 +191,7 @@ def _cells_with_sql(parts: str | Path, mapping: WideColumnMap, mode: str) -> str
         f"AND (f.numeric_value IS NOT NULL OR f.raw_value IN {_NIL_RAW_VALUES_SQL}) "
         f"{extra_filter}"
     )
-    parts_sql = _sql_literal(str(parts))
+    parts_sql = duckdb_path_sql(parts)
     totals_values_sql = _totals_values_sql(mapping)
     members_values_sql = _members_values_sql(mapping)
     select_cols = (
@@ -220,7 +238,7 @@ def _cells_with_sql(parts: str | Path, mapping: WideColumnMap, mode: str) -> str
 
 
 def pivot_duckdb(
-    parts: str | Path,
+    parts: PathInput,
     mapping: WideColumnMap,
     mode: str,
     wide_output: str | Path,
@@ -228,6 +246,8 @@ def pivot_duckdb(
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> None:
     """Same definition as `pivot.pivot_long` (as_first_reported = earliest source per
     company-period-column; latest = latest source), computed via DuckDB window functions
@@ -250,8 +270,10 @@ def pivot_duckdb(
     if mode not in {"latest", "as_first_reported"}:
         raise ValueError(f"unknown pivot mode: {mode}")
     cells_with_sql = _cells_with_sql(parts, mapping, mode)
-    Path(wide_output).parent.mkdir(parents=True, exist_ok=True)
-    Path(provenance_output).parent.mkdir(parents=True, exist_ok=True)
+    wide_output = require_local_path(wide_output, "WIDE output")
+    provenance_output = require_local_path(provenance_output, "provenance output")
+    wide_output.parent.mkdir(parents=True, exist_ok=True)
+    provenance_output.parent.mkdir(parents=True, exist_ok=True)
 
     column_exprs = [
         f'MAX(CASE WHEN wide_column = {_sql_literal(column)} THEN numeric_value END) '
@@ -283,7 +305,13 @@ def pivot_duckdb(
         FROM selected
         ORDER BY company, period_end, wide_column
     """
-    connection = _connect(memory_limit_gb, spill_dir)
+    connection = _connect(
+        memory_limit_gb,
+        spill_dir,
+        duckdb_backend=duckdb_backend,
+        input_paths=(parts,),
+        fsspec_options=fsspec_options,
+    )
     try:
         connection.execute(
             f"COPY ({wide_sql}) TO {_sql_literal(str(wide_output))} "
@@ -298,10 +326,12 @@ def pivot_duckdb(
 
 
 def member_histogram_duckdb(
-    parts: str | Path,
+    parts: PathInput,
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ):
     """Same definition as `qa.member_histogram`, computed via a single DuckDB group-by.
 
@@ -311,7 +341,7 @@ def member_histogram_duckdb(
     resident at once.
     """
     concepts_sql = ", ".join(_sql_literal(concept) for concept in TARGET_CONCEPTS)
-    parts_sql = _sql_literal(str(parts))
+    parts_sql = duckdb_path_sql(parts)
     query = f"""
         SELECT concept, dimension, member,
             COUNT(*) AS observations,
@@ -324,7 +354,13 @@ def member_histogram_duckdb(
         GROUP BY concept, dimension, member
         ORDER BY concept, observations DESC
     """
-    connection = _connect(memory_limit_gb, spill_dir)
+    connection = _connect(
+        memory_limit_gb,
+        spill_dir,
+        duckdb_backend=duckdb_backend,
+        input_paths=(parts,),
+        fsspec_options=fsspec_options,
+    )
     try:
         return connection.sql(query).pl()
     finally:
@@ -332,11 +368,13 @@ def member_histogram_duckdb(
 
 
 def total_component_reconciliation_duckdb(
-    parts: str | Path,
+    parts: PathInput,
     relative_tolerance: float = 1e-6,
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ):
     """Same definition as `qa.total_component_reconciliation`, computed via DuckDB.
 
@@ -349,7 +387,7 @@ def total_component_reconciliation_duckdb(
     DuckDB/Python boundary.
     """
     concepts_sql = ", ".join(_sql_literal(concept) for concept in TARGET_CONCEPTS)
-    parts_sql = _sql_literal(str(parts))
+    parts_sql = duckdb_path_sql(parts)
     key_cols = "company, period_end, concept, source_year, source_month, source_archive, source_member"
     query = f"""
         WITH facts AS (
@@ -396,7 +434,13 @@ def total_component_reconciliation_duckdb(
         GROUP BY concept
         ORDER BY concept
     """
-    connection = _connect(memory_limit_gb, spill_dir)
+    connection = _connect(
+        memory_limit_gb,
+        spill_dir,
+        duckdb_backend=duckdb_backend,
+        input_paths=(parts,),
+        fsspec_options=fsspec_options,
+    )
     try:
         summary = connection.sql(query).pl()
     finally:
@@ -410,25 +454,40 @@ def total_component_reconciliation_duckdb(
 
 
 def write_qa_duckdb(
-    long_path: str | Path,
+    long_path: PathInput,
     histogram_output: str | Path,
     reconciliation_output: str | Path,
     report_output: str | Path,
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> None:
     """Out-of-core equivalent of `qa.write_qa`, for corpora too large for the per-file
     Polars pass (measured to OOM at a 25 GB cgroup cap at full 152-archive scale)."""
-    histogram = member_histogram_duckdb(long_path, memory_limit_gb=memory_limit_gb, spill_dir=spill_dir)
-    reconciliation = total_component_reconciliation_duckdb(
-        long_path, memory_limit_gb=memory_limit_gb, spill_dir=spill_dir
+    histogram = member_histogram_duckdb(
+        long_path,
+        memory_limit_gb=memory_limit_gb,
+        spill_dir=spill_dir,
+        duckdb_backend=duckdb_backend,
+        fsspec_options=fsspec_options,
     )
+    reconciliation = total_component_reconciliation_duckdb(
+        long_path,
+        memory_limit_gb=memory_limit_gb,
+        spill_dir=spill_dir,
+        duckdb_backend=duckdb_backend,
+        fsspec_options=fsspec_options,
+    )
+    histogram_output = require_local_path(histogram_output, "histogram output")
+    reconciliation_output = require_local_path(reconciliation_output, "reconciliation output")
+    report_output = require_local_path(report_output, "QA report output")
     for output in (histogram_output, reconciliation_output, report_output):
-        Path(output).parent.mkdir(parents=True, exist_ok=True)
+        output.parent.mkdir(parents=True, exist_ok=True)
     histogram.write_csv(histogram_output)
     reconciliation.write_csv(reconciliation_output)
-    Path(report_output).write_text(
+    report_output.write_text(
         render_qa_report(histogram, reconciliation, source=str(long_path)),
         encoding="utf-8",
     )
@@ -438,12 +497,14 @@ CREDITORS_MATURITY_DIMENSION = "MaturitiesOrExpirationPeriodsDimension"
 
 
 def creditors_maturity_reconciliation_duckdb(
-    parts: str | Path,
+    parts: PathInput,
     *,
     relative_tolerance: float = 1e-6,
     examples_per_bucket: int = 5,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ):
     """Bucket every (Creditors total, MaturitiesOrExpirationPeriodsDimension components)
     pair that exists in the same filing, to decide whether the maturity split is safe to
@@ -461,7 +522,7 @@ def creditors_maturity_reconciliation_duckdb(
     Returns `(summary, examples)`: `summary` is one row per bucket (count, share); `examples`
     is up to `examples_per_bucket` sampled rows per bucket for manual inspection.
     """
-    parts_sql = _sql_literal(str(parts))
+    parts_sql = duckdb_path_sql(parts)
     key_cols = "company, period_end, source_year, source_month, source_archive, source_member"
     query = f"""
         WITH facts AS (
@@ -513,7 +574,13 @@ def creditors_maturity_reconciliation_duckdb(
         )
         SELECT * FROM bucketed
     """
-    connection = _connect(memory_limit_gb, spill_dir)
+    connection = _connect(
+        memory_limit_gb,
+        spill_dir,
+        duckdb_backend=duckdb_backend,
+        input_paths=(parts,),
+        fsspec_options=fsspec_options,
+    )
     try:
         summary = connection.sql(
             f"SELECT bucket, COUNT(*) AS n FROM ({query}) GROUP BY bucket ORDER BY n DESC"
@@ -536,11 +603,13 @@ def creditors_maturity_reconciliation_duckdb(
 
 
 def employee_unit_distribution_duckdb(
-    parts: str | Path,
+    parts: PathInput,
     *,
     cutoff_percentile: float = 0.999,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ):
     """Compare `AverageNumberEmployeesDuringPeriod` values by tagged unit, and derive a
     candidate cut-off: the point where GBP-tagged values pass `cutoff_percentile` of the
@@ -555,7 +624,7 @@ def employee_unit_distribution_duckdb(
     resulting cut-off was tried in `pivot_duckdb` and then removed before publication
     (every employee value is now kept as-is; `employees_unit_anomaly` is diagnostic only).
     """
-    parts_sql = _sql_literal(str(parts))
+    parts_sql = duckdb_path_sql(parts)
     query = f"""
         SELECT unit, TRY_CAST(numeric_value AS DOUBLE) AS value
         FROM read_parquet({parts_sql})
@@ -565,7 +634,13 @@ def employee_unit_distribution_duckdb(
           AND numeric_value IS NOT NULL
           AND unit IN ('GBP', 'pure')
     """
-    connection = _connect(memory_limit_gb, spill_dir)
+    connection = _connect(
+        memory_limit_gb,
+        spill_dir,
+        duckdb_backend=duckdb_backend,
+        input_paths=(parts,),
+        fsspec_options=fsspec_options,
+    )
     try:
         distribution = connection.sql(
             f"""
@@ -599,10 +674,12 @@ def employee_unit_distribution_duckdb(
 
 
 def restatement_rate_by_year_duckdb(
-    parts: str | Path,
+    parts: PathInput,
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ):
     """Same definition as `restatement_rate_duckdb`, grouped by the year each key was
     *first* reported rather than by concept — for the dataset card to say whether early
@@ -610,7 +687,7 @@ def restatement_rate_by_year_duckdb(
     A bare dash (`NIL_RAW_VALUES`) is treated as a genuine value of 0, not excluded.
     """
     concepts_sql = ", ".join(_sql_literal(concept) for concept in TARGET_CONCEPTS)
-    parts_sql = _sql_literal(str(parts))
+    parts_sql = duckdb_path_sql(parts)
     query = f"""
         WITH facts AS (
             SELECT company, period_end, concept, source_year, source_month,
@@ -650,7 +727,13 @@ def restatement_rate_by_year_duckdb(
         GROUP BY first_source_year
         ORDER BY first_source_year
     """
-    connection = _connect(memory_limit_gb, spill_dir)
+    connection = _connect(
+        memory_limit_gb,
+        spill_dir,
+        duckdb_backend=duckdb_backend,
+        input_paths=(parts,),
+        fsspec_options=fsspec_options,
+    )
     try:
         result = connection.sql(query).pl()
     finally:
