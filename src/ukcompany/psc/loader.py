@@ -18,8 +18,17 @@ approximation that quietly excludes the lines that are hardest to account for.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
+from ..duckdb_backend import (
+    PathInput,
+    connect_duckdb,
+    duckdb_path_sql,
+    require_local_path,
+    sql_literal,
+)
 from ..psc_natures import BAND_PATTERN, CORE_EXACT, CORE_PREFIXES, SUFFIXES_LONGEST_FIRST
 
 DEFAULT_MEMORY_LIMIT_GB = 8
@@ -104,33 +113,30 @@ GOVERNANCE_DROPPED_COLUMNS = (
 )
 
 
-def require_duckdb():
-    try:
-        import duckdb
-    except ImportError as exc:
-        raise RuntimeError("the PSC loader requires the duckdb package") from exc
-    return duckdb
-
-
 def _sql_literal(value: str) -> str:
-    return "'" + value.replace("'", "''") + "'"
+    return sql_literal(value)
 
 
-def _connect(memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB, spill_dir: str = DEFAULT_SPILL_DIR):
+def _connect(
+    memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
+    spill_dir: str = DEFAULT_SPILL_DIR,
+    *,
+    duckdb_backend: str = "native",
+    input_paths: tuple[PathInput, ...] = (),
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
+    required_extensions: tuple[str, ...] = ("parquet",),
+):
     """A dedicated, explicitly bounded connection — see ukcompany.accounts.ooc._connect for
     why the implicit default connection does not reliably bound memory on its own."""
-    duckdb = require_duckdb()
-    Path(spill_dir).mkdir(parents=True, exist_ok=True)
-    connection = duckdb.connect(":memory:")
-    connection.execute(f"SET memory_limit = '{int(memory_limit_gb)}GB'")
-    connection.execute(f"SET temp_directory = {_sql_literal(spill_dir)}")
-    # Root-cause fix for the earlier OOM (not just a higher limit): with insertion-order
-    # preservation ON (DuckDB's default), a COPY of ~16M rows must buffer the whole result
-    # in input order before/while writing, which blows the memory cap; turning it off lets
-    # the pipeline stream and spill to temp_directory freely. Output row order is not relied
-    # on anywhere (readers sort when they need to).
-    connection.execute("SET preserve_insertion_order = false")
-    return connection
+    return connect_duckdb(
+        memory_limit_gb=memory_limit_gb,
+        spill_dir=spill_dir,
+        backend=duckdb_backend,
+        input_paths=input_paths,
+        filesystem_options=fsspec_options,
+        preserve_insertion_order=False,
+        required_extensions=required_extensions,
+    )
 
 
 def _kind_category_case_sql(json_expr: str) -> str:
@@ -141,14 +147,14 @@ def _kind_category_case_sql(json_expr: str) -> str:
     return f"CASE\n{when_clauses}\n        WHEN {json_expr} IS NULL THEN 'unknown'\n        ELSE 'unknown'\n    END"
 
 
-def _parsed_sql(parts_glob: str, snapshot_date: str) -> str:
+def _parsed_sql(parts_glob: PathInput, snapshot_date: str) -> str:
     """The shared base CTE: every field pulled explicitly by JSON path, before governance.
 
     One row per input line, `ignore_errors=true` so a malformed line becomes a row with
     `json IS NULL` (category 'unknown') instead of aborting the whole read — the same
     "never lose a line silently" principle as the rest of this project's extractors.
     """
-    parts_sql = _sql_literal(parts_glob)
+    parts_sql = duckdb_path_sql(parts_glob)
     kind_expr = "d->>'kind'"
     iv_cols_sql = ",\n        ".join(
         f"d->'identity_verification_details'->>{_sql_literal(source_key)} AS {column}"
@@ -272,7 +278,7 @@ _RECORDS_COLUMNS_PRIVATE = (
 )
 
 
-def _records_select_sql(parts_glob: str, snapshot_date: str, *, data_governance: bool) -> str:
+def _records_select_sql(parts_glob: PathInput, snapshot_date: str, *, data_governance: bool) -> str:
     parsed = _parsed_sql(parts_glob, snapshot_date)
     if not data_governance:
         columns_sql = ", ".join(f'"{c}"' for c in _RECORDS_COLUMNS_PRIVATE)
@@ -316,7 +322,7 @@ def _records_select_sql(parts_glob: str, snapshot_date: str, *, data_governance:
     """
 
 
-def _noc_select_sql(parts_glob: str, snapshot_date: str) -> str:
+def _noc_select_sql(parts_glob: PathInput, snapshot_date: str) -> str:
     """psc_noc rows, one per (record, nature of control).
 
     Suffix families, core rights and the band pattern are ALL built from
@@ -376,7 +382,7 @@ def _noc_select_sql(parts_glob: str, snapshot_date: str) -> str:
 
 
 def load_psc(
-    parts_glob: str,
+    parts_glob: PathInput,
     output_dir: str | Path,
     snapshot_date: str,
     *,
@@ -384,6 +390,8 @@ def load_psc(
     person_key_secret: str | None = None,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict:
     """Load one PSC snapshot into `output_dir` (default `data/psc/<snapshot_date>/`).
 
@@ -397,14 +405,21 @@ def load_psc(
             "data_governance=True requires person_key_secret (see PSC_PERSON_KEY_SECRET "
             "in .env) — person keys can only be computed with a real secret"
         )
-    output_dir = Path(output_dir)
+    output_dir = require_local_path(output_dir, "PSC output directory")
     output_dir.mkdir(parents=True, exist_ok=True)
     records_path = output_dir / "psc_records.parquet"
     noc_path = output_dir / "psc_noc.parquet"
     totals_path = output_dir / "psc_totals.json"
     report_path = output_dir / "load_report.json"
 
-    connection = _connect(memory_limit_gb, spill_dir)
+    connection = _connect(
+        memory_limit_gb,
+        spill_dir,
+        duckdb_backend=duckdb_backend,
+        input_paths=(parts_glob,),
+        fsspec_options=fsspec_options,
+        required_extensions=("json", "parquet"),
+    )
     if data_governance:
         secret = person_key_secret
 
@@ -566,7 +581,7 @@ def load_psc(
         # is only one matching row regardless of preserve_insertion_order.
         psc_totals = connection.sql(
             f"WITH lines AS ("
-            f"    SELECT json->'data' AS d FROM read_ndjson_objects({_sql_literal(parts_glob)}, "
+            f"    SELECT json->'data' AS d FROM read_ndjson_objects({duckdb_path_sql(parts_glob)}, "
             f"        ignore_errors=true)"
             f") SELECT to_json(d) FROM lines "
             f"WHERE d->>'kind' = {_sql_literal('totals#persons-of-significant-control-snapshot')} "
@@ -669,9 +684,10 @@ def load_psc(
         "snapshot_date": snapshot_date,
         "data_governance": data_governance,
         "duckdb_settings": {
+            "backend": duckdb_backend,
             "memory_limit_gb": memory_limit_gb,
             "preserve_insertion_order": False,
-            "spill_dir": spill_dir,
+            "spill_dir": str(spill_dir),
         },
         "n_lines": n_lines,
         "n_bad_lines": n_bad_lines,

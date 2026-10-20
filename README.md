@@ -22,6 +22,8 @@ supplied by companies; identity verification (ECCTA) is still rolling out.
 
 ```bash
 pip install -e .[dev]
+# Optional DuckDB remote reads without httpfs:
+pip install -e '.[remote]'
 cp .env.example .env    # then put your key in .env (gitignored), or export CH_API_KEY
 # free key: developer.company-information.service.gov.uk -> sign in ->
 # Manage applications -> Create application (Live) -> New REST API key
@@ -42,6 +44,10 @@ ukcompany validate --labels record-level-data.csv \
 ukcompany rules-doc                        # regenerate docs/rules.md
 ukcompany data-dict                        # regenerate docs/data-dictionary.md
 ```
+
+DuckDB-backed PSC and accounts commands default to native filesystem access. Restricted
+environments can opt into registered fsspec filesystems with `--duckdb-backend fsspec`; see
+[the remote-access guide](docs/remote-duckdb-access.md) for S3/HTTP configuration and limitations.
 
 Outputs in `data/processed/`:
 

@@ -22,10 +22,13 @@ Two output tiers, chosen by ``data_governance`` (default True == governed):
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
+from ukcompany.duckdb_backend import PathInput, duckdb_path_sql, require_local_path
 from ukcompany.psc_natures import (
     classify_kind,
     is_uk_company_number_format,
@@ -96,30 +99,36 @@ def _band_for_count(n: int) -> str:
 
 
 def build_psc_features(
-    records_path: str | Path,
-    noc_path: str | Path,
+    records_path: PathInput,
+    noc_path: PathInput,
     output_dir: str | Path,
     snapshot_date: str,
     *,
     data_governance: bool = True,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict:
     """Build the per-company PSC feature table and write it as Parquet.
 
     Returns a small report dict (row count, fill rates, tier, outputs)."""
-    records_path = str(records_path)
-    noc_path = str(noc_path)
-    output_dir = Path(output_dir)
+    output_dir = require_local_path(output_dir, "PSC features output directory")
     output_dir.mkdir(parents=True, exist_ok=True)
     mode = "governed" if data_governance else "private"
     features_path = output_dir / "psc_company_features.parquet"
     report_path = output_dir / "features_report.json"
 
-    con = _connect(memory_limit_gb, spill_dir)
+    con = _connect(
+        memory_limit_gb,
+        spill_dir,
+        duckdb_backend=duckdb_backend,
+        input_paths=(records_path, noc_path),
+        fsspec_options=fsspec_options,
+    )
     try:
-        rec = f"read_parquet({_sql_literal(records_path)})"
-        noc = f"read_parquet({_sql_literal(noc_path)})"
+        rec = f"read_parquet({duckdb_path_sql(records_path)})"
+        noc = f"read_parquet({duckdb_path_sql(noc_path)})"
         person_cats = _person_category_sql_list()
 
         # Features are built from the GOVERNED load: it carries the pseudonymous person_key
@@ -436,6 +445,7 @@ def build_psc_features(
 
     report = {
         "snapshot_date": snapshot_date,
+        "duckdb_backend": duckdb_backend,
         "tier": mode,
         "data_governance": data_governance,
         "companies_per_person_bands": ("none in governed" if data_governance
@@ -444,6 +454,8 @@ def build_psc_features(
         "information_state_counts": fill,
         "distinct_nature_sets": len(distinct_sets),
         "distinct_corporate_regnos": len(distinct_regnos),
+        "records_source": str(records_path),
+        "natures_source": str(noc_path),
         "outputs": {"psc_company_features": str(features_path)},
     }
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")

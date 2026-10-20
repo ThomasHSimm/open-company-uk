@@ -28,6 +28,10 @@ accounts:
   member_histogram: docs/accounts-member-frequency.csv
   reconciliation_output: docs/accounts-component-reconciliation.csv
   qa_report: docs/accounts-qa.md
+  # `native` preserves DuckDB's built-in local/httpfs behaviour. `fsspec` avoids httpfs.
+  duckdb_backend: native
+  # Passed to s3fs.S3FileSystem / fsspec's HTTPFileSystem; see remote-duckdb-access.md.
+  fsspec_options: {}
 psc:
   downloads_dir: ~/Downloads/psc
   manifest_path: "data/psc/{date}/manifest.json"
@@ -35,6 +39,8 @@ psc:
   output_dir: "data/psc/{date}/{mode}"
   data_governance: true
   duckdb_memory_gb: 8
+  duckdb_backend: native
+  fsspec_options: {}
 snapshot:
   downloads_dir: data/snapshot
   manifest_path: "data/snapshot/{month}/manifest.json"

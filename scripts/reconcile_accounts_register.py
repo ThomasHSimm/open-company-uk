@@ -17,6 +17,7 @@ def main() -> int:
     parser.add_argument("--output", required=True)
     parser.add_argument("--memory-gb", type=int, default=10)
     parser.add_argument("--spill-dir", default="/tmp/ukcompany-accounts-reconciliation")
+    parser.add_argument("--duckdb-backend", choices=("native", "fsspec"), default="native")
     args = parser.parse_args()
     report = reconcile_accounts_register(
         args.features,
@@ -26,6 +27,7 @@ def main() -> int:
         output_path=args.output,
         memory_limit_gb=args.memory_gb,
         spill_dir=args.spill_dir,
+        duckdb_backend=args.duckdb_backend,
     )
     print(json.dumps(report, indent=2))
     return 0

@@ -15,6 +15,7 @@ def main() -> int:
     parser.add_argument("--mode", required=True, choices=("as_first_reported", "latest"))
     parser.add_argument("--output", required=True)
     parser.add_argument("--memory-gb", type=int, default=12)
+    parser.add_argument("--duckdb-backend", choices=("native", "fsspec"), default="native")
     args = parser.parse_args()
     report = compare_wide_extension(
         args.baseline,
@@ -22,6 +23,7 @@ def main() -> int:
         mode=args.mode,
         output_path=args.output,
         memory_limit_gb=args.memory_gb,
+        duckdb_backend=args.duckdb_backend,
     )
     print(json.dumps(report, indent=2))
     return 0

@@ -23,8 +23,16 @@ from __future__ import annotations
 
 import glob as _glob
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
+from ukcompany.duckdb_backend import (
+    PathInput,
+    duckdb_path_sql,
+    require_local_path,
+    uri_scheme,
+)
 from ukcompany.psc.loader import DEFAULT_MEMORY_LIMIT_GB, DEFAULT_SPILL_DIR, _connect, _sql_literal
 
 # Filter obviously-corrupt period-end dates (iXBRL mis-tags produce years like 0001 / 3020). The
@@ -69,18 +77,19 @@ def _register_company_number_col(con, register_sql: str) -> str:
 
 
 def build_accounts_features(
-    wide_path: str | Path,
-    register_glob: str,
+    wide_path: PathInput,
+    register_glob: PathInput,
     output_dir: str | Path,
     t_yyyymm: int,
     *,
     data_governance: bool = True,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    duckdb_backend: str = "native",
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict:
     """Build the per-company accounts feature table at reference month T and write it as Parquet."""
-    wide_path = str(wide_path)
-    output_dir = Path(output_dir)
+    output_dir = require_local_path(output_dir, "accounts features output directory")
     output_dir.mkdir(parents=True, exist_ok=True)
     mode = "governed" if data_governance else "ungoverned"
     features_path = output_dir / "accounts_company_features.parquet"
@@ -88,15 +97,29 @@ def build_accounts_features(
     ty, tm = t_yyyymm // 100, t_yyyymm % 100
     upper_period = f"{ty + 1}-12-31"
 
-    reg_paths = sorted(_glob.glob(register_glob))
-    if not reg_paths:
-        raise FileNotFoundError(f"no register parts matched {register_glob}")
-    reg_list = "[" + ", ".join(_sql_literal(p) for p in reg_paths) + "]"
-    register_sql = f"read_csv({reg_list}, header=true, all_varchar=true, ignore_errors=true)"
+    if isinstance(register_glob, (str, Path)) and not uri_scheme(register_glob):
+        reg_paths: PathInput = sorted(_glob.glob(str(register_glob)))
+        if not reg_paths:
+            raise FileNotFoundError(f"no register parts matched {register_glob}")
+    else:
+        # Remote globs and explicit lists are resolved by the selected DuckDB filesystem.
+        # HTTP servers commonly cannot list wildcard paths, so callers should pass an
+        # explicit URL (or URL list) for HTTP snapshots.
+        reg_paths = register_glob
+    register_sql = (
+        f"read_csv({duckdb_path_sql(reg_paths)}, header=true, all_varchar=true, "
+        "ignore_errors=true)"
+    )
 
-    con = _connect(memory_limit_gb, spill_dir)
+    con = _connect(
+        memory_limit_gb,
+        spill_dir,
+        duckdb_backend=duckdb_backend,
+        input_paths=(wide_path, reg_paths),
+        fsspec_options=fsspec_options,
+    )
     try:
-        wide = f"read_parquet({_sql_literal(wide_path)})"
+        wide = f"read_parquet({duckdb_path_sql(wide_path)})"
         # Rank the periods available by T (row-level point-in-time), newest first.
         con.execute(
             f"""
@@ -213,8 +236,9 @@ def build_accounts_features(
         "data_governance": data_governance,
         "n_companies": n_companies,
         "fill_counts": fill,
-        "wide_source": wide_path,
-        "register_source_glob": register_glob,
+        "wide_source": str(wide_path),
+        "register_source_glob": str(register_glob),
+        "duckdb_backend": duckdb_backend,
         "outputs": {"accounts_company_features": str(features_path)},
     }
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")

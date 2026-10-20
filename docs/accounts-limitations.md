@@ -258,6 +258,9 @@ person-name pattern) as the last check before upload.
   sample-scale Polars implementations, which do not scale past roughly 30 archives on this
   machine (see `docs/AUDIT.md` for the OOM evidence and the engine's internal bugs found and
   fixed during validation). The Polars engines remain the default and are unchanged.
+- The DuckDB engine has an optional registered-fsspec input backend for environments where
+  DuckDB `httpfs` cannot be loaded. It is opt-in; outputs and governance/manifests remain local.
+  See [`remote-duckdb-access.md`](remote-duckdb-access.md).
 
 ## Accounts-parser v2 fix and rebuild (2026-09-27)
 

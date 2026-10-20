@@ -7,6 +7,10 @@ UK-company-number format test are reused verbatim from `ukcompany.psc_natures` â
 definition of each rule, shared by the API path, the bulk loader (`psc_noc`) and this feature
 table. Built by `ukcompany.psc.features.build_psc_features` (CLI: `ukcompany-psc features`).
 
+The loader and feature builder can read HTTP(S) or S3 inputs without DuckDB `httpfs` by selecting
+`--duckdb-backend fsspec`; configuration and format limitations are documented in
+[`remote-duckdb-access.md`](remote-duckdb-access.md). The default remains `native`.
+
 ## How it is built
 
 ```

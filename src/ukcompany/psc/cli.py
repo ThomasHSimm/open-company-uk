@@ -38,6 +38,8 @@ DEFAULTS = {
     "output_dir": "data/psc/{date}/{mode}",
     "data_governance": True,
     "duckdb_memory_gb": 8,
+    "duckdb_backend": "native",
+    "fsspec_options": {},
 }
 
 
@@ -92,6 +94,8 @@ def cmd_load(args: argparse.Namespace) -> int:
         data_governance=data_governance,
         person_key_secret=person_key_secret,
         memory_limit_gb=args.duckdb_memory_gb or int(settings["duckdb_memory_gb"]),
+        duckdb_backend=args.duckdb_backend or str(settings["duckdb_backend"]),
+        fsspec_options=settings.get("fsspec_options"),
     )
     print(f"snapshot date: {report['snapshot_date']}")
     print(f"data_governance: {report['data_governance']}")
@@ -167,6 +171,8 @@ def cmd_refresh(args: argparse.Namespace) -> int:
         data_governance=data_governance,
         person_key_secret=person_key_secret,
         memory_limit_gb=args.duckdb_memory_gb or int(settings["duckdb_memory_gb"]),
+        duckdb_backend=args.duckdb_backend or str(settings["duckdb_backend"]),
+        fsspec_options=settings.get("fsspec_options"),
     )
     elapsed = time.monotonic() - started
 
@@ -190,12 +196,18 @@ def cmd_features(args: argparse.Namespace) -> int:
     from .features import build_psc_features
 
     settings = load_psc_settings(args.settings)
-    load_dir = setting_path(
-        args.load_dir
-        or str(settings["output_dir"]).format(date=args.snapshot_date, mode="governed")
-    )
-    records = load_dir / "psc_records.parquet"
-    noc = load_dir / "psc_noc.parquet"
+    if bool(args.records) != bool(args.noc):
+        raise SystemExit("--records and --noc must be supplied together")
+    if args.records:
+        records = args.records
+        noc = args.noc
+    else:
+        load_dir = setting_path(
+            args.load_dir
+            or str(settings["output_dir"]).format(date=args.snapshot_date, mode="governed")
+        )
+        records = load_dir / "psc_records.parquet"
+        noc = load_dir / "psc_noc.parquet"
     data_governance = True if args.data_governance is None else args.data_governance
     mode = "governed" if data_governance else "private"
     output_dir = setting_path(
@@ -206,6 +218,8 @@ def cmd_features(args: argparse.Namespace) -> int:
         records, noc, output_dir, args.snapshot_date,
         data_governance=data_governance,
         memory_limit_gb=args.duckdb_memory_gb or int(settings["duckdb_memory_gb"]),
+        duckdb_backend=args.duckdb_backend or str(settings["duckdb_backend"]),
+        fsspec_options=settings.get("fsspec_options"),
     )
     print(f"tier: {report['tier']}  companies: {report['n_companies']:,}")
     print(f"information_state: {report['information_state_counts']}")
@@ -236,6 +250,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="default True (see settings.yaml); requires PSC_PERSON_KEY_SECRET in .env",
     )
     load.add_argument("--duckdb-memory-gb", type=int, default=None)
+    load.add_argument("--duckdb-backend", choices=("native", "fsspec"))
     load.set_defaults(func=cmd_load)
 
     refresh = commands.add_parser(
@@ -258,6 +273,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="default True (see settings.yaml); requires PSC_PERSON_KEY_SECRET in .env",
     )
     refresh.add_argument("--duckdb-memory-gb", type=int, default=None)
+    refresh.add_argument("--duckdb-backend", choices=("native", "fsspec"))
     refresh.set_defaults(func=cmd_refresh)
 
     features = commands.add_parser(
@@ -266,12 +282,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     features.add_argument("--snapshot-date", required=True, help="YYYY-MM-DD")
     features.add_argument("--load-dir", help="governed load dir (default from settings)")
+    features.add_argument("--records", help="explicit local or remote psc_records.parquet URI")
+    features.add_argument("--noc", help="explicit local or remote psc_noc.parquet URI")
     features.add_argument("--output-dir")
     features.add_argument(
         "--data-governance", action=argparse.BooleanOptionalAction, default=None,
         help="governed tier (default True) drops the companies-per-person band",
     )
     features.add_argument("--duckdb-memory-gb", type=int, default=None)
+    features.add_argument("--duckdb-backend", choices=("native", "fsspec"))
     features.set_defaults(func=cmd_features)
 
     return parser
