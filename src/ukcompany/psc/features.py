@@ -28,7 +28,12 @@ from typing import Any
 
 import pandas as pd
 
-from ukcompany.duckdb_backend import PathInput, duckdb_path_sql, require_local_path
+from ukcompany.duckdb_backend import (
+    PathInput,
+    duckdb_path_sql,
+    require_local_path,
+    select_duckdb_backend,
+)
 from ukcompany.psc_natures import (
     classify_kind,
     is_uk_company_number_format,
@@ -107,7 +112,7 @@ def build_psc_features(
     data_governance: bool = True,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict:
     """Build the per-company PSC feature table and write it as Parquet.
@@ -119,10 +124,11 @@ def build_psc_features(
     features_path = output_dir / "psc_company_features.parquet"
     report_path = output_dir / "features_report.json"
 
+    selected_backend = select_duckdb_backend(duckdb_backend, (records_path, noc_path))
     con = _connect(
         memory_limit_gb,
         spill_dir,
-        duckdb_backend=duckdb_backend,
+        duckdb_backend=selected_backend,
         input_paths=(records_path, noc_path),
         fsspec_options=fsspec_options,
     )
@@ -445,7 +451,7 @@ def build_psc_features(
 
     report = {
         "snapshot_date": snapshot_date,
-        "duckdb_backend": duckdb_backend,
+        "duckdb_backend": selected_backend,
         "tier": mode,
         "data_governance": data_governance,
         "companies_per_person_bands": ("none in governed" if data_governance

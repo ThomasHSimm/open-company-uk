@@ -36,7 +36,7 @@ def _connect(
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
     *,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     input_paths: tuple[PathInput, ...] = (),
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ):
@@ -70,7 +70,7 @@ def restatement_rate_duckdb(
     scope_label: str,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> RestatementRateResult:
     """Same definition as `qa.restatement_rate_over_parts` (panel check's 7.94%, validated
@@ -246,7 +246,7 @@ def pivot_duckdb(
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> None:
     """Same definition as `pivot.pivot_long` (as_first_reported = earliest source per
@@ -330,7 +330,7 @@ def member_histogram_duckdb(
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ):
     """Same definition as `qa.member_histogram`, computed via a single DuckDB group-by.
@@ -373,7 +373,7 @@ def total_component_reconciliation_duckdb(
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ):
     """Same definition as `qa.total_component_reconciliation`, computed via DuckDB.
@@ -461,7 +461,7 @@ def write_qa_duckdb(
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> None:
     """Out-of-core equivalent of `qa.write_qa`, for corpora too large for the per-file
@@ -503,7 +503,7 @@ def creditors_maturity_reconciliation_duckdb(
     examples_per_bucket: int = 5,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ):
     """Bucket every (Creditors total, MaturitiesOrExpirationPeriodsDimension components)
@@ -608,7 +608,7 @@ def employee_unit_distribution_duckdb(
     cutoff_percentile: float = 0.999,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ):
     """Compare `AverageNumberEmployeesDuringPeriod` values by tagged unit, and derive a
@@ -678,7 +678,7 @@ def restatement_rate_by_year_duckdb(
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ):
     """Same definition as `restatement_rate_duckdb`, grouped by the year each key was

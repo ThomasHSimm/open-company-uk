@@ -2,10 +2,16 @@
 
 The DuckDB-backed PSC and accounts readers have two explicit backends:
 
-- `native` is the default and preserves the existing behaviour. Local files continue to work,
-  and DuckDB may autoload its native `httpfs` extension for HTTP or S3 URIs.
+- `native` preserves DuckDB's existing behaviour. Local files continue to work, and DuckDB may
+  autoload its native `httpfs` extension for HTTP or S3 URIs.
 - `fsspec` registers a Python filesystem on the same in-memory DuckDB connection that executes
   the SQL. DuckDB still parses NDJSON, CSV and Parquet; there is no PyArrow data intermediary.
+
+Library functions select `native` for local inputs and `fsspec` for supported remote URIs when
+`duckdb_backend` is omitted. Existing calls therefore do not need an extra argument when an input
+path changes to `s3://...`. Passing `duckdb_backend="native"` or `"fsspec"` remains an explicit
+override. CLI/configuration defaults remain explicitly `native` for reproducible command runs;
+use `--duckdb-backend fsspec` for a remote CLI input.
 
 Use `fsspec` when DuckDB imports but `httpfs` is unavailable in the execution environment.
 Install the optional packages with:
@@ -51,10 +57,18 @@ cannot list wildcard URLs, so use one explicit URL or an explicit URL list for H
 
 Spill directories, Parquet/CSV outputs, JSON reports, manifests and checksums remain local. A
 remote URI in an output position is rejected instead of being passed through `Path` and mangled.
+In SageMaker, write them to a job output directory and let SageMaker upload the completed directory
+to S3. DuckDB spill space must be on a sufficiently large local volume.
+
+`SnapshotLoader` and `build_snapshot_features` also accept an exact S3/HTTP ZIP or CSV, or an S3
+glob, without changing their existing required parameters. CSV is sequential and a ZIP member has
+to be extracted, so these inputs are staged under the loader cache or the feature build's
+`spill_dir`; this is not a selective range-query path. Pass `fsspec_options` only when custom
+filesystem settings are needed. Ordinary AWS execution-role credential discovery needs no option.
 
 ## Smoke tests
 
-The default remains native:
+The CLI default remains native:
 
 ```bash
 ukcompany-accounts pivot --engine duckdb --duckdb-backend native \
@@ -91,7 +105,7 @@ ukcompany-psc features --duckdb-backend fsspec --snapshot-date 2026-09-18 \
 In fsspec mode the connection is created with DuckDB's known-extension auto-install and autoload
 settings disabled. Only already-installed/built-in JSON and Parquet capabilities are loaded;
 `httpfs` is neither installed nor loaded. The code does not retry with another backend or download
-the complete input after an error.
+a Parquet/NDJSON input after an error.
 
 Parquet supports selective range reads when the server and filesystem do. NDJSON must be parsed
 sequentially, and compressed archives may require a complete sequential read; fsspec cannot make
@@ -100,12 +114,19 @@ the server. The automated suite verifies an aiohttp/fsspec Parquet range read ag
 range-capable HTTP server. Live S3 credentials, private endpoints and internet behaviour are not
 tested by that fixture.
 
+## SageMaker without public internet
+
+Direct S3 input works when the container can reach S3 through an S3 VPC endpoint and its execution
+role has `s3:GetObject` (plus `s3:ListBucket` for wildcard inputs). Bake this project and the
+`remote`/`snapshot` optional dependencies into the environment; no package or DuckDB extension is
+downloaded at runtime. If SageMaker `EnableNetworkIsolation` is enabled, the container has no AWS
+credentials or S3 network access: use a SageMaker input channel to stage data locally and a job
+output directory for results instead of passing `s3://` paths.
+
 ## Scope kept local
 
-The monthly snapshot loader, joins and validation/prospective-study paths deliberately remain
-local-only. They discover local ZIP/CSV parts, verify manifests and SHA-256 hashes, or enforce
-frozen-input identity before querying. Accepting a URI there would bypass rather than preserve
-those controls. The PSC walkthrough is also local-only: it checks every consumed TXT against its
-manifested ZIP before calling the loader, and its report-rendering subprocess reads only the local
-outputs produced by that governed run. Hard-coded Phase-E comparison scripts, PSC site-asset
-generation and the Kaggle staging guard remain local-corpus/pre-publication-directory checks.
+Snapshot download/manifest creation, joins and validation/prospective-study paths remain local.
+They verify manifests and SHA-256 hashes or enforce frozen-input identity before querying. The PSC
+walkthrough is also local-only: it checks every consumed TXT against its manifested ZIP before
+calling the loader. Hard-coded Phase-E comparison scripts, PSC site-asset generation and the
+Kaggle staging guard remain local-corpus/pre-publication-directory checks.

@@ -82,6 +82,18 @@ def _write_snapshot(tmp_path, extra_raw_lines=None, rows=None):
     return str(tmp_path / "BasicCompanyData-*.zip")
 
 
+def _snapshot_zip_bytes(rows=None):
+    directory = io.StringIO()
+    writer = csv.DictWriter(directory, fieldnames=_FIELDS, lineterminator="\n")
+    writer.writeheader()
+    for row in (rows if rows is not None else _ROWS):
+        writer.writerow({field: row.get(field, "") for field in _FIELDS})
+    result = io.BytesIO()
+    with zipfile.ZipFile(result, "w") as archive:
+        archive.writestr("BasicCompanyData-2099-01-01-part1_1.csv", directory.getvalue())
+    return result.getvalue()
+
+
 
 def _rows_by_company(parquet_path):
     return {
@@ -124,6 +136,30 @@ def test_snapshot_feature_values(tmp_path):
     assert not rows["00000005"]["accounts_never_filed"]     # NO ACCOUNTS FILED + next-due 2028 (future)
     assert report["n_malformed_rows"] == 0                  # clean synthetic data
     assert report["n_blank_or_other_rows"] == 0             # no blank/empty rows
+
+
+def test_snapshot_features_accept_remote_zip_with_existing_parameters(tmp_path, monkeypatch):
+    uri = "s3://private-bucket/BasicCompanyData-2099-01-01-part1_1.zip"
+    archive = _snapshot_zip_bytes()
+    monkeypatch.setattr(
+        "ukcompany.snapshot.loader.expand_input_path",
+        lambda value, **kwargs: [uri],
+    )
+    monkeypatch.setattr(
+        "ukcompany.snapshot.loader.open_input_file",
+        lambda value, mode, **kwargs: io.BytesIO(archive),
+    )
+
+    report = build_snapshot_features(
+        uri,
+        tmp_path / "remote-output",
+        SNAPSHOT_DATE,
+        data_governance=True,
+        memory_limit_gb=1,
+        spill_dir=str(tmp_path / "spill"),
+    )
+
+    assert report["n_companies"] == len(_ROWS)
 
 
 def test_snapshot_feature_tiers(tmp_path):

@@ -12,6 +12,7 @@ from ukcompany.duckdb_backend import (
     connect_duckdb,
     duckdb_path_sql,
     require_local_path,
+    select_duckdb_backend,
 )
 
 from .ooc import DEFAULT_SPILL_DIR
@@ -42,7 +43,7 @@ def compare_wide_extension(
     value_columns: Sequence[str] | None = None,
     memory_limit_gb: int = 12,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict:
     """Compare a WIDE extension and fail on first-reported value regressions."""
@@ -51,10 +52,13 @@ def compare_wide_extension(
     if memory_limit_gb <= 0:
         raise ValueError("memory_limit_gb must be positive")
 
+    selected_backend = select_duckdb_backend(
+        duckdb_backend, (baseline_path, candidate_path)
+    )
     connection = connect_duckdb(
         memory_limit_gb=memory_limit_gb,
         spill_dir=spill_dir,
-        backend=duckdb_backend,
+        backend=selected_backend,
         input_paths=(baseline_path, candidate_path),
         filesystem_options=fsspec_options,
         preserve_insertion_order=False,
@@ -138,7 +142,7 @@ def compare_wide_extension(
         "mode": mode,
         "baseline_path": str(baseline_path),
         "candidate_path": str(candidate_path),
-        "duckdb_backend": duckdb_backend,
+        "duckdb_backend": selected_backend,
         "row_counts": {
             "baseline": row[0],
             "candidate": row[1],
