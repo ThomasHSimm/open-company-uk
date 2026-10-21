@@ -66,6 +66,27 @@ def test_loader_is_lazy_full_width_and_preserves_company_numbers(tmp_path):
     assert loader.head(2).height == 2
 
 
+def test_loader_accepts_remote_zip_without_changing_call_shape(tmp_path, monkeypatch):
+    uri = "s3://private-bucket/BasicCompanyData-2026-08-01-part1_1.zip"
+    archive = _zip_bytes(FIXTURES / "part1.csv")
+    monkeypatch.setattr(
+        "ukcompany.snapshot.loader.expand_input_path",
+        lambda value, **kwargs: [uri],
+    )
+    monkeypatch.setattr(
+        "ukcompany.snapshot.loader.open_input_file",
+        lambda value, mode, **kwargs: io.BytesIO(archive),
+    )
+
+    loader = SnapshotLoader(uri, cache_dir=tmp_path / "cache")
+
+    assert loader.columns()[0:2] == ["CompanyName", "CompanyNumber"]
+    assert loader.scan().select("CompanyNumber").collect().to_series().to_list() == [
+        "00000006",
+        "SC000123",
+    ]
+
+
 def test_discovery_finds_complete_dynamic_part_set_and_fails_loudly():
     html = (FIXTURES / "landing.html").read_text(encoding="utf-8")
     parts = discover_parts(html, "https://example.test/en_output.html")

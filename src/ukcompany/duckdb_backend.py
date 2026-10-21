@@ -13,6 +13,7 @@ need them installed.
 
 from __future__ import annotations
 
+import glob
 import os
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
@@ -45,6 +46,22 @@ def validate_duckdb_backend(backend: str) -> str:
         choices = ", ".join(sorted(DUCKDB_BACKENDS))
         raise ValueError(f"unsupported DuckDB backend {backend!r}; choose one of: {choices}")
     return normalized
+
+
+def select_duckdb_backend(
+    backend: str | None,
+    input_paths: Iterable[PathInput] = (),
+) -> str:
+    """Resolve an optional backend without requiring callers to change existing calls.
+
+    An omitted backend is path-driven: local inputs retain the native connection while any
+    supported remote URI selects fsspec.  Passing ``"native"`` or ``"fsspec"`` remains an
+    explicit override, so callers that depend on DuckDB's native ``httpfs`` keep that choice.
+    """
+    if backend is not None:
+        return validate_duckdb_backend(backend)
+    paths = _flatten_paths(input_paths)
+    return "fsspec" if any(is_remote_uri(path) for path in paths) else "native"
 
 
 def uri_scheme(value: PathValue) -> str:
@@ -91,6 +108,50 @@ def require_local_path(value: PathValue, label: str) -> Path:
     if scheme:
         raise ValueError(f"{label} must be a local path, got URI scheme {scheme!r}: {value}")
     return Path(value).expanduser()
+
+
+def expand_input_path(
+    value: PathValue,
+    *,
+    filesystem_options: Mapping[str, Mapping[str, Any]] | None = None,
+) -> list[str]:
+    """Expand one local or fsspec glob without converting a URI to ``Path``.
+
+    Exact remote keys do not require bucket-list permission.  Wildcard S3 paths necessarily
+    call the filesystem's glob operation and therefore need ``s3:ListBucket``.
+    """
+    text = os.fspath(value)
+    scheme = uri_scheme(text)
+    if not scheme:
+        return sorted(glob.glob(str(Path(text).expanduser())))
+    if scheme not in FSSPEC_REMOTE_SCHEMES:
+        raise ValueError(f"unsupported remote input scheme {scheme!r}: {text}")
+    filesystem = _make_filesystem("http" if scheme in {"http", "https"} else scheme, filesystem_options)
+    # Avoid a listing call for an exact object.  This matters for least-privilege SageMaker
+    # execution roles that have GetObject but deliberately lack ListBucket.
+    if not glob.has_magic(text):
+        if not filesystem.exists(text):
+            raise FileNotFoundError(f"remote input not found: {text}")
+        return [text]
+    matches = sorted(filesystem.glob(text))
+    return [filesystem.unstrip_protocol(match) for match in matches]
+
+
+def open_input_file(
+    value: PathValue,
+    mode: str = "rb",
+    *,
+    filesystem_options: Mapping[str, Mapping[str, Any]] | None = None,
+):
+    """Open a local or supported remote input using normal credential discovery."""
+    text = os.fspath(value)
+    scheme = uri_scheme(text)
+    if not scheme:
+        return Path(text).expanduser().open(mode)
+    if scheme not in FSSPEC_REMOTE_SCHEMES:
+        raise ValueError(f"unsupported remote input scheme {scheme!r}: {text}")
+    filesystem = _make_filesystem("http" if scheme in {"http", "https"} else scheme, filesystem_options)
+    return filesystem.open(text, mode)
 
 
 def _options_for(
@@ -210,7 +271,7 @@ def connect_duckdb(
     *,
     memory_limit_gb: int,
     spill_dir: PathValue,
-    backend: str = "native",
+    backend: str | None = None,
     input_paths: Iterable[PathInput] = (),
     filesystem_options: Mapping[str, Mapping[str, Any]] | None = None,
     preserve_insertion_order: bool | None = None,
@@ -223,7 +284,8 @@ def connect_duckdb(
     Outputs and the spill directory remain local; callers pass only remote-capable inputs
     in ``input_paths``.
     """
-    selected = validate_duckdb_backend(backend)
+    resolved_input_paths = tuple(input_paths)
+    selected = select_duckdb_backend(backend, resolved_input_paths)
     spill_path = require_local_path(spill_dir, "DuckDB spill directory")
     spill_path.mkdir(parents=True, exist_ok=True)
     duckdb = require_duckdb()
@@ -251,7 +313,7 @@ def connect_duckdb(
         if selected == "fsspec":
             _require_fsspec()  # Selecting the backend is explicit and requires its base package.
             _ensure_required_extensions(connection, required_extensions)
-            paths = _flatten_paths(input_paths)
+            paths = _flatten_paths(resolved_input_paths)
             schemes = {uri_scheme(path) for path in paths}
             unsupported = sorted(
                 scheme

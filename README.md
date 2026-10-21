@@ -45,9 +45,11 @@ ukcompany rules-doc                        # regenerate docs/rules.md
 ukcompany data-dict                        # regenerate docs/data-dictionary.md
 ```
 
-DuckDB-backed PSC and accounts commands default to native filesystem access. Restricted
-environments can opt into registered fsspec filesystems with `--duckdb-backend fsspec`; see
-[the remote-access guide](docs/remote-duckdb-access.md) for S3/HTTP configuration and limitations.
+DuckDB-backed library functions choose registered fsspec access automatically for S3/HTTP inputs
+when no backend is supplied; local calls retain native filesystem access. Commands keep an explicit
+native default and can use `--duckdb-backend fsspec`. The snapshot loader can stage remote ZIP/CSV
+inputs into local scratch space. See [the remote-access guide](docs/remote-duckdb-access.md) for
+SageMaker, S3/HTTP configuration, output handling and format limitations.
 
 Outputs in `data/processed/`:
 

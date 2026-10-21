@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
+import json
 import shutil
+import tempfile
 import zipfile
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
+
+from ukcompany.duckdb_backend import (
+    PathValue,
+    expand_input_path,
+    is_remote_uri,
+    open_input_file,
+)
 
 MISSING_POLARS = (
     "Snapshot support requires Polars. Install it with: pip install 'open-company-uk[snapshot]'"
@@ -36,9 +47,25 @@ def _require_polars():
         raise ImportError(MISSING_POLARS) from exc
 
 
-def _extract_csv(archive: Path) -> Path:
-    destination = archive.parent / "extracted" / archive.stem
-    with zipfile.ZipFile(archive) as zipped:
+def _extract_csv(
+    archive: PathValue,
+    *,
+    cache_dir: str | Path | None = None,
+    filesystem_options: dict[str, dict[str, Any]] | None = None,
+) -> Path:
+    remote = is_remote_uri(archive)
+    if remote:
+        cache_root = Path(cache_dir or tempfile.gettempdir()) / "ukcompany-snapshot"
+        cache_key = hashlib.sha256(str(archive).encode("utf-8")).hexdigest()[:20]
+        destination = cache_root / cache_key
+        archive_handle = open_input_file(
+            archive, "rb", filesystem_options=filesystem_options
+        )
+    else:
+        archive_path = Path(archive)
+        destination = archive_path.parent / "extracted" / archive_path.stem
+        archive_handle = archive_path.open("rb")
+    with archive_handle, zipfile.ZipFile(archive_handle) as zipped:
         csv_members = [item for item in zipped.infolist() if item.filename.lower().endswith(".csv")]
         if len(csv_members) != 1:
             raise ValueError(f"{archive} must contain exactly one CSV (found {len(csv_members)})")
@@ -46,7 +73,24 @@ def _extract_csv(archive: Path) -> Path:
         if Path(member.filename).name != member.filename:
             raise ValueError(f"unsafe archive member path in {archive}: {member.filename}")
         output = destination / member.filename
-        if output.exists() and output.stat().st_size == member.file_size:
+        metadata_path = output.with_suffix(output.suffix + ".source.json")
+        source_metadata = {
+            "source": str(archive),
+            "member": member.filename,
+            "member_size": member.file_size,
+            "member_crc": member.CRC,
+        }
+        if (
+            output.exists()
+            and output.stat().st_size == member.file_size
+            and (
+                not remote
+                or (
+                    metadata_path.exists()
+                    and json.loads(metadata_path.read_text(encoding="utf-8")) == source_metadata
+                )
+            )
+        ):
             return output
         destination.mkdir(parents=True, exist_ok=True)
         temporary = output.with_suffix(output.suffix + ".tmp")
@@ -56,31 +100,90 @@ def _extract_csv(archive: Path) -> Path:
             temporary.unlink()
             raise ValueError(f"extracted size mismatch for {archive}")
         temporary.replace(output)
+        if remote:
+            metadata_path.write_text(json.dumps(source_metadata, sort_keys=True), encoding="utf-8")
         return output
+
+
+def _stage_remote_csv(
+    source: str,
+    *,
+    cache_dir: str | Path | None = None,
+    filesystem_options: dict[str, dict[str, Any]] | None = None,
+) -> Path:
+    cache_root = Path(cache_dir or tempfile.gettempdir()) / "ukcompany-snapshot"
+    cache_key = hashlib.sha256(source.encode("utf-8")).hexdigest()[:20]
+    destination = cache_root / cache_key / Path(urlsplit(source).path).name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    with open_input_file(source, "rb", filesystem_options=filesystem_options) as remote:
+        with temporary.open("wb") as local:
+            shutil.copyfileobj(remote, local)
+    temporary.replace(destination)
+    return destination
 
 
 class SnapshotLoader:
     """Scan one complete snapshot without collecting it into memory."""
 
-    def __init__(self, parts: str | Path | Iterable[str | Path]):
+    def __init__(
+        self,
+        parts: str | Path | Iterable[str | Path],
+        *,
+        cache_dir: str | Path | None = None,
+        filesystem_options: dict[str, dict[str, Any]] | None = None,
+    ):
+        self.cache_dir = cache_dir
+        self.filesystem_options = filesystem_options
+        self._resolved_csv_paths: tuple[Path, ...] | None = None
         if isinstance(parts, (str, Path)):
-            candidate = Path(parts)
-            if candidate.is_dir():
-                self.parts = tuple(sorted(candidate.glob("BasicCompanyData-*.zip")))
+            if is_remote_uri(parts):
+                self.parts = tuple(
+                    expand_input_path(parts, filesystem_options=filesystem_options)
+                )
             else:
-                self.parts = (candidate,)
+                candidate = Path(parts)
+                if candidate.is_dir():
+                    self.parts = tuple(sorted(candidate.glob("BasicCompanyData-*.zip")))
+                else:
+                    matches = expand_input_path(candidate)
+                    self.parts = tuple(Path(match) for match in matches) or (candidate,)
         else:
-            self.parts = tuple(Path(part) for part in parts)
+            self.parts = tuple(
+                str(part) if is_remote_uri(part) else Path(part) for part in parts
+            )
         if not self.parts:
             raise ValueError("no snapshot CSV or ZIP parts found")
 
     def _csv_paths(self) -> list[Path]:
-        paths = [
-            _extract_csv(path) if path.suffix.casefold() == ".zip" else path for path in self.parts
-        ]
+        if self._resolved_csv_paths is not None:
+            return list(self._resolved_csv_paths)
+        paths: list[Path] = []
+        for part in self.parts:
+            part_text = str(part)
+            suffix = Path(urlsplit(part_text).path).suffix.casefold()
+            if suffix == ".zip":
+                paths.append(
+                    _extract_csv(
+                        part,
+                        cache_dir=self.cache_dir,
+                        filesystem_options=self.filesystem_options,
+                    )
+                )
+            elif is_remote_uri(part):
+                paths.append(
+                    _stage_remote_csv(
+                        str(part),
+                        cache_dir=self.cache_dir,
+                        filesystem_options=self.filesystem_options,
+                    )
+                )
+            else:
+                paths.append(Path(part))
         missing = [str(path) for path in paths if not path.exists()]
         if missing:
             raise FileNotFoundError(f"snapshot part(s) not found: {', '.join(missing)}")
+        self._resolved_csv_paths = tuple(paths)
         return paths
 
     def scan(self) -> Any:

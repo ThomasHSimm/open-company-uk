@@ -31,6 +31,7 @@ from ukcompany.duckdb_backend import (
     PathInput,
     duckdb_path_sql,
     require_local_path,
+    select_duckdb_backend,
     uri_scheme,
 )
 from ukcompany.psc.loader import DEFAULT_MEMORY_LIMIT_GB, DEFAULT_SPILL_DIR, _connect, _sql_literal
@@ -85,7 +86,7 @@ def build_accounts_features(
     data_governance: bool = True,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict:
     """Build the per-company accounts feature table at reference month T and write it as Parquet."""
@@ -111,10 +112,11 @@ def build_accounts_features(
         "ignore_errors=true)"
     )
 
+    selected_backend = select_duckdb_backend(duckdb_backend, (wide_path, reg_paths))
     con = _connect(
         memory_limit_gb,
         spill_dir,
-        duckdb_backend=duckdb_backend,
+        duckdb_backend=selected_backend,
         input_paths=(wide_path, reg_paths),
         fsspec_options=fsspec_options,
     )
@@ -238,7 +240,7 @@ def build_accounts_features(
         "fill_counts": fill,
         "wide_source": str(wide_path),
         "register_source_glob": str(register_glob),
-        "duckdb_backend": duckdb_backend,
+        "duckdb_backend": selected_backend,
         "outputs": {"accounts_company_features": str(features_path)},
     }
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")

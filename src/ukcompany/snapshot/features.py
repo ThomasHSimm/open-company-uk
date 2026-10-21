@@ -20,11 +20,12 @@ Two tiers via ``data_governance`` (governed by default):
 
 from __future__ import annotations
 
-import glob as _glob
 import json
 import re
+from collections.abc import Mapping
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -120,6 +121,7 @@ def build_snapshot_features(
     data_governance: bool = True,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
+    fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict:
     """Build the per-company snapshot feature table and write it as Parquet."""
     snap = date.fromisoformat(snapshot_date)
@@ -131,10 +133,16 @@ def build_snapshot_features(
 
     # Resolve (and if needed extract) the CSV parts via the snapshot loader - one extraction
     # definition shared with the manifest/refresh path.
-    zips = sorted(_glob.glob(str(parts_glob)))
-    if not zips:
-        raise FileNotFoundError(f"no snapshot parts matched {parts_glob}")
-    csv_paths = [str(p) for p in SnapshotLoader(zips)._csv_paths()]
+    loader = SnapshotLoader(
+        parts_glob,
+        cache_dir=Path(spill_dir) / "snapshot-input",
+        filesystem_options=(
+            {protocol: dict(options) for protocol, options in fsspec_options.items()}
+            if fsspec_options is not None
+            else None
+        ),
+    )
+    csv_paths = [str(p) for p in loader._csv_paths()]
     csv_list = "[" + ", ".join(_sql_literal(p) for p in csv_paths) + "]"
     # Column names from the header line, stripped (DuckDB strips the bulk file's leading-whitespace
     # headers, so the stripped names match its own column names). Parser-independent.
@@ -231,7 +239,7 @@ def build_snapshot_features(
         # counts every physical record (good + blank + malformed); subtract companies + malformed.
         import polars as pl
 
-        n_physical = SnapshotLoader(zips).scan().select(pl.len()).collect().item()
+        n_physical = loader.scan().select(pl.len()).collect().item()
         n_blank_or_other = n_physical - n_companies - malformed
         if malformed > SNAPSHOT_MAX_MALFORMED_ROWS:
             raise RuntimeError(

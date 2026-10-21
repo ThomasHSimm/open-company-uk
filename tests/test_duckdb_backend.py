@@ -10,7 +10,11 @@ import duckdb
 import pytest
 
 from ukcompany.accounts import cli as accounts_cli
-from ukcompany.duckdb_backend import connect_duckdb, validate_duckdb_backend
+from ukcompany.duckdb_backend import (
+    connect_duckdb,
+    select_duckdb_backend,
+    validate_duckdb_backend,
+)
 from ukcompany.psc import cli as psc_cli
 from ukcompany.psc.loader import load_psc
 
@@ -86,6 +90,13 @@ def range_http_server(tmp_path: Path):
 def test_invalid_backend_is_rejected() -> None:
     with pytest.raises(ValueError, match="choose one of: fsspec, native"):
         validate_duckdb_backend("magic")
+
+
+def test_omitted_backend_is_path_driven_but_explicit_backend_wins() -> None:
+    remote = ("s3://private-bucket/accounts/*.parquet",)
+    assert select_duckdb_backend(None, ("data/accounts/*.parquet",)) == "native"
+    assert select_duckdb_backend(None, remote) == "fsspec"
+    assert select_duckdb_backend("native", remote) == "native"
 
 
 def test_missing_fsspec_has_actionable_error(tmp_path: Path, monkeypatch) -> None:
@@ -178,6 +189,26 @@ def test_registered_http_filesystem_reads_ranges_without_httpfs(
     assert settings == (False, False)
     assert httpfs_loaded is False
     assert any(value is not None for value in _RangeHandler.request_ranges)
+
+
+def test_remote_input_selects_fsspec_when_backend_is_omitted(
+    tmp_path: Path, range_http_server
+) -> None:
+    url, _ = range_http_server
+    connection = connect_duckdb(
+        memory_limit_gb=1,
+        spill_dir=tmp_path / "auto-spill",
+        input_paths=(url,),
+    )
+    try:
+        assert connection.execute(f"SELECT count(*) FROM read_parquet('{url}')").fetchone() == (
+            2,
+        )
+        assert connection.execute(
+            "SELECT current_setting('autoload_known_extensions')"
+        ).fetchone() == (False,)
+    finally:
+        connection.close()
 
 
 def test_psc_public_entrypoint_accepts_fsspec_backend_locally(tmp_path: Path) -> None:

@@ -156,7 +156,7 @@ def build_public_long_duckdb(
     *,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[int, int]:
     """Write one filtered Parquet per year to `output_dir`, via `COPY ... TO ...` (never

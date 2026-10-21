@@ -27,6 +27,7 @@ from ..duckdb_backend import (
     connect_duckdb,
     duckdb_path_sql,
     require_local_path,
+    select_duckdb_backend,
     sql_literal,
 )
 from ..psc_natures import BAND_PATTERN, CORE_EXACT, CORE_PREFIXES, SUFFIXES_LONGEST_FIRST
@@ -121,7 +122,7 @@ def _connect(
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
     *,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     input_paths: tuple[PathInput, ...] = (),
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
     required_extensions: tuple[str, ...] = ("parquet",),
@@ -390,7 +391,7 @@ def load_psc(
     person_key_secret: str | None = None,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict:
     """Load one PSC snapshot into `output_dir` (default `data/psc/<snapshot_date>/`).
@@ -412,10 +413,11 @@ def load_psc(
     totals_path = output_dir / "psc_totals.json"
     report_path = output_dir / "load_report.json"
 
+    selected_backend = select_duckdb_backend(duckdb_backend, (parts_glob,))
     connection = _connect(
         memory_limit_gb,
         spill_dir,
-        duckdb_backend=duckdb_backend,
+        duckdb_backend=selected_backend,
         input_paths=(parts_glob,),
         fsspec_options=fsspec_options,
         required_extensions=("json", "parquet"),
@@ -684,7 +686,7 @@ def load_psc(
         "snapshot_date": snapshot_date,
         "data_governance": data_governance,
         "duckdb_settings": {
-            "backend": duckdb_backend,
+            "backend": selected_backend,
             "memory_limit_gb": memory_limit_gb,
             "preserve_insertion_order": False,
             "spill_dir": str(spill_dir),

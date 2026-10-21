@@ -12,6 +12,7 @@ from ukcompany.duckdb_backend import (
     PathInput,
     duckdb_path_sql,
     require_local_path,
+    select_duckdb_backend,
     uri_scheme,
 )
 from ukcompany.psc.loader import DEFAULT_MEMORY_LIMIT_GB, DEFAULT_SPILL_DIR, _connect
@@ -26,7 +27,7 @@ def reconcile_accounts_register(
     output_path: str | Path | None = None,
     memory_limit_gb: int = DEFAULT_MEMORY_LIMIT_GB,
     spill_dir: str = DEFAULT_SPILL_DIR,
-    duckdb_backend: str = "native",
+    duckdb_backend: str | None = None,
     fsspec_options: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict:
     """Compare latest account period ends with register ``Accounts.LastMadeUpDate``."""
@@ -42,10 +43,11 @@ def reconcile_accounts_register(
     )
     features_sql = f"read_parquet({duckdb_path_sql(features_path)})"
 
+    selected_backend = select_duckdb_backend(duckdb_backend, (features_path, register_paths))
     connection = _connect(
         memory_limit_gb,
         spill_dir,
-        duckdb_backend=duckdb_backend,
+        duckdb_backend=selected_backend,
         input_paths=(features_path, register_paths),
         fsspec_options=fsspec_options,
     )
@@ -132,7 +134,7 @@ def reconcile_accounts_register(
         "register_snapshot_date": register_snapshot_date,
         "features_path": str(features_path),
         "register_glob": str(register_glob),
-        "duckdb_backend": duckdb_backend,
+        "duckdb_backend": selected_backend,
         "register_rows": register_rows,
         "feature_rows": feature_rows,
         "feature_companies_outside_register": outside_register,
