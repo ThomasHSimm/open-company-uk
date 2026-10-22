@@ -214,7 +214,7 @@ def build_snapshot_features(
               AND trim({col('CompanyNumber')}) <> ''
             """
         )
-        n_companies = con.sql("SELECT COUNT(*) FROM base").fetchone()[0]
+        n_companies = con.execute("SELECT COUNT(*) FROM base").fetchone()[0]
 
         # No silent drops, with blanks separated from malformed rows:
         #  * MALFORMED (wrong column count) rows are captured per line by store_rejects in the
@@ -223,7 +223,7 @@ def build_snapshot_features(
         #  * BLANK lines are skipped by DuckDB and are NOT rejects; they are counted (via the
         #    Polars full-record count) and ALLOWED in any number.
         try:
-            malformed = con.sql(
+            malformed = con.execute(
                 "SELECT COUNT(DISTINCT line) FROM reject_errors"
             ).fetchone()[0]
         except Exception:
@@ -313,7 +313,7 @@ def build_snapshot_features(
         )
         # Sensitivity of the address count to the normalisation: distinct addresses under the
         # standard (stricter) vs loose (maximal-merge) rules.
-        distinct_std, distinct_loose = con.sql(
+        distinct_std, distinct_loose = con.execute(
             "SELECT (SELECT COUNT(*) FROM address_counts), "
             "(SELECT COUNT(DISTINCT addr_loose) FROM base WHERE addr_loose IS NOT NULL)"
         ).fetchone()

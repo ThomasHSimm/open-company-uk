@@ -219,7 +219,7 @@ def _prepare_cohort(con, spec: dict[str, Any]) -> dict[str, Any]:
                ) AS blank_keys
         FROM read_parquet({_sql_literal(path)})
     """
-    rows, distinct_keys, blank_keys = con.sql(duplicate_query).fetchone()
+    rows, distinct_keys, blank_keys = con.execute(duplicate_query).fetchone()
     if rows != spec["input"]["rows"] or distinct_keys != rows or blank_keys:
         raise ValueError(
             "joined input key/row assertion failed: "
@@ -360,7 +360,7 @@ def _sample_population(
             FROM ({sample_sql})
             """
         )
-        sampled_cases, sampled_comparisons, weighted_cases, weighted_comparisons = con.sql(
+        sampled_cases, sampled_comparisons, weighted_cases, weighted_comparisons = con.execute(
             f"""
             SELECT count(*) FILTER (WHERE outcome = 1),
                    count(*) FILTER (WHERE outcome = 0),

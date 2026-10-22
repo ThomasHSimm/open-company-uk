@@ -435,7 +435,7 @@ def build_psc_features(
                     f"governed feature table retains person-linkage columns: {leaked}"
                 )
 
-        n_rows = con.sql(
+        n_rows = con.execute(
             f"SELECT COUNT(*) FROM read_parquet({_sql_literal(str(features_path))})"
         ).fetchone()[0]
         fill = dict(con.sql(

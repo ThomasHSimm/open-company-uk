@@ -256,11 +256,11 @@ def build_accounts_features(
             if leaked:
                 raise RuntimeError(f"governed accounts features retain dropped columns: {leaked}")
 
-        n_companies = con.sql(
+        n_companies = con.execute(
             f"SELECT COUNT(*) FROM read_parquet({_sql_literal(str(features_path))})"
         ).fetchone()[0]
         fill = {
-            c: con.sql(f"SELECT COUNT({c}) FROM features").fetchone()[0]
+            c: con.execute(f"SELECT COUNT({c}) FROM features").fetchone()[0]
             for c in ("equity", "current_ratio", "cash", "employee_band",
                       "d_equity", "accounts_category")
         }
