@@ -588,7 +588,13 @@ def creditors_maturity_reconciliation_duckdb(
         examples = connection.sql(
             f"""
             SELECT * FROM (
-                SELECT *, ROW_NUMBER() OVER (PARTITION BY bucket ORDER BY random()) AS rn
+                SELECT *, ROW_NUMBER() OVER (
+                    PARTITION BY bucket
+                    ORDER BY hash(
+                        company, period_end, source_year, source_month,
+                        source_archive, source_member
+                    )
+                ) AS rn
                 FROM ({query})
             ) WHERE rn <= {int(examples_per_bucket)}
             ORDER BY bucket, rn
@@ -655,12 +661,12 @@ def employee_unit_distribution_duckdb(
             GROUP BY unit
             """
         ).pl()
-        cutoff_row = connection.sql(
+        cutoff_row = connection.execute(
             f"SELECT QUANTILE_CONT(value, {cutoff_percentile}) AS cutoff "
             f"FROM ({query}) WHERE unit = 'pure'"
         ).fetchone()
         cutoff = float(cutoff_row[0])
-        kept, nulled = connection.sql(
+        kept, nulled = connection.execute(
             f"""
             SELECT
                 SUM(CASE WHEN value <= {cutoff} THEN 1 ELSE 0 END) AS kept,

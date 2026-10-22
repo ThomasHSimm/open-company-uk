@@ -51,6 +51,10 @@ native default and can use `--duckdb-backend fsspec`. The snapshot loader can st
 inputs into local scratch space. See [the remote-access guide](docs/remote-duckdb-access.md) for
 SageMaker, S3/HTTP configuration, output handling and format limitations.
 
+For modelling tables with a different company and reference date on every row,
+`assign_accounts_features(...)` and `assign_psc_features(...)` perform point-in-time joins while
+preserving the input rows. See the [row-level feature assignment guide](docs/row-level-feature-assignment.md).
+
 Outputs in `data/processed/`:
 
 | file | content |

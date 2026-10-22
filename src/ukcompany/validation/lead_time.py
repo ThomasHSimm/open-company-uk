@@ -239,7 +239,7 @@ def _create_candidate_inputs(con, wide_path: str, provenance_path: str) -> None:
         WHERE p.wide_column IN ({planned})
         """
     )
-    duplicate_cells = con.sql(
+    duplicate_cells = con.execute(
         """
         SELECT count(*) - count(DISTINCT (company, period_end, wide_column))
         FROM candidate_provenance
@@ -256,7 +256,7 @@ def _create_candidate_inputs(con, wide_path: str, provenance_path: str) -> None:
           ON w.company = c.company_number
         """
     )
-    duplicate_periods = con.sql(
+    duplicate_periods = con.execute(
         "SELECT count(*) - count(DISTINCT (company, period_end)) FROM candidate_wide"
     ).fetchone()[0]
     if duplicate_periods:

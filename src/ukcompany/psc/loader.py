@@ -473,14 +473,14 @@ def load_psc(
             f"COPY ({noc_sql}) TO {_sql_literal(str(noc_path))} "
             f"(FORMAT PARQUET, COMPRESSION ZSTD)"
         )
-        n_noc = connection.sql(
+        n_noc = connection.execute(
             f"SELECT COUNT(*) FROM read_parquet({_sql_literal(str(noc_path))})"
         ).fetchone()[0]
         # Nature-of-control restatement, read from the WRITTEN psc_noc.parquet using the
         # shared psc_natures definitions (core = recognised core right; base_right =
         # code with the longest entity-suffix stripped, band kept). Any code the shared
         # mapping does not recognise (core IS NULL) is surfaced with its count, never dropped.
-        noc_distinct_codes, noc_distinct_cores, noc_distinct_bases = connection.sql(
+        noc_distinct_codes, noc_distinct_cores, noc_distinct_bases = connection.execute(
             f"SELECT COUNT(DISTINCT right_raw), COUNT(DISTINCT core), COUNT(DISTINCT base_right) "
             f"FROM read_parquet({_sql_literal(str(noc_path))})"
         ).fetchone()
@@ -497,8 +497,8 @@ def load_psc(
         # from the persisted output. load_report.json is aggregates-only either way, exactly
         # like docs/recon-psc-results.json, so re-parsing for it is not a governance leak.
         stats = _parsed_sql(parts_glob, snapshot_date)
-        n_lines = connection.sql(f"SELECT COUNT(*) FROM ({stats})").fetchone()[0]
-        n_bad_lines = connection.sql(
+        n_lines = connection.execute(f"SELECT COUNT(*) FROM ({stats})").fetchone()[0]
+        n_bad_lines = connection.execute(
             f"SELECT COUNT(*) FROM ({stats}) WHERE kind IS NULL"
         ).fetchone()[0]
         # Split by cause: `invalid_json` never parsed as JSON at all (read_ndjson_objects's
@@ -507,13 +507,13 @@ def load_psc(
         # `kind`). These are mutually exclusive and sum to n_bad_lines by construction: a
         # line with line_is_valid_json=false necessarily has kind IS NULL too, since `kind`
         # is derived from the same failed parse.
-        n_bad_invalid_json, n_bad_missing_kind = connection.sql(
+        n_bad_invalid_json, n_bad_missing_kind = connection.execute(
             f"SELECT "
             f"  COUNT(*) FILTER (WHERE NOT line_is_valid_json), "
             f"  COUNT(*) FILTER (WHERE line_is_valid_json AND kind IS NULL) "
             f"FROM ({stats})"
         ).fetchone()
-        postcode_present, postcode_valid, postcode_invalid = connection.sql(
+        postcode_present, postcode_valid, postcode_invalid = connection.execute(
             f"SELECT "
             f"  COUNT(*) FILTER (WHERE postcode_norm IS NOT NULL), "
             f"  COUNT(*) FILTER (WHERE postcode_norm IS NOT NULL "
@@ -522,7 +522,7 @@ def load_psc(
             f"      AND NOT regexp_matches(postcode_norm, {_sql_literal(UK_POSTCODE_NORM_RE)})) "
             f"FROM ({stats})"
         ).fetchone()
-        person_key_present, person_key_strict_present, individual_total = connection.sql(
+        person_key_present, person_key_strict_present, individual_total = connection.execute(
             f"SELECT "
             f"  COUNT(*) FILTER (WHERE forename IS NOT NULL AND surname IS NOT NULL "
             f"      AND dob_year IS NOT NULL AND dob_month IS NOT NULL), "
@@ -542,27 +542,27 @@ def load_psc(
                 f"WHERE category = 'unknown' AND kind IS NOT NULL GROUP BY kind"
             ).fetchall()
         )
-        company_number_mismatches = connection.sql(
+        company_number_mismatches = connection.execute(
             f"SELECT COUNT(*) FROM ({stats}) WHERE company_number_mismatch"
         ).fetchone()[0]
-        record_id_dupes = connection.sql(
+        record_id_dupes = connection.execute(
             f"SELECT COUNT(*) FROM ("
             f"  SELECT record_id, COUNT(*) AS n FROM ({stats}) "
             f"  WHERE record_id IS NOT NULL GROUP BY record_id HAVING COUNT(*) > 1"
             f")"
         ).fetchone()[0]
-        psc_id_shared_across_companies = connection.sql(
+        psc_id_shared_across_companies = connection.execute(
             f"SELECT COUNT(*) FROM ("
             f"  SELECT psc_id, COUNT(DISTINCT company_number) AS n_companies FROM ({stats}) "
             f"  WHERE psc_id IS NOT NULL AND category NOT IN ('exemption', 'totals') "
             f"  GROUP BY psc_id HAVING COUNT(DISTINCT company_number) > 1"
             f")"
         ).fetchone()[0]
-        middle_name_present, middle_name_total = connection.sql(
+        middle_name_present, middle_name_total = connection.execute(
             f"SELECT COUNT(*) FILTER (WHERE middle_name IS NOT NULL), COUNT(*) "
             f"FROM ({stats}) WHERE category = 'individual'"
         ).fetchone()
-        date_flags = connection.sql(
+        date_flags = connection.execute(
             f"SELECT "
             f"  COUNT(*) FILTER (WHERE f_ceased_before_notified), "
             f"  COUNT(*) FILTER (WHERE f_pre_regime), "
@@ -573,7 +573,7 @@ def load_psc(
         # Diagnostic for the feature path's active/ceased rule: records whose `ceased`
         # boolean is true but which carry no `ceased_on` date. These are exactly the rows
         # where the boolean-first derive_psc rule and a `ceased_on IS NULL` rule disagree.
-        ceased_bool_true, ceased_bool_true_no_date = connection.sql(
+        ceased_bool_true, ceased_bool_true_no_date = connection.execute(
             f"SELECT COUNT(*) FILTER (WHERE ceased), "
             f"       COUNT(*) FILTER (WHERE ceased AND ceased_on IS NULL) "
             f"FROM ({stats})"
@@ -581,7 +581,7 @@ def load_psc(
         # LIMIT 1 here is order-independent in practice: the snapshot carries exactly one
         # totals line (asserted by category_counts['totals'] == 1 in the report), so there
         # is only one matching row regardless of preserve_insertion_order.
-        psc_totals = connection.sql(
+        psc_totals = connection.execute(
             f"WITH lines AS ("
             f"    SELECT json->'data' AS d FROM read_ndjson_objects({duckdb_path_sql(parts_glob)}, "
             f"        ignore_errors=true)"
@@ -605,7 +605,7 @@ def load_psc(
         # Independently derived from `stats` via array length rather than by unnesting
         # (`_noc_select_sql`'s own method), so this doesn't just recompute the same query
         # that produced psc_noc.parquet — it cross-checks by a different mechanism.
-        expected_noc_rows = connection.sql(
+        expected_noc_rows = connection.execute(
             f"SELECT COALESCE(SUM(len(CAST(natures_of_control_json AS VARCHAR[]))), 0) "
             f"FROM ({stats})"
         ).fetchone()[0]

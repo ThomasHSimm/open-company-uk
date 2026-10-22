@@ -191,7 +191,7 @@ def _assert_unique_keys(con, path: Path, label: str) -> dict[str, int]:
     columns = _columns(con, path)
     if "company_number" not in columns:
         raise ValueError(f"{label} input has no company_number column: {path}")
-    row = con.sql(
+    row = con.execute(
         f"""
         SELECT COUNT(*) AS rows,
                COUNT(*) FILTER (
@@ -219,7 +219,7 @@ def _dict_rows(cursor) -> list[dict]:
 
 
 def _coverage(con, joined: str) -> dict:
-    totals = con.sql(
+    totals = con.execute(
         f"""
         SELECT COUNT(*) AS register,
                COUNT(*) FILTER (WHERE has_psc) AS psc,
@@ -369,9 +369,9 @@ def build_join(
             "(FORMAT PARQUET, COMPRESSION ZSTD)"
         )
         joined = f"read_parquet({_sql_literal(str(output_path))})"
-        output_rows = int(con.sql(f"SELECT COUNT(*) FROM {joined}").fetchone()[0])
+        output_rows = int(con.execute(f"SELECT COUNT(*) FROM {joined}").fetchone()[0])
         output_distinct = int(
-            con.sql(f"SELECT COUNT(DISTINCT company_number) FROM {joined}").fetchone()[0]
+            con.execute(f"SELECT COUNT(DISTINCT company_number) FROM {joined}").fetchone()[0]
         )
         if output_rows != key_counts["register"]["rows"]:
             raise RuntimeError(

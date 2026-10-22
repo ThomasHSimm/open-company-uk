@@ -77,6 +77,72 @@ def _register_company_number_col(con, register_sql: str) -> str:
     return '"' + actual.replace('"', '""') + '"'
 
 
+def _month_difference_sql(
+    later_year: str,
+    later_month: str,
+    earlier_date: str,
+) -> str:
+    return (
+        f"(({later_year}) - year({earlier_date})) * 12 + "
+        f"(({later_month}) - month({earlier_date}))"
+    )
+
+
+def _account_feature_select_sql(
+    *,
+    latest_alias: str,
+    prior_alias: str,
+    reference_yyyymm: str,
+    accounts_category: str,
+) -> str:
+    """Return the shared accounts feature projection for population and row assignment."""
+    latest = latest_alias
+    prior = prior_alias
+    reference_year = f"CAST(floor(({reference_yyyymm}) / 100) AS INTEGER)"
+    reference_month = f"CAST(({reference_yyyymm}) % 100 AS INTEGER)"
+    months_since = _month_difference_sql(reference_year, reference_month, f"{latest}.pe")
+    prior_gap = _month_difference_sql(
+        f"year({latest}.pe)", f"month({latest}.pe)", f"{prior}.prior_pe"
+    )
+    employee_band = (
+        f"CASE WHEN {latest}.employees IS NULL THEN NULL "
+        f"WHEN {latest}.employees <= 0 THEN '0' "
+        f"WHEN {latest}.employees <= 10 THEN '1-10' "
+        f"WHEN {latest}.employees <= 50 THEN '11-50' "
+        f"WHEN {latest}.employees <= 250 THEN '51-250' ELSE '251+' END"
+    )
+    return f"""
+        {latest}.pe AS latest_period_end,
+        {prior}.prior_pe AS prior_period_end,
+        {latest}.n_periods AS n_periods_available,
+        CASE WHEN {latest}.pe IS NULL THEN NULL ELSE {months_since} END
+            AS months_since_latest_period_end,
+        CASE WHEN {prior}.prior_pe IS NULL THEN NULL ELSE {prior_gap} END AS prior_gap_months,
+        {latest}.equity,
+        {latest}.current_assets,
+        {latest}.creditors_within_one_year,
+        {latest}.net_current_assets,
+        {latest}.cash,
+        CASE WHEN {latest}.equity IS NULL THEN NULL ELSE {latest}.equity < 0 END
+            AS negative_equity,
+        CASE WHEN {latest}.net_current_assets IS NULL THEN NULL
+             ELSE {latest}.net_current_assets < 0 END AS net_current_liabilities,
+        CASE WHEN {latest}.creditors_within_one_year IS NULL
+                  OR {latest}.creditors_within_one_year = 0
+             THEN NULL ELSE {latest}.current_assets / {latest}.creditors_within_one_year
+             END AS current_ratio,
+        {employee_band} AS employee_band,
+        {latest}.employees_unit_anomaly,
+        CASE WHEN {prior}.prior_pe IS NULL OR {prior_gap} > {MAX_PRIOR_GAP_MONTHS} THEN NULL
+             ELSE {latest}.equity - {prior}.p_equity END AS d_equity,
+        CASE WHEN {prior}.prior_pe IS NULL OR {prior_gap} > {MAX_PRIOR_GAP_MONTHS} THEN NULL
+             ELSE {latest}.net_current_assets - {prior}.p_nca END AS d_net_current_assets,
+        CASE WHEN {prior}.prior_pe IS NULL OR {prior_gap} > {MAX_PRIOR_GAP_MONTHS} THEN NULL
+             ELSE {latest}.cash - {prior}.p_cash END AS d_cash,
+        {accounts_category} AS accounts_category
+    """.strip()
+
+
 def build_accounts_features(
     wide_path: PathInput,
     register_glob: PathInput,
@@ -95,7 +161,7 @@ def build_accounts_features(
     mode = "governed" if data_governance else "ungoverned"
     features_path = output_dir / "accounts_company_features.parquet"
     report_path = output_dir / "features_report.json"
-    ty, tm = t_yyyymm // 100, t_yyyymm % 100
+    ty = t_yyyymm // 100
     upper_period = f"{ty + 1}-12-31"
 
     if isinstance(register_glob, (str, Path)) and not uri_scheme(register_glob):
@@ -159,49 +225,18 @@ def build_accounts_features(
             """
         )
 
-        # Shared month formula, identical to derive._months_between: (y2-y1)*12 + (m2-m1).
-        months_since = (
-            f"({ty} - year(l.pe)) * 12 + ({tm} - month(l.pe))"
-        )
-        prior_gap = (
-            "(year(l.pe) - year(p.prior_pe)) * 12 + (month(l.pe) - month(p.prior_pe))"
-        )
-        emp_band = (
-            "CASE WHEN l.employees IS NULL THEN NULL "
-            "WHEN l.employees <= 0 THEN '0' "
-            "WHEN l.employees <= 10 THEN '1-10' "
-            "WHEN l.employees <= 50 THEN '11-50' "
-            "WHEN l.employees <= 250 THEN '51-250' ELSE '251+' END"
+        feature_projection = _account_feature_select_sql(
+            latest_alias="l",
+            prior_alias="p",
+            reference_yyyymm=str(t_yyyymm),
+            accounts_category="reg.accounts_category",
         )
         con.execute(
             f"""
             CREATE TEMP TABLE features AS
             SELECT
                 l.company AS company_number,
-                l.pe AS latest_period_end,
-                p.prior_pe AS prior_period_end,
-                l.n_periods AS n_periods_available,
-                {months_since} AS months_since_latest_period_end,
-                CASE WHEN p.prior_pe IS NULL THEN NULL ELSE {prior_gap} END AS prior_gap_months,
-                l.equity, l.current_assets, l.creditors_within_one_year,
-                l.net_current_assets, l.cash,
-                CASE WHEN l.equity IS NULL THEN NULL ELSE l.equity < 0 END AS negative_equity,
-                CASE WHEN l.net_current_assets IS NULL THEN NULL
-                     ELSE l.net_current_assets < 0 END AS net_current_liabilities,
-                -- null (never +/-inf) when the denominator is missing or zero
-                CASE WHEN l.creditors_within_one_year IS NULL OR l.creditors_within_one_year = 0
-                     THEN NULL ELSE l.current_assets / l.creditors_within_one_year
-                     END AS current_ratio,
-                {emp_band} AS employee_band,
-                l.employees_unit_anomaly,
-                -- period-over-period change; null with no prior or a gap > {MAX_PRIOR_GAP_MONTHS} months
-                CASE WHEN p.prior_pe IS NULL OR {prior_gap} > {MAX_PRIOR_GAP_MONTHS} THEN NULL
-                     ELSE l.equity - p.p_equity END AS d_equity,
-                CASE WHEN p.prior_pe IS NULL OR {prior_gap} > {MAX_PRIOR_GAP_MONTHS} THEN NULL
-                     ELSE l.net_current_assets - p.p_nca END AS d_net_current_assets,
-                CASE WHEN p.prior_pe IS NULL OR {prior_gap} > {MAX_PRIOR_GAP_MONTHS} THEN NULL
-                     ELSE l.cash - p.p_cash END AS d_cash,
-                reg.accounts_category
+                {feature_projection}
             FROM latest l
             LEFT JOIN prior p USING (company)
             LEFT JOIN reg USING (company)
@@ -221,11 +256,11 @@ def build_accounts_features(
             if leaked:
                 raise RuntimeError(f"governed accounts features retain dropped columns: {leaked}")
 
-        n_companies = con.sql(
+        n_companies = con.execute(
             f"SELECT COUNT(*) FROM read_parquet({_sql_literal(str(features_path))})"
         ).fetchone()[0]
         fill = {
-            c: con.sql(f"SELECT COUNT({c}) FROM features").fetchone()[0]
+            c: con.execute(f"SELECT COUNT({c}) FROM features").fetchone()[0]
             for c in ("equity", "current_ratio", "cash", "employee_band",
                       "d_equity", "accounts_category")
         }

@@ -190,7 +190,7 @@ def build_public_long_duckdb(
             fsspec_options=fsspec_options,
         )
         try:
-            count = connection.sql(f"SELECT COUNT(*) FROM ({query})").fetchone()[0]
+            count = connection.execute(f"SELECT COUNT(*) FROM ({query})").fetchone()[0]
             if count:
                 connection.execute(
                     f"COPY ({query}) TO {_sql_literal(str(output_path))} "
