@@ -424,18 +424,18 @@ def test_data_governance_true_drops_every_listed_field_everywhere(tmp_path):
     # smuggled through as a string value in some other column (e.g. a mis-scoped `raw`).
     # to_json(t) on the table alias serialises the whole row (every column) to one JSON
     # string per row; string_agg then lets a single substring search cover the entire table.
-    all_text = con.execute(
+    all_text = con.sql(
         f"SELECT string_agg(to_json(t), '|') FROM read_parquet('{records_path}') AS t"
-    ).fetchone()[0]
+    ).limit(1).fetchall()[0][0]
     assert "Alex" not in (all_text or "")
     assert "Example" not in (all_text or "")
     assert "1988" not in (all_text or "")
 
     # birth_band_5y and postcode_district replace the dropped fields with safe derivatives.
-    row = con.execute(
+    row = con.sql(
         f"SELECT birth_band_5y, postcode_district, person_key FROM read_parquet('{records_path}') "
         f"WHERE company_number = '00000001'"
-    ).fetchone()
+    ).limit(1).fetchall()[0]
     assert row[0] == 1985
     assert row[1] == "SA1"
     assert row[2] is not None and len(row[2]) == 64  # sha256 hex digest length
@@ -556,10 +556,10 @@ def test_person_key_is_deterministic_and_secret_dependent(tmp_path):
     import duckdb
 
     con = duckdb.connect(":memory:")
-    key1 = con.execute(
+    key1 = con.sql(
         f"SELECT person_key FROM read_parquet('{output_dir_1 / 'psc_records.parquet'}')"
-    ).fetchone()[0]
-    key2 = con.execute(
+    ).limit(1).fetchall()[0][0]
+    key2 = con.sql(
         f"SELECT person_key FROM read_parquet('{output_dir_2 / 'psc_records.parquet'}')"
-    ).fetchone()[0]
+    ).limit(1).fetchall()[0][0]
     assert key1 != key2

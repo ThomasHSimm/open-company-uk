@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+from ukcompany.duckdb_backend import query_one
 from ukcompany.psc.loader import DEFAULT_MEMORY_LIMIT_GB, DEFAULT_SPILL_DIR, _connect, _sql_literal
 
 JOIN_VERSION = "v1-internal"
@@ -191,7 +192,8 @@ def _assert_unique_keys(con, path: Path, label: str) -> dict[str, int]:
     columns = _columns(con, path)
     if "company_number" not in columns:
         raise ValueError(f"{label} input has no company_number column: {path}")
-    row = con.execute(
+    row = query_one(
+        con,
         f"""
         SELECT COUNT(*) AS rows,
                COUNT(*) FILTER (
@@ -200,7 +202,7 @@ def _assert_unique_keys(con, path: Path, label: str) -> dict[str, int]:
                COUNT(DISTINCT upper(trim(CAST(company_number AS VARCHAR)))) AS distinct_keys
         FROM {source}
         """
-    ).fetchone()
+    )
     counts = {"rows": int(row[0]), "invalid_keys": int(row[1]), "distinct_keys": int(row[2])}
     if counts["invalid_keys"]:
         raise ValueError(f"{label} input contains {counts['invalid_keys']} null/blank company keys")
@@ -219,7 +221,8 @@ def _dict_rows(cursor) -> list[dict]:
 
 
 def _coverage(con, joined: str) -> dict:
-    totals = con.execute(
+    totals = query_one(
+        con,
         f"""
         SELECT COUNT(*) AS register,
                COUNT(*) FILTER (WHERE has_psc) AS psc,
@@ -230,7 +233,7 @@ def _coverage(con, joined: str) -> dict:
                COUNT(*) FILTER (WHERE NOT has_psc AND NOT has_accounts) AS register_only
         FROM {joined}
         """
-    ).fetchone()
+    )
     source_totals = {
         "register": int(totals[0]),
         "psc": int(totals[1]),
@@ -369,9 +372,9 @@ def build_join(
             "(FORMAT PARQUET, COMPRESSION ZSTD)"
         )
         joined = f"read_parquet({_sql_literal(str(output_path))})"
-        output_rows = int(con.execute(f"SELECT COUNT(*) FROM {joined}").fetchone()[0])
+        output_rows = int(query_one(con, f"SELECT COUNT(*) FROM {joined}")[0])
         output_distinct = int(
-            con.execute(f"SELECT COUNT(DISTINCT company_number) FROM {joined}").fetchone()[0]
+            query_one(con, f"SELECT COUNT(DISTINCT company_number) FROM {joined}")[0]
         )
         if output_rows != key_counts["register"]["rows"]:
             raise RuntimeError(

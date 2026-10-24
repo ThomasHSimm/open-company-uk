@@ -19,6 +19,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from ukcompany.duckdb_backend import query_one
 from ukcompany.psc.loader import _connect, _sql_literal
 
 MODEL_NAMES = (
@@ -219,7 +220,7 @@ def _prepare_cohort(con, spec: dict[str, Any]) -> dict[str, Any]:
                ) AS blank_keys
         FROM read_parquet({_sql_literal(path)})
     """
-    rows, distinct_keys, blank_keys = con.execute(duplicate_query).fetchone()
+    rows, distinct_keys, blank_keys = query_one(con, duplicate_query)
     if rows != spec["input"]["rows"] or distinct_keys != rows or blank_keys:
         raise ValueError(
             "joined input key/row assertion failed: "
@@ -360,7 +361,8 @@ def _sample_population(
             FROM ({sample_sql})
             """
         )
-        sampled_cases, sampled_comparisons, weighted_cases, weighted_comparisons = con.execute(
+        sampled_cases, sampled_comparisons, weighted_cases, weighted_comparisons = query_one(
+            con,
             f"""
             SELECT count(*) FILTER (WHERE outcome = 1),
                    count(*) FILTER (WHERE outcome = 0),
@@ -368,7 +370,7 @@ def _sample_population(
                    sum(sample_weight) FILTER (WHERE outcome = 0)
             FROM {table} WHERE split = {_sql_literal(split)}
             """
-        ).fetchone()
+        )
         if sampled_cases != plan["eligible_cases"] or sampled_comparisons != target:
             raise RuntimeError(f"{population}/{split} fixed-size sample count mismatch")
         if not math.isclose(weighted_cases, plan["eligible_cases"], abs_tol=1e-7):

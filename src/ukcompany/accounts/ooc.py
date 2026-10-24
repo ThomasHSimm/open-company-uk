@@ -20,6 +20,7 @@ from ukcompany.duckdb_backend import (
     PathInput,
     connect_duckdb,
     duckdb_path_sql,
+    query_one,
     require_local_path,
     sql_literal,
 )
@@ -661,19 +662,21 @@ def employee_unit_distribution_duckdb(
             GROUP BY unit
             """
         ).pl()
-        cutoff_row = connection.execute(
+        cutoff_row = query_one(
+            connection,
             f"SELECT QUANTILE_CONT(value, {cutoff_percentile}) AS cutoff "
             f"FROM ({query}) WHERE unit = 'pure'"
-        ).fetchone()
+        )
         cutoff = float(cutoff_row[0])
-        kept, nulled = connection.execute(
+        kept, nulled = query_one(
+            connection,
             f"""
             SELECT
                 SUM(CASE WHEN value <= {cutoff} THEN 1 ELSE 0 END) AS kept,
                 SUM(CASE WHEN value > {cutoff} THEN 1 ELSE 0 END) AS nulled
             FROM ({query}) WHERE unit = 'GBP'
             """
-        ).fetchone()
+        )
     finally:
         connection.close()
     return distribution, {"cutoff": cutoff, "gbp_kept": int(kept), "gbp_nulled": int(nulled)}

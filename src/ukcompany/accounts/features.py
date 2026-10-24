@@ -30,6 +30,7 @@ from typing import Any
 from ukcompany.duckdb_backend import (
     PathInput,
     duckdb_path_sql,
+    query_one,
     require_local_path,
     select_duckdb_backend,
     uri_scheme,
@@ -256,11 +257,12 @@ def build_accounts_features(
             if leaked:
                 raise RuntimeError(f"governed accounts features retain dropped columns: {leaked}")
 
-        n_companies = con.execute(
+        n_companies = query_one(
+            con,
             f"SELECT COUNT(*) FROM read_parquet({_sql_literal(str(features_path))})"
-        ).fetchone()[0]
+        )[0]
         fill = {
-            c: con.execute(f"SELECT COUNT({c}) FROM features").fetchone()[0]
+            c: query_one(con, f"SELECT COUNT({c}) FROM features")[0]
             for c in ("equity", "current_ratio", "cash", "employee_band",
                       "d_equity", "accounts_category")
         }

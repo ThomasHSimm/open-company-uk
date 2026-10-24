@@ -39,6 +39,18 @@ def require_duckdb():
     return duckdb
 
 
+def query_one(connection: Any, query: str):
+    """Run a relation query and return at most one fully-consumed row.
+
+    Newer DuckDB releases removed ``DuckDBPyRelation.fetchone()``. Using
+    ``connection.execute(...).fetchone()`` is not equivalent there because it can leave an
+    unfinished result attached to the connection. Limiting and fully consuming the relation
+    works across both APIs.
+    """
+    rows = connection.sql(query).limit(1).fetchall()
+    return rows[0] if rows else None
+
+
 def validate_duckdb_backend(backend: str) -> str:
     """Return a normalized backend name or raise an actionable error."""
     normalized = str(backend).strip().lower()
@@ -337,9 +349,10 @@ def connect_duckdb(
                     _make_filesystem(protocol, filesystem_options)
                 )
 
-            httpfs = connection.execute(
-                "SELECT loaded FROM duckdb_extensions() WHERE extension_name = 'httpfs'"
-            ).fetchone()
+            httpfs = query_one(
+                connection,
+                "SELECT loaded FROM duckdb_extensions() WHERE extension_name = 'httpfs'",
+            )
             if httpfs and httpfs[0]:
                 raise RuntimeError(
                     "DuckDB httpfs is loaded on an fsspec connection; refusing to continue"

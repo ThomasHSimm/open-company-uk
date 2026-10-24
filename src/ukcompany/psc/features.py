@@ -31,6 +31,7 @@ import pandas as pd
 from ukcompany.duckdb_backend import (
     PathInput,
     duckdb_path_sql,
+    query_one,
     require_local_path,
     select_duckdb_backend,
 )
@@ -435,9 +436,10 @@ def build_psc_features(
                     f"governed feature table retains person-linkage columns: {leaked}"
                 )
 
-        n_rows = con.execute(
+        n_rows = query_one(
+            con,
             f"SELECT COUNT(*) FROM read_parquet({_sql_literal(str(features_path))})"
-        ).fetchone()[0]
+        )[0]
         fill = dict(con.sql(
             """SELECT 'identified', COUNT(*) FROM features
                 WHERE psc_information_state = 'identified'
