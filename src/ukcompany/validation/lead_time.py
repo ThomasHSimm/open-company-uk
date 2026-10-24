@@ -18,6 +18,7 @@ from typing import Any
 
 from ukcompany.accounts.features import MAX_PRIOR_GAP_MONTHS, PLAUSIBLE_PERIOD_START
 from ukcompany.accounts.pivot import require_polars
+from ukcompany.duckdb_backend import query_one
 from ukcompany.psc.loader import _connect, _sql_literal
 
 from .labels import LabelSet, load_labels
@@ -239,12 +240,13 @@ def _create_candidate_inputs(con, wide_path: str, provenance_path: str) -> None:
         WHERE p.wide_column IN ({planned})
         """
     )
-    duplicate_cells = con.execute(
+    duplicate_cells = query_one(
+        con,
         """
         SELECT count(*) - count(DISTINCT (company, period_end, wide_column))
         FROM candidate_provenance
         """
-    ).fetchone()[0]
+    )[0]
     if duplicate_cells:
         raise RuntimeError(f"candidate provenance has {duplicate_cells} duplicate cell keys")
     con.execute(
@@ -256,9 +258,10 @@ def _create_candidate_inputs(con, wide_path: str, provenance_path: str) -> None:
           ON w.company = c.company_number
         """
     )
-    duplicate_periods = con.execute(
+    duplicate_periods = query_one(
+        con,
         "SELECT count(*) - count(DISTINCT (company, period_end)) FROM candidate_wide"
-    ).fetchone()[0]
+    )[0]
     if duplicate_periods:
         raise RuntimeError(f"candidate WIDE has {duplicate_periods} duplicate period keys")
 

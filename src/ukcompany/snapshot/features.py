@@ -30,6 +30,7 @@ from typing import Any
 import pandas as pd
 
 from ukcompany.derive import _months_between
+from ukcompany.duckdb_backend import query_one
 from ukcompany.psc.loader import DEFAULT_MEMORY_LIMIT_GB, DEFAULT_SPILL_DIR, _connect, _sql_literal
 from ukcompany.validation.labels import sic_section_from_code
 
@@ -214,7 +215,7 @@ def build_snapshot_features(
               AND trim({col('CompanyNumber')}) <> ''
             """
         )
-        n_companies = con.execute("SELECT COUNT(*) FROM base").fetchone()[0]
+        n_companies = query_one(con, "SELECT COUNT(*) FROM base")[0]
 
         # No silent drops, with blanks separated from malformed rows:
         #  * MALFORMED (wrong column count) rows are captured per line by store_rejects in the
@@ -223,9 +224,7 @@ def build_snapshot_features(
         #  * BLANK lines are skipped by DuckDB and are NOT rejects; they are counted (via the
         #    Polars full-record count) and ALLOWED in any number.
         try:
-            malformed = con.execute(
-                "SELECT COUNT(DISTINCT line) FROM reject_errors"
-            ).fetchone()[0]
+            malformed = query_one(con, "SELECT COUNT(DISTINCT line) FROM reject_errors")[0]
         except Exception:
             malformed = 0  # store_rejects creates reject_errors only once a reject is seen
         quarantine_path = None
@@ -313,10 +312,11 @@ def build_snapshot_features(
         )
         # Sensitivity of the address count to the normalisation: distinct addresses under the
         # standard (stricter) vs loose (maximal-merge) rules.
-        distinct_std, distinct_loose = con.execute(
+        distinct_std, distinct_loose = query_one(
+            con,
             "SELECT (SELECT COUNT(*) FROM address_counts), "
             "(SELECT COUNT(DISTINCT addr_loose) FROM base WHERE addr_loose IS NOT NULL)"
-        ).fetchone()
+        )
 
         # --- assemble ---
         con.execute(

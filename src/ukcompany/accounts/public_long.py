@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from ukcompany.duckdb_backend import PathInput, duckdb_path_sql, require_local_path
+from ukcompany.duckdb_backend import PathInput, duckdb_path_sql, query_one, require_local_path
 
 from .ooc import DEFAULT_MEMORY_LIMIT_GB, DEFAULT_SPILL_DIR, _connect, _sql_literal
 
@@ -190,7 +190,7 @@ def build_public_long_duckdb(
             fsspec_options=fsspec_options,
         )
         try:
-            count = connection.execute(f"SELECT COUNT(*) FROM ({query})").fetchone()[0]
+            count = query_one(connection, f"SELECT COUNT(*) FROM ({query})")[0]
             if count:
                 connection.execute(
                     f"COPY ({query}) TO {_sql_literal(str(output_path))} "

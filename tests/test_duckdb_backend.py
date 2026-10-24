@@ -12,6 +12,7 @@ import pytest
 from ukcompany.accounts import cli as accounts_cli
 from ukcompany.duckdb_backend import (
     connect_duckdb,
+    query_one,
     select_duckdb_backend,
     validate_duckdb_backend,
 )
@@ -97,6 +98,17 @@ def test_omitted_backend_is_path_driven_but_explicit_backend_wins() -> None:
     assert select_duckdb_backend(None, ("data/accounts/*.parquet",)) == "native"
     assert select_duckdb_backend(None, remote) == "fsspec"
     assert select_duckdb_backend("native", remote) == "native"
+
+
+def test_query_one_consumes_relation_and_handles_an_empty_result() -> None:
+    connection = duckdb.connect(":memory:")
+    try:
+        assert query_one(connection, "SELECT 42") == (42,)
+        assert query_one(connection, "SELECT 42 WHERE false") is None
+        # A later relation query must not see an unfinished result on the connection.
+        assert connection.sql("SELECT 7").fetchall() == [(7,)]
+    finally:
+        connection.close()
 
 
 def test_missing_fsspec_has_actionable_error(tmp_path: Path, monkeypatch) -> None:
